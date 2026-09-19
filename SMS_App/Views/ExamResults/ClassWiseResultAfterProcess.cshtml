@@ -189,39 +189,91 @@
     <script src="~/lib/DataTable/js/buttons.html5.min.js"></script>
     <script>
         $(document).ready(function () {
+            // The table has a two-row header (subject name spanning Mark/GPA/Grade). Exports only
+            // read the bottom header row, so the subject name is prefixed back on here.
+            const subjectNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(subjectNames));
+            const fixedLeadingColumns = 3; // #, Class Roll, Name
+            const exportOptions = {
+                columns: ':not(.action)',
+                format: {
+                    header: function (data, columnIdx) {
+                        const subjectIdx = Math.floor((columnIdx - fixedLeadingColumns) / 3);
+                        if (columnIdx < fixedLeadingColumns || subjectIdx >= subjectNames.length) {
+                            return data;
+                        }
+                        return subjectNames[subjectIdx] + ' - ' + data;
+                    }
+                }
+            };
+
+            // Three columns per subject plus ~15 fixed ones: A3 once there are many subjects.
+            const pdfPageSize = (subjectNames.length > 5) ? 'A3' : 'A4';
+            const pdfPageWidth = (pdfPageSize === 'A3' ? 1190.55 : 841.89) - 20; // minus the 10pt margins
+
+            // The buttons must be configured here: a separate `new $.fn.dataTable.Buttons(...)` creates
+            // a second, never-displayed button set, and the visible buttons fall back to the defaults.
             $('#myTable').dataTable({
                 "lengthMenu": [[25, 50, 100, -1], [25, 50, 100, "All"]],
                 "dom": 'lBfrtip',
                 'columnDefs': [{
                     'targets': '.no-sort', // column index (start from 0)
                     'orderable': false, // set orderable false for selected columns
-                }]
-            });
-
-            new $.fn.dataTable.Buttons($('#myTable'), {
+                }],
                 buttons: [
-                    {
-                        extend: 'copy',
-                        exportOptions: {
-                            columns: ':not(.action)'
-                        }
-                    },
-                    {
-                        extend: 'excel',
-                        exportOptions: {
-                            columns: ':not(.action)'
-                        }
-                    },
+                    { extend: 'copy', exportOptions: exportOptions },
+                    { extend: 'excel', exportOptions: exportOptions },
+                    { extend: 'csv', exportOptions: exportOptions },
                     {
                         extend: 'pdf',
-                        exportOptions: {
-                            columns: ':not(.action)'
-                        }
-                    },
-                    {
-                        extend: 'print',
-                        exportOptions: {
-                            columns: ':not(.action)'
+                        // Default header (Mark/GPA/Grade only): customize() rebuilds it as two rows so the
+                        // subject name spans its three columns instead of being repeated in every one.
+                        exportOptions: { columns: ':not(.action)' },
+                        orientation: 'landscape',
+                        pageSize: pdfPageSize,
+                        customize: function (doc) {
+                            const tableNode = doc.content.find(function (c) { return c.table; });
+                            const table = tableNode.table;
+                            const bottom = table.body[0];
+                            const isSubjectColumn = function (i) {
+                                return i >= fixedLeadingColumns && Math.floor((i - fixedLeadingColumns) / 3) < subjectNames.length;
+                            };
+                            const top = bottom.map(function (cell, i) {
+                                if (!isSubjectColumn(i)) return { text: cell.text, style: 'tableHeader', rowSpan: 2 };
+                                if ((i - fixedLeadingColumns) % 3 === 0) {
+                                    return { text: subjectNames[Math.floor((i - fixedLeadingColumns) / 3)], style: 'tableHeader', colSpan: 3 };
+                                }
+                                return {};
+                            });
+                            const second = bottom.map(function (cell, i) { return isSubjectColumn(i) ? cell : {}; });
+                            table.body.splice(0, 1, top, second);
+                            table.headerRows = 2;
+
+                            // Explicit widths: pdfmake sizes every '*' column to the widest unbreakable cell
+                            // (an 11-digit phone number), which pushes the table off the page. Give each column
+                            // a width in font-size units and pick the largest font that still fits the page.
+                            const columnCount = bottom.length;
+                            const columnEm = function (i) {
+                                if (i === 0) return 2.2;                          // #
+                                if (i === 1) return 4;                            // class roll
+                                if (i === 2) return 11;                           // student name
+                                if (isSubjectColumn(i)) return 3.2;               // mark / GPA / grade
+                                return (i >= columnCount - 2) ? 6.6 : 6;          // phone numbers : other summary columns
+                            };
+                            const cellOverhead = 2.5; // pdfmake adds padding (1+1) + border on top of each width
+                            let totalEm = 0;
+                            for (let i = 0; i < columnCount; i++) totalEm += columnEm(i);
+                            const fontSize = Math.min(7, (pdfPageWidth - columnCount * cellOverhead - 4) / totalEm);
+                            table.widths = bottom.map(function (cell, i) { return columnEm(i) * fontSize; });
+
+                            tableNode.layout = {
+                                hLineWidth: function () { return 0.25; }, vLineWidth: function () { return 0.25; },
+                                hLineColor: function () { return '#cccccc'; }, vLineColor: function () { return '#cccccc'; },
+                                paddingLeft: function () { return 1; }, paddingRight: function () { return 1; },
+                                paddingTop: function () { return 1; }, paddingBottom: function () { return 1; }
+                            };
+                            doc.pageMargins = [10, 10, 10, 10];
+                            doc.defaultStyle.fontSize = fontSize;
+                            doc.styles.tableHeader.fontSize = doc.defaultStyle.fontSize;
                         }
                     }
                 ]

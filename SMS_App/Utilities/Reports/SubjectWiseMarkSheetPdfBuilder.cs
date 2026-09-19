@@ -49,7 +49,7 @@ public class SubjectWiseMarkSheetPdfBuilder : IDocument
     {
         container.Page(page =>
         {
-            page.Size(PageSizes.A4);
+            page.Size(PageSizes.A4.Landscape());
             page.Margin(25);
             page.DefaultTextStyle(x => x.FontSize(9));
             page.Header().Element(ComposeHeader);

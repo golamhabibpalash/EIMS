@@ -55,25 +55,33 @@ SMS.Entities     → Domain models, enums, ViewModels (no logic)
 SMS.Frameworks   → Shared utilities, tag helpers, encryption
 ```
 
-**Strict rule**: Dependencies flow downward only. Controllers → Managers → Repositories. Never skip layers; controllers must never call repositories directly.
+**Strict rule**: Dependencies flow downward only. Controllers → Managers → Repositories. Never skip layers; controllers must never call repositories directly. (`ExpensTypesController` is an existing violation — it injects `IExpenseTypeRepository`; don't copy it.)
 
 ## Key Architectural Patterns
 
 ### Repository Pattern
-- All repositories inherit `GenericRepository<T>` (`SMS.DAL/Repositories/Base/`)
+- All repositories inherit `Repository<T>` (`SMS.DAL/Repositories/Base/Repository.cs`), which implements `IRepository<T>` (`SMS.DAL/Contracts/Base/`)
 - Interfaces live in `SMS.DAL/Contracts/`, implementations in `SMS.DAL/Repositories/`
-- Standard async CRUD: `GetByIdAsync()`, `GetAllAsync()`, `AddAsync()`, `UpdateAsync()`, `DeleteAsync()`
+- Standard async CRUD: `GetByIdAsync()`, `GetAllAsync()`, `AddAsync()`, `UpdateAsync()`, `RemoveAsync()`
+- The base `Add/Update/Remove` methods each call `SaveChangesAsync()`, and they **catch exceptions and return `false`** (logging only to `Console`). A `false` result can hide the real EF error — reproduce it in a custom repository method or check the console when debugging. `UpdateAsync` marks the whole entity `Modified` rather than relying on change tracking.
+- `SMS.BLL/Managers/Base/Manager.cs` is the equivalent base for managers.
 
 ### Manager Pattern (Business Logic)
 - All business logic in Manager classes under `SMS.BLL/Managers/`
 - Interfaces in `SMS.BLL/Contracts/`
 - Managers inject repositories; controllers inject managers only
+- All manager/repository DI registrations live in `SMS_App/Configurations/DependencyInjectionConfiguration.cs` (`Addservices()`), not in `Program.cs`
 
 ### Claim-Based Authorization (Not Role-Based)
 - All authorization uses policies defined in `SMS_App/Configurations/AuthorizationPolicies.cs`
 - Decorate actions with `[Authorize(Policy = "[EntityName]Policy")]`
+- Policy name and claim string are different things: e.g. policy `IndexAcademicClassesPolicy` requires claim `"View Academic Class"`. Policy names contain historical typos (e.g. `CraeteAcademicExamTypePolicy`) that controllers and `SiteMap.Config` reference verbatim — grep before renaming.
 - Claims stored in `ClaimStores` entity and assigned via roles
 - Global auth filter in `Program.cs` requires authenticated user for all routes
+- The sidebar/nav is data-driven from `SMS_App/SiteMap.Config` (loaded as a singleton `SiteMap`). Each `<item>` names a `Controller`, `Action`, and the policy in `Claim=`; a new screen isn't reachable from the menu until it has an entry there.
+
+### ZKTeco Attendance Machines
+`Controllers/IClockController.cs` serves the `/iclock/*` ADMS push endpoints that terminal firmware has hard-coded, so those routes can't be renamed or moved into an area. It is `[AllowAnonymous]` and trusts only a registered device serial (`SN`); responses must stay plain text. Direct-socket device access lives in `SMS.BLL/ZKTeco/ZkClient.cs`.
 
 ### AutoMapper
 - Profiles configured in `SMS_App/Utilities/AutoMapperConfiguration/AutoMapperProfile.cs`
@@ -114,23 +122,31 @@ Persisted to `SMS_App/Keys/` for shared hosting stability. App name: `"SMS_App"`
 6. Create ViewModels in `SMS_App/ViewModels/[Feature]/`
 7. Create Controller at `SMS_App/Controllers/[Entity]Controller.cs` — inject manager only
 8. Create Views at `SMS_App/Views/[Entity]/`
-9. Register manager + repository in service collection (`Program.cs`)
-10. Add authorization policy in `AuthorizationPolicies.cs` and apply `[Authorize(Policy = "...")]` to actions
+9. Register manager + repository in `SMS_App/Configurations/DependencyInjectionConfiguration.cs`
+10. Add authorization policy in `AuthorizationPolicies.cs`, apply `[Authorize(Policy = "...")]` to actions, and add a menu `<item>` in `SMS_App/SiteMap.Config`
 
 ## Code Conventions
 
 - All I/O operations use `async/await`; method names suffixed with `Async`
 - `[ValidateAntiForgeryToken]` on all POST/PUT/DELETE actions
-- `QueryTrackingBehavior.NoTracking` by default in `ApplicationDbContext`; use `.AsTracking()` only when updating
+- `QueryTrackingBehavior.NoTracking` is set globally where the `DbContext` is registered in `Program.cs`; use `.AsTracking()` only when updating
 - Avoid N+1 queries: pre-load all related data in the controller via `Dictionary<K,V>` caches or `.Include()`, never query the DB inside a view loop
 - ViewModel naming: `[Entity][Operation]VM` (e.g., `StudentCreateVM`, `StudentListVM`)
 - **Cross-platform (Linux deploy)**: format dates for `<input type="date">` with explicit `yyyy-MM-dd` (a culture-default `ToString()` breaks on Linux). PostgreSQL timestamp handling relies on `Npgsql.EnableLegacyTimestampBehavior` (set in `Program.cs`); be mindful of `DateTime` `Kind` when writing new date/time code.
+
+## Deployment & Versioning
+
+- Pushing to **`FinalDeployment`** (the current branch) runs `.github/workflows/deploy.yml`, which builds once and deploys the identical package to **every** client instance (Noble, Mamitonnesa, DMCPS, Unityschoolbd, Curiosity). Treat a push there as a production release; use the workflow's manual "Run workflow" to target a single instance.
+- The pipeline strips `appsettings*.json` and never touches `Keys/`, `logs/`, or uploaded images on the servers — per-client config is edited on each server, not in the repo. Adding a client means adding a GitHub Environment plus entries in `deploy.yml` (see `Resources/deployment/CICD.md`).
+- The product version is `VersionPrefix` in `Directory.Build.props` (bumped by hand); CI appends build number, commit, and timestamp, and `SMS_App/BuildInfo.cs` reads them back for the UI footer. Local builds show build `0` / commit `local`.
 
 ## Notable Files
 
 | File | Purpose |
 |------|---------|
-| `SMS_App/Program.cs` | Application entry point, DI registration, auth/session config |
+| `SMS_App/Program.cs` | Application entry point: DB provider, Identity, auth/session, Hangfire, middleware |
+| `SMS_App/Configurations/DependencyInjectionConfiguration.cs` | `Addservices()` — every manager/repository registration |
+| `SMS_App/SiteMap.Config` | Menu tree; each item binds a controller/action to a policy |
 | `SMS.DB/ApplicationDbContext.cs` | EF Core context, inherits `IdentityDbContext` |
 | `SMS_App/Configurations/AuthorizationPolicies.cs` | All claim-based authorization policies |
 | `SMS_App/appsettings.json` | App configuration (encrypted connection strings) |
@@ -148,4 +164,4 @@ Persisted to `SMS_App/Keys/` for shared hosting stability. App name: `"SMS_App"`
 - `README.md` — Feature overview and setup instructions  
 - `CODING_STANDARDS.md` (root and per-layer) — Naming conventions, SOLID patterns  
 - `PERFORMANCE_FIXES.md` — N+1 query optimization example for StudentFeeAllocations  
-- `SiteMap.Config` — Navigation menu structure
+- `Resources/deployment/CICD.md` — Per-instance GitHub Environments, secrets, and what the pipeline never overwrites
