@@ -42,10 +42,8 @@
                 <div class="form-group row mb-2">
                     <label asp-for="Attachments" class="col-sm-3 col-form-label"></label>
                     <div class="col-sm-9">
-                        <input asp-for="Attachments" type="file" multiple class="form-control" />
-                        <small class="text-muted">
-                            Images, PDF, Office documents, text, logs or zip. Up to 5 MB each.
-                        </small>
+                        <input asp-for="Attachments" type="file" multiple accept="image/*,application/pdf" class="form-control" />
+                        <small class="text-muted">Images or PDF only. Up to 2 MB each.</small>
                     </div>
                 </div>
 
@@ -62,4 +60,5 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <partial name="_AttachmentValidationScript" />
 }

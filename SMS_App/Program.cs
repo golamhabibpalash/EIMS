@@ -236,6 +236,18 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Ensure the ticket attachment folder exists at startup, unlike Images/Student/Photo etc. it is
+// never created at deploy time, so this surfaces a permission/ownership problem in the startup
+// log instead of the first real user's upload failing with a 500 (see TicketsController).
+try
+{
+    Directory.CreateDirectory(Path.Combine(app.Environment.WebRootPath, "Uploads", "Tickets"));
+}
+catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+{
+    Console.Error.WriteLine($"[STARTUP WARNING] Could not create wwwroot/Uploads/Tickets: {ex.Message}. Ticket attachments will be rejected until this is fixed.");
+}
+
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto

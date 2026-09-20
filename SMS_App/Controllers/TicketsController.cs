@@ -25,12 +25,14 @@ namespace SMS_App.Controllers;
 /// </summary>
 public class TicketsController : Controller
 {
-    private const long MaxAttachmentBytes = 5 * 1024 * 1024;
+    private const long MaxAttachmentBytes = 2 * 1024 * 1024;
+    private const string MaxAttachmentLabel = "2 MB";
 
+    // Images and PDF only - screenshots and scanned documents are what tickets actually need,
+    // and keeping the allow-list narrow avoids ever having to serve an arbitrary file type inline.
     private static readonly string[] AllowedExtensions =
     {
-        ".jpg", ".jpeg", ".png", ".gif", ".webp",
-        ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt", ".log", ".zip"
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf"
     };
 
     private readonly ITicketManager _ticketManager;
@@ -314,6 +316,43 @@ public class TicketsController : Controller
         return File(bytes, attachment.ContentType ?? "application/octet-stream", attachment.OriginalFileName);
     }
 
+    // GET: Tickets/ViewAttachment/5
+    /// <summary>
+    /// Same file as DownloadAttachment, but served "inline" instead of "attachment" so the
+    /// browser renders an image or PDF itself rather than downloading it - used for the
+    /// thumbnail and "View" link on the details page.
+    /// </summary>
+    [Authorize(Policy = "DetailsTicketsPolicy")]
+    public async Task<IActionResult> ViewAttachment(int id)
+    {
+        var attachment = await _ticketManager.GetAttachmentAsync(id);
+        if (attachment is null)
+        {
+            return NotFound();
+        }
+
+        var path = Path.Combine(AttachmentFolder(), attachment.StoredFileName);
+        if (!System.IO.File.Exists(path))
+        {
+            return NotFound();
+        }
+
+        var bytes = await System.IO.File.ReadAllBytesAsync(path);
+
+        // The stored name is user input (the original upload's file name) - strip quotes and
+        // control characters before it goes into a response header, rather than trust it as-is.
+        var safeName = new string((attachment.OriginalFileName ?? "attachment")
+            .Where(c => !char.IsControl(c) && c != '"')
+            .ToArray());
+        if (string.IsNullOrWhiteSpace(safeName))
+        {
+            safeName = "attachment";
+        }
+
+        Response.Headers["Content-Disposition"] = $"inline; filename=\"{safeName}\"";
+        return File(bytes, attachment.ContentType ?? "application/octet-stream");
+    }
+
     // POST: Tickets/DeleteAttachment/5
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -426,7 +465,21 @@ public class TicketsController : Controller
         }
 
         var folder = AttachmentFolder();
-        Directory.CreateDirectory(folder);
+
+        try
+        {
+            // Never created at deploy time (unlike Images/Student/Photo etc.), so this is the
+            // first thing to fail if the app's process account can't write under wwwroot -
+            // on Linux that's a permission/ownership mismatch, on Windows an IIS app-pool ACL.
+            Directory.CreateDirectory(folder);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            await _appLogger.ErrorAsync($"Ticket {ticketId} attachment folder could not be created: {folder}", ex.Message);
+            rejected.AddRange(files.Where(f => f is not null && f.Length > 0)
+                .Select(f => $"{f.FileName} (attachments are not available on this server right now)"));
+            return rejected;
+        }
 
         foreach (var file in files.Where(f => f is not null && f.Length > 0))
         {
@@ -440,7 +493,7 @@ public class TicketsController : Controller
 
             if (file.Length > MaxAttachmentBytes)
             {
-                rejected.Add($"{file.FileName} (larger than 5 MB)");
+                rejected.Add($"{file.FileName} (larger than {MaxAttachmentLabel})");
                 continue;
             }
 
@@ -463,7 +516,7 @@ public class TicketsController : Controller
                     FileSize = file.Length
                 }, userId, MACService.GetMAC());
             }
-            catch (IOException ex)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 rejected.Add($"{file.FileName} (could not be saved)");
                 await _appLogger.ErrorAsync($"Ticket {ticketId} attachment failed", ex.Message);

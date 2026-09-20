@@ -105,11 +105,32 @@
             <legend class="float-none w-auto text-primary px-2" style="font-size:1.1rem;">Attachments</legend>
             @if (Model.Attachments.Any())
             {
+                var imageAttachments = Model.Attachments.Where(f => (f.ContentType ?? "").StartsWith("image/")).ToList();
+                @if (imageAttachments.Any())
+                {
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        @foreach (var file in imageAttachments)
+                        {
+                            <a asp-action="ViewAttachment" asp-route-id="@file.Id" target="_blank" title="@file.OriginalFileName">
+                                <img src="@Url.Action("ViewAttachment", new { id = file.Id })"
+                                     alt="@file.OriginalFileName" class="border rounded"
+                                     style="width:70px;height:70px;object-fit:cover;" />
+                            </a>
+                        }
+                    </div>
+                }
                 <ul class="list-group list-group-flush">
                     @foreach (var file in Model.Attachments)
                     {
                         <li class="list-group-item px-0">
-                            <a asp-action="DownloadAttachment" asp-route-id="@file.Id">@file.OriginalFileName</a>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="text-truncate" style="max-width:60%;" title="@file.OriginalFileName">@file.OriginalFileName</span>
+                                <span class="small text-nowrap">
+                                    <a asp-action="ViewAttachment" asp-route-id="@file.Id" target="_blank">View</a>
+                                    &middot;
+                                    <a asp-action="DownloadAttachment" asp-route-id="@file.Id">Download</a>
+                                </span>
+                            </div>
                             <div class="small text-muted">@(Math.Round(file.FileSize / 1024.0, 1)) KB</div>
                         </li>
                     }

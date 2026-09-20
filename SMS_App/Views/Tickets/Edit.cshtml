@@ -41,8 +41,8 @@
                 <div class="form-group row mb-2">
                     <label asp-for="Attachments" class="col-sm-3 col-form-label">Add files</label>
                     <div class="col-sm-9">
-                        <input asp-for="Attachments" type="file" multiple class="form-control" />
-                        <small class="text-muted">Up to 5 MB each.</small>
+                        <input asp-for="Attachments" type="file" multiple accept="image/*,application/pdf" class="form-control" />
+                        <small class="text-muted">Images or PDF only. Up to 2 MB each.</small>
                     </div>
                 </div>
 
@@ -64,11 +64,18 @@
                 <ul class="list-group list-group-flush">
                     @foreach (var file in Model.ExistingAttachments)
                     {
-                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                            <a asp-action="DownloadAttachment" asp-route-id="@file.Id">@file.OriginalFileName</a>
-                            <form asp-action="DeleteAttachment" asp-route-id="@file.Id" method="post" class="deleteAttachment m-0">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
-                            </form>
+                        <li class="list-group-item px-0">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <span class="text-truncate" style="max-width:55%;" title="@file.OriginalFileName">@file.OriginalFileName</span>
+                                <form asp-action="DeleteAttachment" asp-route-id="@file.Id" method="post" class="deleteAttachment m-0">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                </form>
+                            </div>
+                            <div class="small">
+                                <a asp-action="ViewAttachment" asp-route-id="@file.Id" target="_blank">View</a>
+                                &middot;
+                                <a asp-action="DownloadAttachment" asp-route-id="@file.Id">Download</a>
+                            </div>
                         </li>
                     }
                 </ul>
@@ -83,6 +90,7 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <partial name="_AttachmentValidationScript" />
     <script>
         $(function () {
             $('form.deleteAttachment').on('submit', function () {
