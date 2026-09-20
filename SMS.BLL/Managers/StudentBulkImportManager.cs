@@ -2,6 +2,7 @@ using ClosedXML.Excel;
 using SMS.BLL.Contracts;
 using SMS.Entities;
 using SMS.Entities.AdditionalModels.StudentImport;
+using SMS.Entities.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -678,9 +679,13 @@ namespace SMS.BLL.Managers
         private static string BuildUniqueId(DateTime dob, AcademicSession session, int generatedRoll)
         {
             string rollText = generatedRoll.ToString();
-            return dob.ToString("yyMMdd")
+            string uniqueId = dob.ToString("yyMMdd")
                  + session.Name.Substring(session.Name.Length - 1, 1)
                  + rollText.Substring(rollText.Length - 2, 2);
+
+            // See StudentsController.GenerateUniquId - a birth year ending 00-09 puts a leading
+            // zero on this, which must be stripped the same way there so the two never disagree.
+            return AttendancePinMatcher.Normalize(uniqueId) ?? uniqueId;
         }
 
         #endregion Derived values

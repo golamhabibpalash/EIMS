@@ -4,6 +4,7 @@ using SMS.BLL.Contracts;
 using SMS.DAL.Contracts;
 using SMS.Entities;
 using SMS.Entities.AdditionalModels;
+using SMS.Entities.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -108,9 +109,16 @@ namespace SMS.BLL.Managers
         {
             var academicSession = await _academicSessionRepository.GetByIdAsync(sessionId);
             int sessionYear = Convert.ToInt32(academicSession.Name.Substring(academicSession.Name.Length - 4));
-            List<Tran_MachineRawPunch> attendanceList = new List<Tran_MachineRawPunch>();
-            attendanceList = await _attendanceMachineRepository.Table.AsNoTracking().Where(s => s.CardNo == uniqueId && s.PunchDatetime.Year == sessionYear).ToListAsync();
-            return attendanceList;
+
+            // CardNo (raw punch, as the machine sent it) is matched against uniqueId with the same
+            // leading-zero-tolerant comparison used everywhere else (AttendancePinMatcher) - that
+            // can't be translated to SQL, so the year filter runs in the database and the PIN match
+            // runs in memory over that one year's punches (one student's profile view, not a hot path).
+            var yearPunches = await _attendanceMachineRepository.Table.AsNoTracking()
+                .Where(s => s.PunchDatetime.Year == sessionYear)
+                .ToListAsync();
+
+            return yearPunches.Where(s => AttendancePinMatcher.Matches(s.CardNo, uniqueId)).ToList();
         }
     }
 }

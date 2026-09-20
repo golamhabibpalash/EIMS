@@ -4,6 +4,7 @@ using SMS.DAL.Repositories.Base;
 using SMS.DB;
 using SMS.Entities;
 using SMS.Entities.AdditionalModels;
+using SMS.Entities.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -38,10 +39,14 @@ namespace SMS.DAL.Repositories
                 .Where(t => t.PunchDatetime.Date == parsedDate.Date)
                 .ToListAsync();
 
-            // One entry per enrolled PIN, holding that PIN's first punch of the day.
+            // One entry per enrolled PIN, holding that PIN's first punch of the day. Keyed by the
+            // normalized PIN (see AttendancePinMatcher) so "0123" and "123" resolve to the same
+            // entry - a raw string key here was why a student enrolled with a leading zero showed
+            // up unpunched on this screen even though the monthly report matched them correctly.
             var firstPunchByPin = rawPunches
-                .Where(p => !string.IsNullOrWhiteSpace(p.CardNo))
-                .GroupBy(p => p.CardNo.Trim())
+                .Select(p => new { Pin = AttendancePinMatcher.Normalize(p.CardNo), p.PunchDatetime })
+                .Where(p => p.Pin != null)
+                .GroupBy(p => p.Pin)
                 .ToDictionary(g => g.Key, g => g.Min(p => p.PunchDatetime));
 
             // Candidates are tried in order, so the current enrolment scheme
@@ -51,7 +56,8 @@ namespace SMS.DAL.Repositories
             {
                 foreach (var pin in candidatePins)
                 {
-                    if (!string.IsNullOrWhiteSpace(pin) && firstPunchByPin.TryGetValue(pin.Trim(), out var first))
+                    var normalized = AttendancePinMatcher.Normalize(pin);
+                    if (normalized != null && firstPunchByPin.TryGetValue(normalized, out var first))
                         return first.ToString("hh:mm:ss tt");
                 }
                 return null;
@@ -241,9 +247,10 @@ namespace SMS.DAL.Repositories
             }
         }
 
-        // Distinct, trimmed CardNo values punched on the given day. The machine
-        // stores whatever PIN was enrolled, so callers match it against the
-        // person's UniqueId / MachineUserId (with a roll / id fallback).
+        // Distinct, normalized CardNo values punched on the given day (see AttendancePinMatcher -
+        // "0123" and "123" collapse to the same entry). The machine stores whatever PIN was
+        // enrolled, so callers match it against the person's UniqueId / MachineUserId (with a
+        // roll / id fallback).
         private async Task<HashSet<string>> GetPunchedPinsAsync(string date)
         {
             if (!DateTime.TryParse(date, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
@@ -255,16 +262,17 @@ namespace SMS.DAL.Repositories
                 .ToListAsync();
 
             return cardNos
-                .Where(c => !string.IsNullOrWhiteSpace(c))
-                .Select(c => c.Trim())
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                .Select(AttendancePinMatcher.Normalize)
+                .Where(c => c != null)
+                .ToHashSet();
         }
 
         private static bool HasPunch(HashSet<string> punchedPins, params string[] candidatePins)
         {
             foreach (var pin in candidatePins)
             {
-                if (!string.IsNullOrWhiteSpace(pin) && punchedPins.Contains(pin.Trim()))
+                var normalized = AttendancePinMatcher.Normalize(pin);
+                if (normalized != null && punchedPins.Contains(normalized))
                     return true;
             }
             return false;
@@ -272,10 +280,15 @@ namespace SMS.DAL.Repositories
 
         public async Task<Tran_MachineRawPunch> GetTodaysAttendanceByUserIdAsync(int attendanceId)
         {
-            var allAttendance = await _context.Tran_MachineRawPunch.Where(t => t.PunchDatetime.Date == DateTime.Now.Date).ToListAsync();
-            var existAttendance = await _context.Tran_MachineRawPunch.FirstOrDefaultAsync(m => m.CardNo == attendanceId.ToString() && m.PunchDatetime.Date == DateTime.Now.Date);
+            // CardNo is matched against attendanceId (an int, so it never carries a leading zero
+            // itself) with the same tolerant comparison used everywhere else - a query predicate
+            // can't call AttendancePinMatcher, so today's punches are fetched once and matched in
+            // memory (this also drops the previous, separate, unused fetch of the same rows).
+            var todaysPunches = await _context.Tran_MachineRawPunch
+                .Where(t => t.PunchDatetime.Date == DateTime.Now.Date)
+                .ToListAsync();
 
-            return existAttendance;
+            return todaysPunches.FirstOrDefault(m => AttendancePinMatcher.Matches(m.CardNo, attendanceId.ToString()));
         }
 
     }

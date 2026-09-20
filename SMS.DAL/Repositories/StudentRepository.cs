@@ -4,6 +4,7 @@ using SMS.DAL.Repositories.Base;
 using SMS.DB;
 using SMS.Entities;
 using SMS.Entities.AdditionalModels;
+using SMS.Entities.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -103,11 +104,17 @@ namespace SMS.DAL.Repositories
         }
         public async Task<Student> GetStudentByUniqueIdAsync(string uniqueId)
         {
+            // Callers include attendance-punch handlers (Hangfire jobs, the SMS notifier) that
+            // pass a raw machine CardNo, which the app can't control the formatting of. Student
+            // rows are now generated/cleaned up without a leading zero (see AttendancePinMatcher),
+            // so normalize the search value the same way instead of comparing raw strings.
+            var normalized = AttendancePinMatcher.Normalize(uniqueId) ?? uniqueId?.Trim();
+
             var student = await _context.Student
                 .Include(s => s.AcademicClass)
                 .Include(s => s.AcademicSession)
                 .Include(s => s.AcademicSection)
-                .FirstOrDefaultAsync(s => s.UniqueId.Trim() == uniqueId.Trim());
+                .FirstOrDefaultAsync(s => s.UniqueId.Trim() == normalized);
             return student;
         }
 

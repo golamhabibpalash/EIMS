@@ -20,6 +20,7 @@ using SMS.Entities.AdditionalModels;
 using SMS.Entities.AdditionalModels.StudentImport;
 using SMS.Entities.AdditionalModels.StudentVM;
 using SMS.Entities.Enums;
+using SMS.Entities.Utilities;
 using SMS_App.Utilities.LoggerService;
 using SMS_App.Utilities.MACIPServices;
 using SMS_App.Utilities.Pagination;
@@ -1416,7 +1417,12 @@ public class StudentsController : Controller
         AcademicSession academicSession = await _academicSessionManager.GetByIdAsync(student.AcademicSessionId);
         uniqueId += academicSession.Name.Substring(academicSession.Name.Length - 1, 1);
         uniqueId += student.ClassRoll.ToString().Substring(student.ClassRoll.ToString().Length - 2, 2);
-        return uniqueId;
+
+        // A birth year ending 00-09 puts a leading zero on "yyMMdd" (e.g. DOB 2005 -> "05...").
+        // That leading zero doesn't change the ID's numeric value, but a UniqueId is also typed
+        // into the attendance machine as a PIN, and used to have to match by exact string on some
+        // screens - normalize it away here so a leading zero can never reach the database again.
+        return AttendancePinMatcher.Normalize(uniqueId) ?? uniqueId;
     }
     #region APIs //All of the students related APIs will placed here
 
