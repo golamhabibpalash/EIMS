@@ -144,6 +144,9 @@ public class InstitutesController : Controller
                 institute.Slogan = existingInstitute.Slogan;
                 institute.Address = existingInstitute.Address;
                 institute.BranchName = existingInstitute.BranchName;
+                institute.StartingTime = existingInstitute.StartingTime;
+                institute.ClosingTime = existingInstitute.ClosingTime;
+                institute.LateTime = existingInstitute.LateTime;
 
                 string img = "";
                 string root = _host.WebRootPath;
@@ -253,22 +256,13 @@ public class InstitutesController : Controller
             Institute institute = await _instituteManager.GetFirstOrDefaultAsync();
             if (institute != null)
             {
-                DateOnly dateOnly = new DateOnly(1900, 01, 01);
-                string amPmIndicator = model.StartingTime.ToString("tt", System.Globalization.CultureInfo.InvariantCulture);
+                // The form uses <input type="time">, which posts 24-hour
+                // "HH:mm" values, so the bound DateTimes are already correct
+                // as-is. (The old code tried an AM/PM +12h adjustment here,
+                // but DateTime.AddHours() returns a new value and the result
+                // was discarded, so it was a silent no-op.)
                 institute.StartingTime = model.StartingTime;
-                if (amPmIndicator=="pm")
-                {
-                    institute.StartingTime.AddHours(12);
-                }
-                amPmIndicator = model.ClosingTime.ToString("tt", System.Globalization.CultureInfo.InvariantCulture);
                 institute.ClosingTime = model.ClosingTime;
-                if (amPmIndicator.ToLower()=="pm")
-                {
-                    institute.ClosingTime.AddHours(12);
-                }
-
-                TimeSpan span = model.LateTimeStart-model.StartingTime;
-
                 institute.LateTime = model.LateTimeStart;
 
                 await _instituteManager.UpdateAsync(institute);
