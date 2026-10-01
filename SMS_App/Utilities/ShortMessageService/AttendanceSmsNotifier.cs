@@ -155,9 +155,13 @@ namespace SMS_App.Utilities.ShortMessageService
             if (alreadySent)
                 return AttendanceSmsResult.Skip($"{attendanceType} SMS already sent for this user");
 
+            var instituteName = string.IsNullOrWhiteSpace(institute.ShortName)
+                ? institute.Name?.Trim() ?? string.Empty
+                : institute.ShortName.Trim();
+
             var text = isCheckIn
-                ? GenerateCheckInSMS(name, punchTime.ToString())
-                : GenerateCheckOutSMS(name, punchTime.ToString());
+                ? GenerateCheckInSMS(name, punchTime.ToString(), instituteName)
+                : GenerateCheckOutSMS(name, punchTime.ToString(), instituteName);
 
             if (string.IsNullOrEmpty(text))
                 return AttendanceSmsResult.Skip("Message could not be composed");
@@ -248,20 +252,22 @@ namespace SMS_App.Utilities.ShortMessageService
             return (null, null, false, $"No student or employee is enrolled with PIN '{pin}'");
         }
 
-        private static string GenerateCheckInSMS(string name, string attendanceTime)
+        private static string GenerateCheckInSMS(string name, string attendanceTime, string instituteShortName)
         {
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(attendanceTime))
                 return string.Empty;
 
-            return name + " আজ " + attendanceTime + " মিনিটে স্কুলে উপস্থিত হয়েছে। -নোবেল ।";
+            var suffix = string.IsNullOrWhiteSpace(instituteShortName) ? string.Empty : " -" + instituteShortName.Trim();
+            return name + " আজ " + attendanceTime + " মিনিটে স্কুলে উপস্থিত হয়েছে।" + suffix + " ।";
         }
 
-        private static string GenerateCheckOutSMS(string name, string attendanceTime)
+        private static string GenerateCheckOutSMS(string name, string attendanceTime, string instituteShortName)
         {
             if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(attendanceTime))
                 return string.Empty;
 
-            return name + " স্কুল থেকে " + attendanceTime + " মিনিটে প্রস্থান করেছে। -নোবেল ।";
+            var suffix = string.IsNullOrWhiteSpace(instituteShortName) ? string.Empty : " -" + instituteShortName.Trim();
+            return name + " স্কুল থেকে " + attendanceTime + " মিনিটে প্রস্থান করেছে।" + suffix + " ।";
         }
     }
 }

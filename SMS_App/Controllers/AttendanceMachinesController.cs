@@ -26,8 +26,9 @@ public class AttendanceMachinesController : Controller
     private readonly IAcademicSessionManager _academicSessionManager;
     private readonly IPhoneSMSManager _phoneSMSManager; 
     private readonly IParamBusConfigManager _paramBusConfigManager;
+    private readonly IInstituteManager _instituteManager;
 
-    public AttendanceMachinesController(IHttpContextAccessor contextAccessor, IAttendanceMachineManager attendanceMachineManager, IEmployeeManager employeeManager, IStudentManager studentManager, IDesignationManager designationManager, IAcademicClassManager academicClassManager, IAcademicSessionManager academicSessionManager, IPhoneSMSManager phoneSMSManager, IParamBusConfigManager paramBusConfigManager = null)
+    public AttendanceMachinesController(IHttpContextAccessor contextAccessor, IAttendanceMachineManager attendanceMachineManager, IEmployeeManager employeeManager, IStudentManager studentManager, IDesignationManager designationManager, IAcademicClassManager academicClassManager, IAcademicSessionManager academicSessionManager, IPhoneSMSManager phoneSMSManager, IInstituteManager instituteManager, IParamBusConfigManager paramBusConfigManager = null)
     {
         _contextAccessor = contextAccessor;
         _attendanceMachineManager = attendanceMachineManager;
@@ -37,6 +38,7 @@ public class AttendanceMachinesController : Controller
         _academicClassManager = academicClassManager;
         _academicSessionManager = academicSessionManager;
         _phoneSMSManager = phoneSMSManager;
+        _instituteManager = instituteManager;
         _paramBusConfigManager = paramBusConfigManager;
     }
     // GET: AttendanceMachinesController
@@ -114,7 +116,12 @@ public class AttendanceMachinesController : Controller
                             phoneSMS.CreatedAt = DateTime.Now;
                             phoneSMS.CreatedBy = HttpContext.Session.GetString("UserId");
                             phoneSMS.MobileNumber = st.GuardianPhone == null ? st.PhoneNo : st.GuardianPhone;
-                            phoneSMS.Text = st.NameBangla + " আজ " + model.PunchDatetime.ToString("hh:mm tt") + " মিনিটে স্কুলে উপস্থিত হয়েছে। -নোবেল ।";
+                            var smsInstitute = await _instituteManager.GetFirstOrDefaultAsync();
+                            var smsInstituteName = smsInstitute == null || string.IsNullOrWhiteSpace(smsInstitute.ShortName)
+                                ? smsInstitute?.Name?.Trim() ?? string.Empty
+                                : smsInstitute.ShortName.Trim();
+                            var smsNameSuffix = string.IsNullOrWhiteSpace(smsInstituteName) ? string.Empty : " -" + smsInstituteName;
+                            phoneSMS.Text = st.NameBangla + " আজ " + model.PunchDatetime.ToString("hh:mm tt") + " মিনিটে স্কুলে উপস্থিত হয়েছে।" + smsNameSuffix + " ।";
                             phoneSMS.SMSType = "CheckIn";
                             bool isSend = await MobileSMS.SendSMS(phoneSMS.MobileNumber, phoneSMS.Text);                                
                             if (isSaved)
