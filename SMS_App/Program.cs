@@ -133,6 +133,15 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddDefaultUI()
 .AddDefaultTokenProviders();
 
+// FIX: Huge-claims 400s. Identity's default factory bakes every permission
+// claim into the login cookie; ~250 of them overflow IIS header limits.
+// AppClaimsPrincipalFactory keeps the cookie to id/name/roles/stamp only,
+// and PermissionClaimsTransformation rehydrates permissions from the DB per
+// request (memory-cached), so the cookie stays ~1 KB for everyone.
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, AppClaimsPrincipalFactory>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Authentication.IClaimsTransformation, PermissionClaimsTransformation>();
+
 // Fix Auto Logout Issue
 builder.Services.Configure<SecurityStampValidatorOptions>(options =>
 {
