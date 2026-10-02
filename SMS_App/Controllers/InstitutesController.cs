@@ -124,14 +124,13 @@ public class InstitutesController : Controller
         {
             try
             {
-                // The Edit form only posts eight of the Institute's fields.
-                // Binding straight into a fresh entity and saving that wiped
-                // everything the form does not carry - ShortName, Phone1,
-                // Phone2, Email, FavIcon and, most damaging, StartingTime /
-                // ClosingTime / LateTime, which the attendance SMS window and
-                // the check-in/check-out split are both derived from. Load the
-                // stored row and copy the edited fields onto it instead, the
-                // same way SchoolTimeTable already does.
+                // The Edit modal on Index posts every scalar field below
+                // (Name, ShortName, EIIN, phones, Email, Slogan, Address,
+                // BranchName, the three times). Binding straight into a fresh
+                // entity and saving that used to wipe them; load the stored
+                // row and copy the edited fields onto it instead, the same
+                // way SchoolTimeTable already does. Every field the modal
+                // posts must appear here, otherwise it silently stops saving.
                 Institute institute = await _instituteManager.GetByIdAsync(id);
                 if (institute == null)
                 {
@@ -140,7 +139,11 @@ public class InstitutesController : Controller
                 }
 
                 institute.Name = existingInstitute.Name;
+                institute.ShortName = existingInstitute.ShortName;
                 institute.EIIN = existingInstitute.EIIN;
+                institute.Phone1 = existingInstitute.Phone1;
+                institute.Phone2 = existingInstitute.Phone2;
+                institute.Email = existingInstitute.Email;
                 institute.Slogan = existingInstitute.Slogan;
                 institute.Address = existingInstitute.Address;
                 institute.BranchName = existingInstitute.BranchName;
