@@ -1,43 +1,143 @@
 ﻿@model SMS_App.ViewModels.AdministrationVM.EditUserVM
 @{
+    ViewData["Title"] = "Edit User";
+    GlobalUI.PageTitle = "Edit User";
+    var initial = string.IsNullOrEmpty(Model.UserName) ? "?" : Model.UserName.Substring(0, 1).ToUpper();
+    var typeName = Model.UserType == 's' ? "Student" : Model.UserType == 'e' ? "Employee" : "Other";
+    var typeBadge = Model.UserType == 's' ? "bg-info" : Model.UserType == 'e' ? "bg-primary" : "bg-secondary";
 }
-<form asp-action="EditUser" asp-controller="Accounts" method="post">
-    <div class="form-group form-inline">
-        <label class="col-md-2 text-md-end" asp-for="UserName"></label>
-        <input asp-for="UserName" class="form-control" />
-    </div>
-    <div class="form-group form-inline">
-        <label class="col-md-2 text-md-end" asp-for="Email"></label>
-        <input asp-for="Email" class="form-control" />
-    </div>
-    <div class="form-group form-inline">
-        <label class="col-md-2 text-md-end" asp-for="NormalizedEmail"></label>
-        <input asp-for="NormalizedEmail" class="form-control" />
-    </div>
-    <div class="form-group form-inline">
-        <label class="col-md-2 text-md-end" asp-for="EmailConfirmed"></label>
-        <input asp-for="EmailConfirmed" class="form-control" />
-    </div>
-    <div class="form-group form-inline">
-        <label class="col-md-2 text-md-end" asp-for="PhoneNumber"></label>
-        <input asp-for="PhoneNumber" class="form-control" />
-    </div>
-    <div class="form-group form-inline">
-        <label class="col-md-2 text-md-end" asp-for="PhoneNumberConfirmed"></label>
-        <input asp-for="PhoneNumberConfirmed" class="form-control" />
-    </div>
-    <div class="form-group form-inline">
-        <label class="col-md-2 text-md-end" asp-for="UserType"></label>
-        <input asp-for="UserType" class="form-control" />
-    </div>
-    <div class="form-group form-inline">
-        <label class="col-md-2 text-md-end" asp-for="ReferenceId"></label>
-        <input asp-for="ReferenceId" class="form-control" />
-    </div>
-    <div class="form-group form-inline">
-        <div class="col-md-4 offset-md-2">
-            <input type="submit" value="Submit" class="btn btn-info" /> 
-            <a asp-action="UserList" class="btn btn-success">Back To List</a>
+
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card shadow-sm mb-3">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-navy-blue text-white d-flex align-items-center justify-content-center flex-shrink-0" style="width:64px;height:64px;font-size:1.75rem;">@initial</div>
+                <div class="flex-grow-1">
+                    <h5 class="mb-1">@Model.UserName</h5>
+                    <div>
+                        <span class="badge @typeBadge">@typeName</span>
+                        @if (Model.EmailConfirmed)
+                        {
+                            <span class="badge bg-success"><i class="fa fa-check"></i> Email verified</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark"><i class="fa fa-exclamation-triangle"></i> Email unverified</span>
+                        }
+                        @if (Model.PhoneNumberConfirmed)
+                        {
+                            <span class="badge bg-success"><i class="fa fa-check"></i> Phone verified</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark"><i class="fa fa-exclamation-triangle"></i> Phone unverified</span>
+                        }
+                    </div>
+                </div>
+                <a asp-action="UserList" class="btn btn-secondary btn-sm"><i class="fa fa-arrow-left"></i> Back To List</a>
+            </div>
         </div>
+
+        <form asp-action="EditUser" asp-controller="Accounts" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="Id" />
+
+            <fieldset class="border p-3 shadow-sm mb-3">
+                <legend class="float-none w-auto text-primary px-2" style="font-size:1.1rem;">Login &amp; Contact</legend>
+                <div class="form-group row mb-2">
+                    <label asp-for="UserName" class="col-sm-3 col-form-label"></label>
+                    <div class="col-sm-9">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fa fa-user"></i></span>
+                            <input asp-for="UserName" class="form-control" readonly />
+                        </div>
+                        <small class="text-muted">Login name mirrors the email address and is set from it on save.</small>
+                    </div>
+                </div>
+                <div class="form-group row mb-2">
+                    <label asp-for="Email" class="col-sm-3 col-form-label"></label>
+                    <div class="col-sm-9">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fa fa-envelope"></i></span>
+                            <input asp-for="Email" class="form-control" placeholder="user@example.com" />
+                        </div>
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row mb-2">
+                    <label asp-for="PhoneNumber" class="col-sm-3 col-form-label">Phone Number</label>
+                    <div class="col-sm-9">
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fa fa-phone"></i></span>
+                            <input asp-for="PhoneNumber" class="form-control" placeholder="01XXXXXXXXX" />
+                        </div>
+                        <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row mb-2">
+                    <label asp-for="NormalizedEmail" class="col-sm-3 col-form-label">Normalized Email</label>
+                    <div class="col-sm-9">
+                        <input asp-for="NormalizedEmail" class="form-control" readonly />
+                        <small class="text-muted">Auto-derived from the email on save.</small>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="border p-3 shadow-sm mb-3">
+                <legend class="float-none w-auto text-primary px-2" style="font-size:1.1rem;">Verification</legend>
+                <div class="form-group row mb-2">
+                    <label asp-for="EmailConfirmed" class="col-sm-3 col-form-label">Email Confirmed</label>
+                    <div class="col-sm-9 d-flex align-items-center">
+                        <div class="form-check form-switch">
+                            <input asp-for="EmailConfirmed" class="form-check-input" role="switch" />
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group row mb-2">
+                    <label asp-for="PhoneNumberConfirmed" class="col-sm-3 col-form-label">Phone Confirmed</label>
+                    <div class="col-sm-9 d-flex align-items-center">
+                        <div class="form-check form-switch">
+                            <input asp-for="PhoneNumberConfirmed" class="form-check-input" role="switch" />
+                        </div>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset class="border p-3 shadow-sm mb-3">
+                <legend class="float-none w-auto text-primary px-2" style="font-size:1.1rem;">Linking</legend>
+                <div class="form-group row mb-2">
+                    <label asp-for="UserType" class="col-sm-3 col-form-label">User Type</label>
+                    <div class="col-sm-9">
+                        <select asp-for="UserType" class="form-select">
+                            <option value="s">Student</option>
+                            <option value="e">Employee</option>
+                            @if (Model.UserType != 's' && Model.UserType != 'e')
+                            {
+                                <option value="@Model.UserType">Other (@Model.UserType)</option>
+                            }
+                        </select>
+                        <span asp-validation-for="UserType" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row mb-2">
+                    <label asp-for="ReferenceId" class="col-sm-3 col-form-label">Reference Id</label>
+                    <div class="col-sm-9">
+                        <input asp-for="ReferenceId" type="number" class="form-control" placeholder="Linked student / employee record id" />
+                        <span asp-validation-for="ReferenceId" class="text-danger"></span>
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="form-group row">
+                <div class="col-sm-12 text-end">
+                    <a asp-action="UserList" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-navy-blue"><i class="fa fa-save"></i> Update User</button>
+                </div>
+            </div>
+        </form>
     </div>
-</form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

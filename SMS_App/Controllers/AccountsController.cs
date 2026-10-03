@@ -109,6 +109,10 @@ public class AccountsController : Controller
     public async Task<IActionResult> EditUser(string id)
     {
         ApplicationUser user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
         EditUserVM editUserVM = new EditUserVM()
         {
             Id = user.Id,
@@ -124,12 +128,16 @@ public class AccountsController : Controller
         return View(editUserVM);
     }
 
-    [HttpPost]
+    [HttpPost, ValidateAntiForgeryToken]
     [Authorize(Roles = "SuperAdmin")]
     [Authorize(Policy = "EditUserAccountsPolicy")]
     public async Task<IActionResult> EditUser(string id, EditUserVM model)
     {
         ApplicationUser user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
 
         user.UserName = model.Email;
         user.NormalizedEmail = model.Email.ToUpper();
@@ -143,9 +151,14 @@ public class AccountsController : Controller
         var result = await _userManager.UpdateAsync(user);
         if (result.Succeeded)
         {
+            TempData["msg"] = "User updated successfully.";
             return RedirectToAction("Userlist");
         }
-        return View(user);
+        foreach (var error in result.Errors)
+        {
+            ModelState.AddModelError(string.Empty, error.Description);
+        }
+        return View(model);
     }
     [HttpGet, AllowAnonymous]
     public IActionResult UserLogin()

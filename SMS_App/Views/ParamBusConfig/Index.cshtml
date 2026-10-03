@@ -16,7 +16,7 @@
                 <td>Is Active</td>
                 <td>Last Modified</td>
                 <td>
-                    <button id="addBtn" type="button" class="btn btn-primary btn-sm" data-toggle="modal" data-target=".bd-example-modal-lg">Add</button>
+                    <button id="addBtn" type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target=".bd-example-modal-lg">Add</button>
                 </td>
             </tr>
         </thead>
@@ -43,7 +43,7 @@
 
                     </td>
                     <td>
-                        <button data-id="@item.Id" data-ParamSL="@item.ParamSL" data-ConfigName="@item.ConfigName" data-ParamValue="@item.ParamValue" data-Remarks="@item.Remarks" data-IsActive="@item.IsActive" class="btn btn-sm btn-warning editBtn" data-toggle="modal" data-target=".bd-example-modal-lg"><span class="fa fa-edit"></span></button>
+                        <button data-id="@item.Id" data-ParamSL="@item.ParamSL" data-ConfigName="@item.ConfigName" data-ParamValue="@item.ParamValue" data-Remarks="@item.Remarks" data-IsActive="@item.IsActive" class="btn btn-sm btn-warning editBtn" data-bs-toggle="modal" data-bs-target=".bd-example-modal-lg"><span class="fa fa-edit"></span></button>
                     </td>
                 </tr>
             }
@@ -54,7 +54,7 @@ else
 {
     <div class="row">
         <div class="jumbotron text-center">
-            <button type="button" class="btn btn-primary" data-toggle="modal" data-target=".bd-example-modal-lg">Add</button>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target=".bd-example-modal-lg">Add</button>
         </div>
     </div>
 }
@@ -87,8 +87,10 @@ else
         $('#ConfigName').val(name);
         $('#ParamValue').val(value);
         $('#Remarks').val(remarks);
-        $('#IsActive').val(active);
-        $('#IsActive').prop('checked', active);
+        // data-IsActive renders as "True"/"False"; compare case-insensitively.
+        // Never .val() the checkbox: that rewrites its posted value and a
+        // checked box would then still save false.
+        $('#IsActive').prop('checked', String(active).toLowerCase() === 'true');
         $('#submitBtn').text('Update');
     });
     $('#addBtn').click(function () {

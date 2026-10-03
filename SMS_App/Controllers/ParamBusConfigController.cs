@@ -36,7 +36,7 @@ namespace SMS_App.Controllers
             return View(paramBusConfigVM);
         }
         
-        [HttpPost]
+        [HttpPost, ValidateAntiForgeryToken]
         [Authorize(Policy = "UpSertParamBusConfigPolicy")]
         public async Task<IActionResult> UpSert(ParamBusConfig paramBusConfig)
         {
@@ -44,6 +44,11 @@ namespace SMS_App.Controllers
             {
                 GlobalUI.PageTitle = "Update Configure Parameter";
                 ParamBusConfig existingParamBusConfig = await _paramBusConfigManager.GetByIdAsync(paramBusConfig.Id);
+                if (existingParamBusConfig == null)
+                {
+                    TempData["failed"] = "Configuration data not found.";
+                    return RedirectToAction(nameof(Index));
+                }
                 try
                 {
                     existingParamBusConfig.EditedBy = HttpContext.Session.GetString("UserId");
@@ -58,6 +63,10 @@ namespace SMS_App.Controllers
                     if (isUpdated)
                     {
                         TempData["created"] = "Configuration data updated Successfully";
+                    }
+                    else
+                    {
+                        TempData["failed"] = "Fail to update configuration data.";
                     }
                 }
                 catch (Exception)
