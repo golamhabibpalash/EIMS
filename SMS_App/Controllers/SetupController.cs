@@ -178,7 +178,7 @@ namespace SMS_App.Controllers
                 .Select(s => new
                 {
                     s.Id,
-                    Label = $"{s.Name} ({s.UniqueId})"
+                    Label = $"{s.Name} ({s.UniqueId}) - Roll {s.ClassRoll}"
                 })
                 .ToList();
             return new SelectList(students, "Id", "Label");

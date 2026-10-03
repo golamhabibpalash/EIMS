@@ -70,4 +70,14 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script>
+        $(function () {
+            $('#SampleStudentId').select2({
+                theme: 'bootstrap-5',
+                width: '100%',
+                placeholder: '-- Select an active student --',
+                allowClear: true
+            });
+        });
+    </script>
 }
