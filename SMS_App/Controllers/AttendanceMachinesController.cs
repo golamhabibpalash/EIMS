@@ -117,11 +117,7 @@ public class AttendanceMachinesController : Controller
                             phoneSMS.CreatedBy = HttpContext.Session.GetString("UserId");
                             phoneSMS.MobileNumber = st.GuardianPhone == null ? st.PhoneNo : st.GuardianPhone;
                             var smsInstitute = await _instituteManager.GetFirstOrDefaultAsync();
-                            var smsInstituteName = smsInstitute == null || string.IsNullOrWhiteSpace(smsInstitute.ShortName)
-                                ? smsInstitute?.Name?.Trim() ?? string.Empty
-                                : smsInstitute.ShortName.Trim();
-                            var smsNameSuffix = string.IsNullOrWhiteSpace(smsInstituteName) ? string.Empty : " -" + smsInstituteName;
-                            phoneSMS.Text = st.NameBangla + " আজ " + model.PunchDatetime.ToString("hh:mm tt") + " মিনিটে স্কুলে উপস্থিত হয়েছে।" + smsNameSuffix + " ।";
+                            phoneSMS.Text = AttendanceSmsText.CheckIn(st.NameBangla, model.PunchDatetime.ToString("hh:mm tt"), AttendanceSmsText.DisplayName(smsInstitute));
                             phoneSMS.SMSType = "CheckIn";
                             bool isSend = await MobileSMS.SendSMS(phoneSMS.MobileNumber, phoneSMS.Text);                                
                             if (isSaved)

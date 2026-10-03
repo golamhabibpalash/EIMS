@@ -1,0 +1,67 @@
+@model SMS_App.ViewModels.SetupVM.SmsTestVM
+@{
+    ViewData["Title"] = "SMS Dry-Run Test";
+    GlobalUI.PageTitle = "SMS Dry-Run Test";
+}
+
+<div class="row">
+    <div class="col-md-10">
+        <fieldset class="border-primary p-2 border">
+            <legend class="w-auto text-primary">Attendance SMS dry-run</legend>
+            <p class="text-muted">
+                Preview the exact text guardians receive, composed by the same code as the live jobs.
+                Current institute signature: <strong>-@(string.IsNullOrEmpty(Model.InstituteName) ? "(none set)" : Model.InstituteName)</strong>
+            </p>
+            <form asp-action="TestSms" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="form-group row mb-2">
+                    <label asp-for="SampleName" class="control-label col-md-3 col-form-label text-md-end"></label>
+                    <div class="col-md-9">
+                        <input asp-for="SampleName" class="form-control" />
+                        <span asp-validation-for="SampleName" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row mb-2">
+                    <label asp-for="TestNumber" class="control-label col-md-3 col-form-label text-md-end"></label>
+                    <div class="col-md-9">
+                        <input asp-for="TestNumber" class="form-control" placeholder="01XXXXXXXXX (only needed to send)" />
+                        <small class="text-muted">Preview costs nothing. Sending uses real gateway balance.</small>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <div class="col-md-9 offset-md-3">
+                        <button type="submit" name="command" value="preview" class="btn btn-info"><i class="fa fa-eye"></i> Preview</button>
+                        <button type="submit" name="command" value="send" class="btn btn-navy-blue"><i class="fa fa-paper-plane"></i> Preview &amp; send test SMS</button>
+                        <a asp-action="SMSControl" class="btn btn-secondary">Back</a>
+                    </div>
+                </div>
+            </form>
+        </fieldset>
+
+        @if (!string.IsNullOrEmpty(Model.Result))
+        {
+            <div class="alert @(Model.Sent ? "alert-success" : "alert-warning") mt-3">@Model.Result</div>
+        }
+
+        @if (!string.IsNullOrEmpty(Model.PreviewCheckIn))
+        {
+            <div class="card mt-3">
+                <div class="card-header bg-navy-blue text-light">Composed messages (exactly as sent)</div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-md-2">Check-in</dt>
+                        <dd class="col-md-10 border rounded p-2">@Model.PreviewCheckIn</dd>
+                        <dt class="col-md-2">Check-out</dt>
+                        <dd class="col-md-10 border rounded p-2">@Model.PreviewCheckOut</dd>
+                        <dt class="col-md-2">Absent</dt>
+                        <dd class="col-md-10 border rounded p-2">@Model.PreviewAbsent</dd>
+                    </dl>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

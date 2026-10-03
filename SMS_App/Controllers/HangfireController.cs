@@ -362,7 +362,7 @@ public class HangfireController : ControllerBase
                                 else
                                 {
                                     string studentName = !string.IsNullOrEmpty(student.NameBangla) ? student.NameBangla : student.Name;
-                                    string smsText = GenerateCheckInSMSText(studentName, attendance.PunchDatetime.ToString("hh:mm tt"), instituteShortName);
+                                    string smsText = AttendanceSmsText.CheckIn(studentName, attendance.PunchDatetime.ToString("hh:mm tt"), instituteShortName);
                                     if (PhoneNumberValidate(phoneNumber) == false)
                                     {
                                         continue;
@@ -445,7 +445,7 @@ public class HangfireController : ControllerBase
                                 else
                                 {
                                     string studentName = !string.IsNullOrEmpty(student.NameBangla) ? student.NameBangla : student.Name;
-                                    string smsText = GenerateCheckInSMSText(studentName, attendance.PunchDatetime.ToString("hh:mm tt"), instituteShortName);
+                                    string smsText = AttendanceSmsText.CheckIn(studentName, attendance.PunchDatetime.ToString("hh:mm tt"), instituteShortName);
                                     if (PhoneNumberValidate(phoneNumber) == false)
                                     {
                                         continue;
@@ -527,7 +527,7 @@ public class HangfireController : ControllerBase
                             {
                                 employeeName = !string.IsNullOrEmpty(empObject.EmployeeNameBangla) ? empObject.EmployeeNameBangla : empObject.EmployeeName;
                                 attTime = att.PunchDatetime.ToString("hh:mm tt");
-                                smsText = GenerateCheckInSMSText(employeeName, attTime, instituteShortName);
+                                smsText = AttendanceSmsText.CheckIn(employeeName, attTime, instituteShortName);
 
                                 if (PhoneNumberValidate(phoneNumber) == false)
                                 {
@@ -644,7 +644,7 @@ public class HangfireController : ControllerBase
                             else
                             {
                                 string studentName = !string.IsNullOrEmpty(student.NameBangla) ? student.NameBangla : student.Name;
-                                string smsText = GenerateCheckOutSMSText(studentName, attendance.PunchDatetime.ToString("hh:mm tt"), instituteShortName);
+                                string smsText = AttendanceSmsText.CheckOut(studentName, attendance.PunchDatetime.ToString("hh:mm tt"), instituteShortName);
                                 bool isSMSSent = await MobileSMS.SendSMS(phoneNumber, smsText);
                                 if (isSMSSent)
                                 {
@@ -716,7 +716,7 @@ public class HangfireController : ControllerBase
                             else
                             {
                                 string studentName = !string.IsNullOrEmpty(student.NameBangla) ? student.NameBangla : student.Name;
-                                string smsText = GenerateCheckOutSMSText(studentName, attendance.PunchDatetime.ToString("hh:mm tt"), instituteShortName);
+                                string smsText = AttendanceSmsText.CheckOut(studentName, attendance.PunchDatetime.ToString("hh:mm tt"), instituteShortName);
                                 bool isSMSSent = await MobileSMS.SendSMS(phoneNumber, smsText);
                                 if (isSMSSent)
                                 {
@@ -776,7 +776,7 @@ public class HangfireController : ControllerBase
                         else
                         {
                             string empName = !string.IsNullOrEmpty(objEmployee.EmployeeNameBangla) ? objEmployee.EmployeeNameBangla : objEmployee.EmployeeName;
-                            string smsText = GenerateCheckOutSMSText(empName, attendance.PunchDatetime.ToString("hh:mm tt"), instituteShortName);
+                            string smsText = AttendanceSmsText.CheckOut(empName, attendance.PunchDatetime.ToString("hh:mm tt"), instituteShortName);
                             bool isSent = await MobileSMS.SendSMS(phoneNumber, smsText);
                             if (isSent)
                             {
@@ -1030,7 +1030,7 @@ public class HangfireController : ControllerBase
                     {
                         continue;
                     }
-                    string smsText = GenerateAbsentNotificationText(studentName, "student", 1, instituteShortName);
+                    string smsText = AttendanceSmsText.AbsentToday(studentName, DateTime.Now.ToString("dd MMM yyyy"), instituteShortName);
                     bool isSMSSent = await MobileSMS.SendSMS(phoneNumber, smsText);
                     if (isSMSSent)
                     {
@@ -1094,7 +1094,7 @@ public class HangfireController : ControllerBase
                     {
                         continue;
                     }
-                    string smsText = GenerateAbsentNotificationText(employeeName, "employee", 1, instituteShortName);
+                    string smsText = employeeName + " is not in school today.";
                     bool isSMSSent = await MobileSMS.SendSMS(phoneNumber, smsText);
                     if (isSMSSent)
                     {
@@ -1132,73 +1132,12 @@ public class HangfireController : ControllerBase
     /// </summary>
     private async Task<string> GetInstituteShortNameAsync()
     {
-        var institute = await _instituteManager.GetFirstOrDefaultAsync();
-        if (institute == null || string.IsNullOrWhiteSpace(institute.ShortName))
-            return institute?.Name?.Trim() ?? string.Empty;
-        return institute.ShortName.Trim();
+        return AttendanceSmsText.DisplayName(await _instituteManager.GetFirstOrDefaultAsync());
     }
 
-    private static string SmsNameSuffix(string instituteShortName) =>
-        string.IsNullOrWhiteSpace(instituteShortName) ? string.Empty : " -" + instituteShortName.Trim();
-
-    private string GenerateCheckInSMSText(string name, string attendanceTime, string instituteShortName)
-    {
-        string msg = string.Empty;
-        if (!string.IsNullOrEmpty(attendanceTime) && !string.IsNullOrEmpty(name))
-        {
-            try
-            {
-                msg = name + " আজ " + attendanceTime + " মিনিটে স্কুলে উপস্থিত হয়েছে।" + SmsNameSuffix(instituteShortName) + " ।";
-                var tLength = msg.Length;
-            }
-            catch (Exception)
-            {
-
-                throw;
-            }
-        }
-        return msg;
-    }
-    private string GenerateCheckOutSMSText(string name, string attendanceTime, string instituteShortName)
-    {
-        string msg = string.Empty;
-        if (!string.IsNullOrEmpty(attendanceTime) && !string.IsNullOrEmpty(name))
-        {
-            try
-            {
-                msg = name + " স্কুল থেকে " + attendanceTime + " মিনিটে প্রস্থান করেছে।" + SmsNameSuffix(instituteShortName) + " ।";
-            }
-            catch (Exception)
-            {
-
-                throw;
-            }
-        }
-        return msg;
-    }
-
-    private string GenerateAbsentNotificationText(string name, string smsFor, int absentDayCount, string instituteShortName)
-    {
-        string msg = string.Empty;
-        if (absentDayCount == 1)
-        {
-            string dateTime = DateTime.Now.ToString("dd MMM yyyy");
-            if (smsFor == "employee")
-            {
-                msg = name + " is not in school today.";
-            }
-            else
-            {
-                msg = name + " আজ (" + dateTime + ") স্কুলে আসেনি ।" + SmsNameSuffix(instituteShortName) + "।";
-            }
-        }
-        if (absentDayCount > 1)
-        {
-            msg = name + "গত " + absentDayCount + " দিন থেকে স্কুলে আসছে না ।" + SmsNameSuffix(instituteShortName) + "।";
-        }
-
-        return msg;
-    }
+    // SMS wording lives in the shared AttendanceSmsText composer (same code the
+    // dry-run test page previews); the per-job institute name is resolved via
+    // GetInstituteShortNameAsync() above and passed in at each call site.
     #endregion SMS Generate Section Finished Here XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
     private bool PhoneNumberValidate(string phoneNumber)

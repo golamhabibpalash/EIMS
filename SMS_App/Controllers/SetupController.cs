@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using SchoolManagementSystem;
 using SMS_App.Utilities.MACIPServices;
+using SMS_App.Utilities.ShortMessageService;
 using SMS_App.ViewModels.SetupVM;
 using SMS_App.ViewModels.Students;
 using SMS.BLL.Contracts;
@@ -26,12 +28,16 @@ namespace SMS_App.Controllers
         private readonly IMapper _mapper;
         private readonly IStudentManager _studentManager;  
         private readonly IAcademicClassManager _academicClassManager;
-        public SetupController(ISetupMobileSMSManager setupMobileSMSManager, IMapper mapper, IStudentManager studentManager, IAcademicClassManager academicClassManager)
+        private readonly IInstituteManager _instituteManager;
+        private readonly IPhoneSMSManager _phoneSMSManager;
+        public SetupController(ISetupMobileSMSManager setupMobileSMSManager, IMapper mapper, IStudentManager studentManager, IAcademicClassManager academicClassManager, IInstituteManager instituteManager, IPhoneSMSManager phoneSMSManager)
         {
             _setupMobileSMSManager = setupMobileSMSManager;
             _mapper = mapper;
             _studentManager = studentManager;
             _academicClassManager = academicClassManager;
+            _instituteManager = instituteManager;
+            _phoneSMSManager = phoneSMSManager;
         }
 
         [Authorize(Policy = "IndexSetupPolicy")]
@@ -97,6 +103,62 @@ namespace SMS_App.Controllers
                 }
             }
             return View(attendanceSetupVM);
+        }
+
+        [HttpGet]
+        [Authorize(Policy = "SMSControlSetupPolicy")]
+        public async Task<IActionResult> TestSms()
+        {
+            GlobalUI.PageTitle = "SMS Dry-Run Test";
+            var model = new SmsTestVM { SampleName = "টেস্ট শিক্ষার্থী" };
+            model.InstituteName = AttendanceSmsText.DisplayName(await _instituteManager.GetFirstOrDefaultAsync());
+            return View(model);
+        }
+
+        [HttpPost, ValidateAntiForgeryToken]
+        [Authorize(Policy = "SMSControlSetupPolicy")]
+        public async Task<IActionResult> TestSms(SmsTestVM model, string command)
+        {
+            GlobalUI.PageTitle = "SMS Dry-Run Test";
+            model.InstituteName = AttendanceSmsText.DisplayName(await _instituteManager.GetFirstOrDefaultAsync());
+            if (string.IsNullOrWhiteSpace(model.SampleName))
+            {
+                ModelState.AddModelError(nameof(model.SampleName), "Sample name is required.");
+                return View(model);
+            }
+
+            string time = DateTime.Now.ToString("hh:mm tt");
+            string today = DateTime.Now.ToString("dd MMM yyyy");
+            model.PreviewCheckIn = AttendanceSmsText.CheckIn(model.SampleName, time, model.InstituteName);
+            model.PreviewCheckOut = AttendanceSmsText.CheckOut(model.SampleName, time, model.InstituteName);
+            model.PreviewAbsent = AttendanceSmsText.AbsentToday(model.SampleName, today, model.InstituteName);
+
+            if (command == "send")
+            {
+                string number = (model.TestNumber ?? string.Empty).Trim();
+                if (!System.Text.RegularExpressions.Regex.IsMatch(number, @"^01[3-9]\d{8}$"))
+                {
+                    model.Result = "Enter a valid 11-digit mobile number starting with 013-019.";
+                    model.Sent = false;
+                    return View(model);
+                }
+                bool sent = await MobileSMS.SendSMS(number, model.PreviewCheckIn);
+                model.Sent = sent;
+                model.Result = sent ? $"Test SMS sent to {number}." : "Test SMS failed: gateway balance finished or provider problem.";
+                if (sent)
+                {
+                    await _phoneSMSManager.AddAsync(new PhoneSMS
+                    {
+                        Text = model.PreviewCheckIn,
+                        MobileNumber = number,
+                        SMSType = "Test",
+                        MACAddress = MACService.GetMAC(),
+                        CreatedAt = DateTime.Now,
+                        CreatedBy = HttpContext.Session.GetString("UserId")
+                    });
+                }
+            }
+            return View(model);
         }
 
         [HttpGet]
