@@ -110,8 +110,9 @@ namespace SMS_App.Controllers
         public async Task<IActionResult> TestSms()
         {
             GlobalUI.PageTitle = "SMS Dry-Run Test";
-            var model = new SmsTestVM { SampleName = "টেস্ট শিক্ষার্থী" };
+            var model = new SmsTestVM();
             model.InstituteName = AttendanceSmsText.DisplayName(await _instituteManager.GetFirstOrDefaultAsync());
+            ViewBag.StudentList = await ActiveStudentOptionsAsync();
             return View(model);
         }
 
@@ -121,11 +122,19 @@ namespace SMS_App.Controllers
         {
             GlobalUI.PageTitle = "SMS Dry-Run Test";
             model.InstituteName = AttendanceSmsText.DisplayName(await _instituteManager.GetFirstOrDefaultAsync());
-            if (string.IsNullOrWhiteSpace(model.SampleName))
+            ViewBag.StudentList = await ActiveStudentOptionsAsync();
+            if (model.SampleStudentId == null)
             {
-                ModelState.AddModelError(nameof(model.SampleName), "Sample name is required.");
+                ModelState.AddModelError(nameof(model.SampleStudentId), "Select a student.");
                 return View(model);
             }
+            var student = await _studentManager.GetByIdAsync(model.SampleStudentId.Value);
+            if (student == null)
+            {
+                ModelState.AddModelError(nameof(model.SampleStudentId), "Selected student no longer exists.");
+                return View(model);
+            }
+            model.SampleName = !string.IsNullOrEmpty(student.NameBangla) ? student.NameBangla : student.Name;
 
             string time = DateTime.Now.ToString("hh:mm tt");
             string today = DateTime.Now.ToString("dd MMM yyyy");
@@ -159,6 +168,20 @@ namespace SMS_App.Controllers
                 }
             }
             return View(model);
+        }
+
+        private async Task<SelectList> ActiveStudentOptionsAsync()
+        {
+            var students = (await _studentManager.GetAllAsync())
+                .Where(s => s.Status == true)
+                .OrderBy(s => s.Name)
+                .Select(s => new
+                {
+                    s.Id,
+                    Label = $"{s.Name} ({s.UniqueId})"
+                })
+                .ToList();
+            return new SelectList(students, "Id", "Label");
         }
 
         [HttpGet]

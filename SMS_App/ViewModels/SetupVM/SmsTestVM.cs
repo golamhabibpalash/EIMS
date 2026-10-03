@@ -4,8 +4,9 @@ namespace SMS_App.ViewModels.SetupVM
 {
     public class SmsTestVM
     {
-        [Required]
-        [Display(Name = "Sample name")]
+        [Display(Name = "Student")]
+        public int? SampleStudentId { get; set; }
+
         public string SampleName { get; set; }
 
         [Display(Name = "Test mobile number")]
