@@ -25,6 +25,9 @@ public class PermissionClaimsTransformation : IClaimsTransformation
 {
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(15);
 
+    public static string CacheKey(string userId, string securityStamp) =>
+        $"permclaims:{userId}:{securityStamp}";
+
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly IMemoryCache _cache;
@@ -49,7 +52,7 @@ public class PermissionClaimsTransformation : IClaimsTransformation
             return principal;
 
         var stamp = principal.FindFirstValue(_userManager.Options.ClaimsIdentity.SecurityStampClaimType);
-        var cacheKey = $"permclaims:{userId}:{stamp}";
+        var cacheKey = CacheKey(userId, stamp);
 
         if (!_cache.TryGetValue(cacheKey, out List<Claim> claims))
         {

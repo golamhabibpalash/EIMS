@@ -3,9 +3,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using SMS.BLL.Contracts;
 using SMS.Entities;
+using SMS_App.Configurations;
 using SMS_App.Utilities.EmailServices;
 using SMS_App.Utilities.LoggerService;
 using SMS_App.Utilities.MACIPServices;
@@ -32,9 +34,10 @@ public class AccountsController : Controller
     private readonly ILogger<AccountsController> _logger;
     private readonly ILogManager _logManager;
     private readonly IAppLogger _appLogger;
+    private readonly IMemoryCache _cache;
     //private readonly ApplicationDbContext _context;
 
-    public AccountsController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IStudentManager studentManager, IEmployeeManager employeeManager, RoleManager<IdentityRole> roleManager, IPhoneSMSManager phoneSMSManager, IInstituteManager instituteManager, ILogger<AccountsController> logger, ILogManager logManager, IAppLogger appLogger = null)
+    public AccountsController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IStudentManager studentManager, IEmployeeManager employeeManager, RoleManager<IdentityRole> roleManager, IPhoneSMSManager phoneSMSManager, IInstituteManager instituteManager, ILogger<AccountsController> logger, ILogManager logManager, IMemoryCache cache, IAppLogger appLogger = null)
     {
         _signInManager = signInManager;
         _userManager = userManager;
@@ -45,6 +48,7 @@ public class AccountsController : Controller
         _instituteManager = instituteManager;
         _logger = logger;
         _logManager = logManager;
+        _cache = cache;
         _appLogger = appLogger;
     }
 
@@ -765,6 +769,11 @@ public class AccountsController : Controller
             }
             if (result.Succeeded)
             {
+                // Role membership feeds the request principal via
+                // PermissionClaimsTransformation: drop the cached set so the
+                // change applies on the user's next request, no re-login.
+                _cache.Remove(PermissionClaimsTransformation.CacheKey(
+                    user.Id, await _userManager.GetSecurityStampAsync(user)));
                 if (i < (model.Count - 1))
                 {
                     continue;

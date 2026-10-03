@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.TagHelpers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using SchoolManagementSystem;
+using SMS_App.Configurations;
 using SMS_App.ViewModels.AdministrationVM;
 using SMS_App.ViewModels.ClaimContext;
 using SMS.BLL.Contracts;
@@ -28,13 +30,15 @@ namespace SMS_App.Controllers
         private readonly RoleManager<IdentityRole> _roleManager;
         private readonly IClaimStoreManager _claimStoreManager;
         private readonly IProjectModuleManager _projectModuleManager;
-        public AdministrationsController(IEmployeeManager employeeManager, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, IClaimStoreManager claimStoreManager, IProjectModuleManager projectModuleManager)
+        private readonly IMemoryCache _cache;
+        public AdministrationsController(IEmployeeManager employeeManager, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, IClaimStoreManager claimStoreManager, IProjectModuleManager projectModuleManager, IMemoryCache cache)
         {
             _employeeManager = employeeManager;
             _userManager = userManager;
             _roleManager = roleManager;
             _claimStoreManager = claimStoreManager;
             _projectModuleManager = projectModuleManager;
+            _cache = cache;
         }
 
         [Authorize(Policy = "ViewUserProfileAdministrationsPolicy")]
@@ -139,6 +143,13 @@ namespace SMS_App.Controllers
 
                 foreach (var claim in toAdd)
                     await _userManager.AddClaimAsync(aUser, claim);
+
+                // Auto-sync: drop the cached permission set so the user's next
+                // request reloads fresh claims - no logout/login needed. This also
+                // makes revocations effective immediately (safer than waiting for
+                // cookie/cache expiry).
+                _cache.Remove(PermissionClaimsTransformation.CacheKey(
+                    aUser.Id, await _userManager.GetSecurityStampAsync(aUser)));
 
                 // Roles
                 var userRoles = await _userManager.GetRolesAsync(aUser);
