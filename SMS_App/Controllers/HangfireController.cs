@@ -261,6 +261,7 @@ public class HangfireController : ControllerBase
     #endregion Fingerprint Machine Jobs Finished xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
     #region CheckIn SMS Section Start===========================================
+    [Hangfire.DisableConcurrentExecution(timeoutInSeconds: 1800)]
     public async Task<string> SendCheckInSMS()
     {
         string msg = string.Empty;
@@ -354,7 +355,7 @@ public class HangfireController : ControllerBase
                             }
                             else
                             {
-                                bool isAlreadySMSSent = await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, DateTime.Now.ToString("dd-MM-yyyy"));
+                                bool isAlreadySMSSent = !SmsSendGate.TryClaim(phoneNumber, smsType) || await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, DateTime.Now.ToString("dd-MM-yyyy"));
                                 if (isAlreadySMSSent)
                                 {
                                     continue;
@@ -437,7 +438,7 @@ public class HangfireController : ControllerBase
                             }
                             else
                             {
-                                bool isAlreadySMSSent = await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, DateTime.Now.ToString("dd-MM-yyyy"));
+                                bool isAlreadySMSSent = !SmsSendGate.TryClaim(phoneNumber, smsType) || await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, DateTime.Now.ToString("dd-MM-yyyy"));
                                 if (isAlreadySMSSent)
                                 {
                                     continue;
@@ -518,7 +519,7 @@ public class HangfireController : ControllerBase
                         {
                             phoneNumber = empObject.Phone;
 
-                            bool isSMSAlredySent = await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, DateTime.Now.ToString("dd-MM-yyyy"));
+                            bool isSMSAlredySent = !SmsSendGate.TryClaim(phoneNumber, smsType) || await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, DateTime.Now.ToString("dd-MM-yyyy"));
                             if (isSMSAlredySent)
                             {
                                 continue;
@@ -567,6 +568,7 @@ public class HangfireController : ControllerBase
     #endregion CheckIn SMS Section Finished xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
     #region CheckOut SMS Section Start =========================================
+    [Hangfire.DisableConcurrentExecution(timeoutInSeconds: 1800)]
     public async Task<IActionResult> SendCheckOutSMS()
     {
         string msg = string.Empty;
@@ -636,7 +638,7 @@ public class HangfireController : ControllerBase
                         else
                         {
                             string smsType = "CheckOut";
-                            bool isAlreadySent = await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, date.ToString("dd-MM-yyyy"));
+                            bool isAlreadySent = !SmsSendGate.TryClaim(phoneNumber, smsType) || await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, date.ToString("dd-MM-yyyy"));
                             if (isAlreadySent)
                             {
                                 continue;
@@ -708,7 +710,7 @@ public class HangfireController : ControllerBase
                         else
                         {
                             string smsType = "CheckOut";
-                            bool isAlreadySent = await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, date.ToString("dd-MM-yyyy"));
+                            bool isAlreadySent = !SmsSendGate.TryClaim(phoneNumber, smsType) || await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, date.ToString("dd-MM-yyyy"));
                             if (isAlreadySent)
                             {
                                 continue;
@@ -768,7 +770,7 @@ public class HangfireController : ControllerBase
                     {
                         string phoneNumber = objEmployee.Phone;
                         string smsType = "CheckOut";
-                        bool isAlreadySent = await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, date.ToString("dd-MM-yyyy"));
+                        bool isAlreadySent = !SmsSendGate.TryClaim(phoneNumber, smsType) || await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, date.ToString("dd-MM-yyyy"));
                         if (isAlreadySent)
                         {
                             continue;
@@ -809,6 +811,7 @@ public class HangfireController : ControllerBase
 
     #region Summary SMS Region Start Here ======================================
 
+    [Hangfire.DisableConcurrentExecution(timeoutInSeconds: 1800)]
     public async Task<IActionResult> SMSSendDailyAttendanceSummary()
     {
         var currentMonthHolidays = await _offDayManager.GetMonthlyHolidaysAsync(DateTime.Now.ToString("MMyyyy"));
@@ -912,7 +915,7 @@ public class HangfireController : ControllerBase
                         {
                             foreach (var num in phoneNumber)
                             {
-                                bool isAlreadySent = await _phoneSMSManager.IsSMSSendForAttendance(num, smsType, DateTime.Today.ToString("dd-MM-yyyy"));
+                                bool isAlreadySent = !SmsSendGate.TryClaim(num, smsType) || await _phoneSMSManager.IsSMSSendForAttendance(num, smsType, DateTime.Today.ToString("dd-MM-yyyy"));
                                 if (isAlreadySent)
                                 {
                                     continue;
@@ -958,6 +961,7 @@ public class HangfireController : ControllerBase
 
 
     #region Absent Student Notification by SMS Start here ======================
+    [Hangfire.DisableConcurrentExecution(timeoutInSeconds: 1800)]
     public async Task<IActionResult> SendAbsentNotificationSMS()
     {
 
@@ -1025,7 +1029,7 @@ public class HangfireController : ControllerBase
                     }
                     string studentName = student.NameBangla != null ? student.NameBangla : student.Name != null ? student.Name : string.Empty;
                     string smsType = "absent";
-                    bool isAlreadySMSSent = await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, date);
+                    bool isAlreadySMSSent = !SmsSendGate.TryClaim(phoneNumber, smsType) || await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, date);
                     if (isAlreadySMSSent)
                     {
                         continue;
@@ -1089,7 +1093,7 @@ public class HangfireController : ControllerBase
                         continue;
                     }
                     string smsType = "absent";
-                    bool isAlreadySMSSent = await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, date);
+                    bool isAlreadySMSSent = !SmsSendGate.TryClaim(phoneNumber, smsType) || await _phoneSMSManager.IsSMSSendForAttendance(phoneNumber, smsType, date);
                     if (isAlreadySMSSent)
                     {
                         continue;
@@ -1153,6 +1157,7 @@ public class HangfireController : ControllerBase
     #region Income SMS===========================================================
     #region Daily Student Collection ============================================
 
+    [Hangfire.DisableConcurrentExecution(timeoutInSeconds: 1800)]
     public async Task<IActionResult> SendDailyCollectionSMS()
     {
         var currentMonthHolidays = await _offDayManager.GetMonthlyHolidaysAsync(DateTime.Now.ToString("MMyyyy"));
@@ -1195,7 +1200,7 @@ public class HangfireController : ControllerBase
 
                         foreach (var num in phoneNumber)
                         {
-                            bool isAlreadySent = await _phoneSMSManager.IsSMSSendForAttendance(num, smsType, DateTime.Today.ToString("dd-MM-yyyy"));
+                            bool isAlreadySent = !SmsSendGate.TryClaim(num, smsType) || await _phoneSMSManager.IsSMSSendForAttendance(num, smsType, DateTime.Today.ToString("dd-MM-yyyy"));
                             if (!isAlreadySent)
                             {
                                 bool isSend = await MobileSMS.SendSMS(num, smsText);

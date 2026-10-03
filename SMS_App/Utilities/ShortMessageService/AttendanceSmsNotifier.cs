@@ -149,7 +149,7 @@ namespace SMS_App.Utilities.ShortMessageService
             if (string.IsNullOrWhiteSpace(mobileNumber))
                 return AttendanceSmsResult.Skip($"{name} has no contact number on file");
 
-            var alreadySent = await _phoneSMSManager.IsSMSSendForAttendance(
+            var alreadySent = !SmsSendGate.TryClaim(mobileNumber, attendanceType) || await _phoneSMSManager.IsSMSSendForAttendance(
                 mobileNumber, attendanceType, DateTime.Now.ToString("yyyyMMdd"));
 
             if (alreadySent)

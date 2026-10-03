@@ -119,11 +119,20 @@ public class AttendanceMachinesController : Controller
                             var smsInstitute = await _instituteManager.GetFirstOrDefaultAsync();
                             phoneSMS.Text = AttendanceSmsText.CheckIn(st.NameBangla, model.PunchDatetime.ToString("hh:mm tt"), AttendanceSmsText.DisplayName(smsInstitute));
                             phoneSMS.SMSType = "CheckIn";
-                            bool isSend = await MobileSMS.SendSMS(phoneSMS.MobileNumber, phoneSMS.Text);                                
-                            if (isSaved)
+                            bool alreadySent = !SmsSendGate.TryClaim(phoneSMS.MobileNumber, phoneSMS.SMSType)
+                                || await _phoneSMSManager.IsSMSSendForAttendance(phoneSMS.MobileNumber, phoneSMS.SMSType, DateTime.Now.ToString("dd-MM-yyyy"));
+                            if (!alreadySent)
                             {
-                               await _phoneSMSManager.AddAsync(phoneSMS);
-                                msg ="New attendance added manually with sms for" + model.CardNo;
+                            bool isSend = await MobileSMS.SendSMS(phoneSMS.MobileNumber, phoneSMS.Text);                                
+                            if (isSend)
+                            {
+                                await _phoneSMSManager.AddAsync(phoneSMS);
+                                msg = "New attendance added manually with sms for" + model.CardNo;
+                            }
+                            }
+                            else
+                            {
+                                msg = "Attendance saved; CheckIn SMS already sent to this number today.";
                             }
 
                         }
