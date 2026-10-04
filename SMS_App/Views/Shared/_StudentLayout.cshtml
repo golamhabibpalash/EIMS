@@ -82,7 +82,7 @@
 <body class="nav-md">
     @if (Context.Session.GetString("ImpersonatorId") != null)
     {
-        <div class="alert alert-warning text-center mb-0" role="alert" style="position:relative;z-index:2000;">
+        <div class="alert alert-warning text-center mb-0" role="alert" style="position:fixed;top:0;left:0;right:0;z-index:10060;">
             <i class="fa fa-user-secret"></i> You are testing as another user. Actions count as them.
             <a asp-controller="Accounts" asp-action="StopImpersonation" class="btn btn-sm btn-danger ms-2">Stop &amp; return to my account</a>
         </div>
