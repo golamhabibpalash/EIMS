@@ -204,8 +204,10 @@ public class AccountsController : Controller
         return RedirectToAction("Index", "Home");
     }
 
-    [HttpGet]
-    [Authorize]
+    // NOTE: intentionally AllowAnonymous. The class-level SuperAdmin gate would
+    // lock out the very (non-admin) test user this must rescue. Safety comes
+    // from the server-side session marker: without it this only redirects.
+    [HttpGet, AllowAnonymous]
     public async Task<IActionResult> StopImpersonation()
     {
         string adminId = HttpContext.Session.GetString("ImpersonatorId");
