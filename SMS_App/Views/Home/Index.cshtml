@@ -480,6 +480,8 @@
             </div>
         </div>
 
+        @if (ViewBag.CanSeeFinance == true)
+        {
         <div class="col-xl-3 col-lg-6 col-md-6 mb-4 animate-3">
             <div class="card stat-card h-100" style="--card-gradient: linear-gradient(135deg, #0d6efd, #0a58ca);">
                 <div class="card-body" style="background: linear-gradient(135deg, #e7f1ff, #bbd4f8);">
@@ -505,6 +507,7 @@
                 </a>
             </div>
         </div>
+        }
 
         <div class="col-xl-3 col-lg-6 col-md-6 mb-4 animate-4">
             <div class="card stat-card h-100" style="--card-gradient: linear-gradient(135deg, #fd7e14, #d63384);">
@@ -588,6 +591,8 @@
             </div>
         </div>
 
+        @if (ViewBag.CanSeeFinance == true)
+        {
         <div class="col-lg-6 mb-4">
             <div class="card custom-card">
                 <div class="card-header">
@@ -646,6 +651,7 @@
                 </div>
             </div>
         </div>
+        }
     </div>
 
     <div class="row mt-2">

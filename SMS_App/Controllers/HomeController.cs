@@ -63,6 +63,22 @@ public class HomeController : Controller
             
             HttpContext.Session.SetString("UserId", user.Id);
 
+            // Money is restricted: only holders of a finance/accounts permission
+            // claim see collection figures; everyone else (teachers, other
+            // staff) gets the dashboard without them. Strictly claim-based, so
+            // granting/revoking works through User Profile with no code change.
+            // To widen/narrow the audience, edit this list only.
+            string[] financeClaimValues = new[]
+            {
+                "PaymentStudentPaymentsPolicy", "DuePaymentStudentPaymentsPolicy",
+                "PreviousDuePaymentStudentPaymentsPolicy", "StudentPaymentInfoReportsPolicy",
+                "StudentPaymentReportsPolicy", "ReceiptPaymentReportsPolicy",
+                "IndexStudentFeeAllocationsPolicy", "GroupStudentFeeAllocationsPolicy",
+                "IndexStudentFeeHeadsPolicy", "IndexClassFeeListsPolicy"
+            };
+            bool canSeeFinance = financeClaimValues.Any(v => User.Claims.Any(c => c.Value == v));
+            ViewBag.CanSeeFinance = canSeeFinance;
+
             var institute = await _instituteManager.GetFirstOrDefaultAsync();
             ViewBag.InstituteLogo = institute?.Logo;
             ViewBag.InstituteName = institute?.Name;
@@ -129,7 +145,9 @@ public class HomeController : Controller
                 dashboard.TodayAbsentStudentList = new List<Student>();
             }
 
-            // Today's Collection
+            // Today's Collection (skipped entirely for staff without finance access)
+            if (canSeeFinance)
+            {
             try
             {
                 var todayCollections = await _studentPaymentManager.GetPaymentSummeryByDate(today);
@@ -152,6 +170,7 @@ public class HomeController : Controller
             catch
             {
                 dashboard.MonthlyCollection = 0;
+            }
             }
 
             // Class-wise student counts
