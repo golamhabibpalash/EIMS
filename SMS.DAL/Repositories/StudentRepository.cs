@@ -104,17 +104,34 @@ namespace SMS.DAL.Repositories
         }
         public async Task<Student> GetStudentByUniqueIdAsync(string uniqueId)
         {
-            // Callers include attendance-punch handlers (Hangfire jobs, the SMS notifier) that
-            // pass a raw machine CardNo, which the app can't control the formatting of. Student
-            // rows are now generated/cleaned up without a leading zero (see AttendancePinMatcher),
-            // so normalize the search value the same way instead of comparing raw strings.
-            var normalized = AttendancePinMatcher.Normalize(uniqueId) ?? uniqueId?.Trim();
+            // UniqueIds are inconsistently zero-padded across instances - and even
+            // across rows ("027826618" vs "27826618") - while callers pass raw
+            // machine CardNos, ReferenceIds and roll-derived strings. Exact match
+            // first (preserves today's behavior for clean data), then the padded
+            // variants, so a formatting difference can never silently drop a student
+            // (empty payment history, missed SMS, blank dashboard) again.
+            if (string.IsNullOrWhiteSpace(uniqueId))
+            {
+                return null;
+            }
+            var trimmed = uniqueId.Trim();
 
             var student = await _context.Student
                 .Include(s => s.AcademicClass)
                 .Include(s => s.AcademicSession)
                 .Include(s => s.AcademicSection)
-                .FirstOrDefaultAsync(s => s.UniqueId.Trim() == normalized);
+                .FirstOrDefaultAsync(s => s.UniqueId == trimmed);
+            if (student != null)
+            {
+                return student;
+            }
+
+            var keys = AttendancePinMatcher.KeyVariants(trimmed);
+            student = await _context.Student
+                .Include(s => s.AcademicClass)
+                .Include(s => s.AcademicSession)
+                .Include(s => s.AcademicSection)
+                .FirstOrDefaultAsync(s => s.UniqueId != null && keys.Contains(s.UniqueId.Trim()));
             return student;
         }
 
