@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using SMS.Entities.AdditionalModels.StudentVM;
+using SMS.Entities.Utilities;
 
 namespace SMS.BLL.Managers;
 
@@ -132,7 +133,7 @@ public class StudentPaymentManager : Manager<StudentPayment>, IStudentPaymentMan
     public async Task<List<StudentPayment>> GetPaymentByStudentUniqueId(string uniqueId)
     {
         var payments = await _studentPaymentRepository.GetAllAsync();
-        return payments.Where(p => p.UniqueId == uniqueId).ToList();
+        return payments.Where(p => AttendancePinMatcher.Matches(p.UniqueId, uniqueId)).ToList();
     }
 
     public async Task<List<PaidAmountResult>> GetPaidAmountByFeeHeadAsync(string uniqueId, int sessionId, int isResidential, int classId, int feeHeadId)

@@ -5,6 +5,7 @@ using SMS.DB;
 using SMS.Entities;
 using SMS.Entities.AdditionalModels;
 using SMS.Entities.AdditionalModels.Finance;
+using SMS.Entities.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -252,13 +253,16 @@ public class StudentPaymentRepository : Repository<StudentPayment>, IStudentPaym
         List<StudentPayment> payments = new List<StudentPayment>();
         try
         {
+            // Payment rows were historically written with inconsistent zero-padding
+            // ("02607009" vs "2607009"), so an exact match silently drops history.
+            var keys = AttendancePinMatcher.KeyVariants(uniqueId);
             payments = await _context.StudentPayment
             .Include(sp => sp.StudentPaymentDetails)
                 .ThenInclude(sp => sp.StudentFeeHead)
             .Include(s => s.Student)
                 .ThenInclude(ss => ss.AcademicClass)
             .Include(s => s.Student.AcademicSession)
-            .Where(sp => sp.UniqueId == uniqueId).ToListAsync();
+            .Where(sp => keys.Contains(sp.UniqueId)).ToListAsync();
         }
         catch (Exception)
         {
@@ -271,9 +275,10 @@ public class StudentPaymentRepository : Repository<StudentPayment>, IStudentPaym
         List<PaidAmountResult> result = new List<PaidAmountResult>();
         try
         {
+            var keys = AttendancePinMatcher.KeyVariants(uniqueId);
             var paidAmount = await _context.StudentPaymentDetails
                 .Include(pd => pd.StudentPayment)
-                .Where(pd => pd.StudentPayment.UniqueId == uniqueId
+                .Where(pd => keys.Contains(pd.StudentPayment.UniqueId)
                     && pd.StudentPayment.AcademicSessionId == sessionId
                     && pd.StudentFeeHeadId == feeHeadId)
                 .SumAsync(pd => pd.PaidAmount);

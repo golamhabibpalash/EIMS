@@ -3,6 +3,7 @@ using SMS.DAL.Contracts;
 using SMS.DAL.Repositories.Base;
 using SMS.DB;
 using SMS.Entities;
+using SMS.Entities.Utilities;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -33,8 +34,10 @@ namespace SMS.DAL.Repositories
 
         public async Task<List<StudentPaymentDetails>> GetAllByStudentAsync(string studentUniqueId)
         {
+            // Same zero-padding history as StudentPayment.UniqueId - match variants.
+            var keys = AttendancePinMatcher.KeyVariants(studentUniqueId);
             return await _context.StudentPaymentDetails
-                .Where(d => d.StudentPayment.UniqueId == studentUniqueId)
+                .Where(d => keys.Contains(d.StudentPayment.UniqueId))
                 .Include(d => d.StudentPayment)
                 .Include(d => d.StudentFeeHead)
                 .ToListAsync();

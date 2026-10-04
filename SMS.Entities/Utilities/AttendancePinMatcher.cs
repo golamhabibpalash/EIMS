@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 
 namespace SMS.Entities.Utilities
 {
@@ -41,6 +42,22 @@ namespace SMS.Entities.Utilities
         {
             var normalizedA = Normalize(a);
             return normalizedA != null && normalizedA == Normalize(b);
+        }
+
+        /// <summary>
+        /// All string forms worth matching in the database for one id: the trimmed
+        /// value plus its canonical form (so "02607009" also finds "2607009" and
+        /// vice versa). For use as <c>keys.Contains(column)</c> in EF queries,
+        /// which translates to SQL IN - the canonicalizer itself cannot run in SQL.
+        /// </summary>
+        public static string[] KeyVariants(string pin)
+        {
+            if (string.IsNullOrWhiteSpace(pin))
+            {
+                return System.Array.Empty<string>();
+            }
+
+            return new[] { pin.Trim(), Normalize(pin) }.Distinct().ToArray();
         }
     }
 }
