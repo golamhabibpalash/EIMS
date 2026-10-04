@@ -31,7 +31,11 @@ public class NavigationViewComponent : ViewComponent
         _userManager = userManager;
     }
 
-    public async Task<IViewComponentResult> InvokeAsync()
+    // viewName selects the markup flavor: "Default" (admin Smart theme) or
+    // "Gentelella" (teacher/student layouts). Filtering is identical - user
+    // claims + active DB modules - so every layout is permission-driven from
+    // the same SiteMap source with no per-layout hardcoding.
+    public async Task<IViewComponentResult> InvokeAsync(string viewName = "Default")
     {
         var user = _httpContextAccessor.HttpContext?.User;
         if (user == null)
@@ -89,6 +93,6 @@ public class NavigationViewComponent : ViewComponent
 
         var filteredSiteMap = new SiteMap { Modules = filteredModules };
 
-        return View(filteredSiteMap);
+        return View(viewName, filteredSiteMap);
     }
 }

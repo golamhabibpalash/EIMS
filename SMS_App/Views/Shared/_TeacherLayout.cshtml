@@ -118,45 +118,20 @@
                     <!-- sidebar menu -->
                     <div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
                         <div class="menu_section">
+                            @{
+                                var navUser = await _userManager.GetUserAsync(User);
+                            }
                             <ul class="nav side-menu">
                                 <li>
                                     <a asp-controller="Home" asp-action="Index"><i class="fas fa-home"></i> Dashboard </a>
                                 </li>
-                                <li>
-                                    <a><i class="fas fa-users"></i> Students <span class="fas fa-chevron-down"></span></a>
-                                    <ul class="nav child_menu">
-                                        <li>
-                                            <a asp-action="Index" asp-controller="Students">All Students</a>
-                                        </li>
-                                    </ul>
-                                </li>
-                                <li>
-                                    <a><i class="fas fa-clipboard-check"></i> Attendance <span class="fas fa-chevron-down"></span></a>
-                                    <ul class="nav child_menu">
-                                        <li>
-                                            <a asp-action="Create" asp-controller="AttendanceMachines">Add Attendance</a>
-                                        </li>
-                                        <li>
-                                            <a asp-action="DailyAttendanceReport" asp-controller="Reports">Daily Report</a>
-                                        </li>
-                                    </ul>
-                                </li>
-                                <li>
-                                    <a><i class="fas fa-pencil-alt"></i> Exams <span class="fas fa-chevron-down"></span></a>
-                                    <ul class="nav child_menu">
-                                        <li>
-                                            <a asp-action="Index" asp-controller="AcademicExams">Examinations</a>
-                                        </li>
-                                    </ul>
-                                </li>
-                                <li>
-                                    <a><i class="fas fa-user-tie"></i> Employees <span class="fas fa-chevron-down"></span></a>
-                                    <ul class="nav child_menu">
-                                        <li>
-                                            <a asp-action="Index" asp-controller="Employees">All Employees</a>
-                                        </li>
-                                    </ul>
-                                </li>
+                                @if (navUser != null && navUser.UserType == 's')
+                                {
+                                    <li>
+                                        <a asp-controller="Students" asp-action="Profile" asp-route-id="@navUser.ReferenceId"><i class="far fa-address-card"></i> My Profile </a>
+                                    </li>
+                                }
+                                @await Component.InvokeAsync("Navigation", new { viewName = "Gentelella" })
                             </ul>
                         </div>
                         <div class="menu_section">

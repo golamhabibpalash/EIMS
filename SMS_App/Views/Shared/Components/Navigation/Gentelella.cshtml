@@ -1,0 +1,35 @@
+@model SMS_App.ViewModels.ModuleSubModuleVM.SiteMap
+
+@* Permission-driven navigation for the Gentelella layouts (teacher/student).
+   The model arrives pre-filtered by NavigationViewComponent: only modules
+   active in ProjectModules and only items whose Claim value the current user
+   holds. New SiteMap entries / granted claims appear here automatically -
+   nothing is hardcoded. Items without a target are skipped defensively. *@
+@foreach (var module in Model.Modules)
+{
+    var subs = (module.Submodules ?? new List<SMS_App.ViewModels.ModuleSubModuleVM.Submodule>())
+        .Where(s => s.Items != null && s.Items.Any(i => !string.IsNullOrEmpty(i.Controller) && !string.IsNullOrEmpty(i.Action)))
+        .ToList();
+    if (!subs.Any())
+    {
+        continue;
+    }
+    <li>
+        <a><i class="@(string.IsNullOrEmpty(module.Icon) ? "fas fa-folder" : module.Icon)"></i> @module.DisplayName <span class="fas fa-chevron-down"></span></a>
+        <ul class="nav child_menu">
+            @foreach (var sub in subs)
+            {
+                if (subs.Count > 1)
+                {
+                    <li><span class="text-muted small">@sub.DisplayName</span></li>
+                }
+                @foreach (var item in sub.Items.Where(i => !string.IsNullOrEmpty(i.Controller) && !string.IsNullOrEmpty(i.Action)))
+                {
+                    <li>
+                        <a asp-controller="@item.Controller" asp-action="@item.Action">@item.DisplayName</a>
+                    </li>
+                }
+            }
+        </ul>
+    </li>
+}
