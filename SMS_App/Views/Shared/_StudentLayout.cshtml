@@ -1,4 +1,5 @@
 ﻿@using Microsoft.AspNetCore.Identity;
+@using Microsoft.AspNetCore.Http;
 
 @inject SignInManager<ApplicationUser> _signInManager;
 @inject UserManager<ApplicationUser> _userManager;
@@ -14,7 +15,7 @@
         GlobalUI.Logo = info.FirstOrDefault().Logo;
     }
     string instituteName = GlobalUI.InstituteName != null ? GlobalUI.InstituteName : "Institute Name";
-    string instituteLogo = GlobalUI.Logo != null ? GlobalUI.Logo : "nobleLogo.png";
+    string instituteLogo = !string.IsNullOrEmpty(GlobalUI.Logo) ? GlobalUI.Logo : "instituteLogo.png";
 }
 
 @{
@@ -59,8 +60,8 @@
     <!-- Bootstrap -->
     <link href="~/lib/bootstrap/bootstrap-5.3.8-dist/css/bootstrap.min.css" rel="stylesheet" />
 
-    <!-- Font Awesome -->
-    <link href="~/lib/fontawesome/css/fontawesome.min.css" rel="stylesheet" />
+    <!-- Font Awesome (all styles: solid/regular/brands - fontawesome.min.css alone defines no icons) -->
+    <link href="~/lib/fontawesome/css/all.min.css" rel="stylesheet" />
     <!-- NProgress -->
     <link href="~/lib/Theme/css/nprogress.css" rel="stylesheet" />
 
@@ -79,6 +80,13 @@
 </head>
 
 <body class="nav-md">
+    @if (Context.Session.GetString("ImpersonatorId") != null)
+    {
+        <div class="alert alert-warning text-center mb-0" role="alert" style="position:relative;z-index:2000;">
+            <i class="fa fa-user-secret"></i> You are testing as another user. Actions count as them.
+            <a asp-controller="Accounts" asp-action="StopImpersonation" class="btn btn-sm btn-danger ms-2">Stop &amp; return to my account</a>
+        </div>
+    }
     @await RenderSectionAsync("Styles", required: false)
     @*<body class="nav-sm">*@
     <div class="container body">
@@ -103,8 +111,10 @@
                         <div class="menu_section">
                             <ul class="nav side-menu">
                                 <li>
-                             @*        <a asp-controller="Students" asp-action="Details" asp-route-id="@user.ReferenceId"><i class="fa fa-home"></i> Details <span class="fa fa-chevron-down"></span></a> *@
-                                    <a asp-controller="Students" asp-action="Profile" asp-route-id="@user.ReferenceId"><i class="far fa-address-card"></i></a>
+                                    <a asp-controller="Home" asp-action="Index"><i class="fas fa-home"></i> Dashboard </a>
+                                </li>
+                                <li>
+                                    <a asp-controller="Students" asp-action="Profile" asp-route-id="@user.ReferenceId"><i class="far fa-address-card"></i> My Profile </a>
                                 </li>
 
                             </ul>
@@ -117,20 +127,20 @@
                     <!-- /sidebar menu -->
                     <!-- /menu footer buttons -->
                     <div class="sidebar-footer hidden-small">
-                        <a data-toggle="tooltip" data-placement="top" title="Settings">
-                            <span class="glyphicon glyphicon-cog" aria-hidden="true"></span>
+                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="Settings">
+                            <i class="fa fa-cog" aria-hidden="true"></i>
                         </a>
-                        <a data-toggle="tooltip" data-placement="top" title="FullScreen">
-                            <span class="glyphicon glyphicon-fullscreen" aria-hidden="true"></span>
+                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="FullScreen" onclick="toggleFullScreen();return false;" href="#">
+                            <i class="fa fa-expand" aria-hidden="true"></i>
                         </a>
-                        <a data-toggle="tooltip" data-placement="top" title="Lock">
-                            <span class="glyphicon glyphicon-eye-close" aria-hidden="true"></span>
+                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="Lock" asp-action="LockScreen" asp-controller="Accounts">
+                            <i class="fa fa-lock" aria-hidden="true"></i>
                         </a>
                         @if (_signInManager.IsSignedIn(User))
                         {
                             <form asp-action="Logout" asp-controller="accounts" method="post">
-                                <button data-toggle="tooltip" data-placement="top" title="Logout" type="submit">
-                                    <span class="glyphicon glyphicon-off" aria-hidden="true"></span>
+                                <button data-bs-toggle="tooltip" data-bs-placement="top" title="Logout" type="submit" style="background:none;border:none;color:inherit;">
+                                    <i class="fa fa-power-off" aria-hidden="true"></i>
                                 </button>
                             </form>
 
@@ -138,8 +148,8 @@
                         else
                         {
 
-                            <a data-toggle="tooltip" data-placement="top" title="Login" asp-action="login" asp-controller="Accounts">
-                                <span class="glyphicon glyphicon-log-in" aria-hidden="true"></span>
+                            <a data-bs-toggle="tooltip" data-bs-placement="top" title="Login" asp-action="login" asp-controller="Accounts">
+                                <i class="fa fa-sign-in-alt" aria-hidden="true"></i>
                             </a>
                         }
 
@@ -265,8 +275,18 @@
 
 
 
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(function () { });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
         $(document).ready(function () {
             menuToggle();
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.forEach(function (el) { new bootstrap.Tooltip(el); });
         });
     </script>
 </body>
