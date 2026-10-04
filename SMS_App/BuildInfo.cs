@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
 
@@ -26,6 +27,32 @@ namespace SchoolManagementSystem
         /// <summary>Compact label for the footer / sidebar, e.g. "1.2.3.57" or "1.2.3.0 (local)".</summary>
         public static string ShortDisplay =>
             IsOfficialBuild ? Version : $"{Version} (local)";
+
+        /// <summary>
+        /// Per-assembly build stamps. The footer commit only reflects SMS_App.dll,
+        /// so a stale SMS.DAL.dll (where most data-access fixes live) used to be
+        /// undetectable. The Version dialog lists every layer; all commits must
+        /// match after a full deploy.
+        /// </summary>
+        public static IReadOnlyList<(string Name, string Commit)> ComponentCommits()
+        {
+            return new[]
+            {
+                ("SMS_App", Commit),
+                ("SMS.BLL", CommitOf(typeof(SMS.BLL.Contracts.IPhoneSMSManager))),
+                ("SMS.DAL", CommitOf(typeof(SMS.DAL.Contracts.IStudentPaymentRepository))),
+                ("SMS.DB", CommitOf(typeof(SMS.DB.ApplicationDbContext))),
+                ("SMS.Entities", CommitOf(typeof(SMS.Entities.Student))),
+            };
+        }
+
+        private static string CommitOf(Type typeInAssembly)
+        {
+            var informational = typeInAssembly.Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            var parts = (informational ?? string.Empty).Split('+');
+            return parts.Length > 1 && parts[0].Length > 0 ? parts[1] : "unknown";
+        }
 
         static BuildInfo()
         {

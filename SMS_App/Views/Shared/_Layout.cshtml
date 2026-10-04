@@ -700,6 +700,14 @@
 
                             <dt class="col-5">Institute</dt>
                             <dd class="col-7">@instituteName</dd>
+
+                            <dt class="col-5">Components</dt>
+                            <dd class="col-7">
+                                @foreach (var component in BuildInfo.ComponentCommits())
+                                {
+                                    <div>@component.Name: <code>@component.Commit</code></div>
+                                }
+                            </dd>
                         </dl>
                     </div>
                     <div class="modal-footer">
