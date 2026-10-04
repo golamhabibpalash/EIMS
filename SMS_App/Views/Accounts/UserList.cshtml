@@ -44,6 +44,10 @@
                         <td>@item.ReferenceId</td>
                         <td>
                             <a class="btn btn-sm btn-warning rounded mr-1" asp-action="EditUser" asp-route-id="@item.Id" data-toggle="tooltip" data-placement="top" title="Edit"><i class="fa fa-edit"></i> </a>
+                            @if (User.IsInRole("SuperAdmin"))
+                            {
+                                <a class="btn btn-sm rounded btn-info mr-1" asp-action="Impersonate" asp-route-id="@item.Id" data-toggle="tooltip" data-placement="top" title="Login as this user for testing"><i class="fa fa-user-secret"></i> </a>
+                            }
                             <a class="btn btn-sm rounded btn-danger" asp-action="DeleteUser" asp-route-id="@item.Id" data-toggle="tooltip" data-placement="right" title="Delete"><i class="fa fa-trash"></i> </a>
                         </td>
                     </tr>

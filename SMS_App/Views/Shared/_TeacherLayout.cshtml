@@ -1,4 +1,5 @@
 ﻿@using Microsoft.AspNetCore.Identity;
+@using Microsoft.AspNetCore.Http;
 @using SMS.BLL.Contracts;
 
 @inject SignInManager<ApplicationUser> _signInManager;
@@ -97,6 +98,13 @@
 </head>
 
 <body class="nav-md">
+    @if (Context.Session.GetString("ImpersonatorId") != null)
+    {
+        <div class="alert alert-warning text-center mb-0" role="alert" style="position:relative;z-index:2000;">
+            <i class="fa fa-user-secret"></i> You are testing as another user. Actions count as them.
+            <a asp-controller="Accounts" asp-action="StopImpersonation" class="btn btn-sm btn-danger ms-2">Stop &amp; return to my account</a>
+        </div>
+    }
     @await RenderSectionAsync("Styles", required: false)
     @*<body class="nav-sm">*@
     <div class="container body">

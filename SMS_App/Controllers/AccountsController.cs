@@ -170,6 +170,67 @@ public class AccountsController : Controller
         return View();
     }
 
+    /// <summary>
+    /// Admin testing aid: sign in as another user without their password, so a
+    /// SuperAdmin can verify exactly what a teacher/student sees. The original
+    /// admin id is kept server-side in session (never in URLs or cookies the
+    /// browser can forge); StopImpersonation restores it. Every switch is
+    /// audit-logged. SuperAdmin-only, same gate as EditUser.
+    /// </summary>
+    [HttpGet]
+    [Authorize(Roles = "SuperAdmin")]
+    [Authorize(Policy = "EditUserAccountsPolicy")]
+    public async Task<IActionResult> Impersonate(string id)
+    {
+        if (!string.IsNullOrEmpty(HttpContext.Session.GetString("ImpersonatorId")))
+        {
+            TempData["msg"] = "Already testing as another user. Stop first to switch.";
+            return RedirectToAction("UserList");
+        }
+        var target = await _userManager.FindByIdAsync(id);
+        if (target == null)
+        {
+            return NotFound();
+        }
+        var admin = await _userManager.GetUserAsync(User);
+        HttpContext.Session.SetString("ImpersonatorId", admin.Id);
+        HttpContext.Session.SetString("UserId", target.Id);
+        await _signInManager.SignOutAsync();
+        await _signInManager.SignInAsync(target, isPersistent: false);
+        if (_appLogger != null)
+        {
+            await _appLogger.InfoAsync($"Impersonation started: {admin.UserName} is now testing as {target.UserName}.");
+        }
+        return RedirectToAction("Index", "Home");
+    }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<IActionResult> StopImpersonation()
+    {
+        string adminId = HttpContext.Session.GetString("ImpersonatorId");
+        if (string.IsNullOrEmpty(adminId))
+        {
+            return RedirectToAction("Index", "Home");
+        }
+        var admin = await _userManager.FindByIdAsync(adminId);
+        HttpContext.Session.Remove("ImpersonatorId");
+        if (admin == null)
+        {
+            await _signInManager.SignOutAsync();
+            return RedirectToAction("Login");
+        }
+        var current = await _userManager.GetUserAsync(User);
+        await _signInManager.SignOutAsync();
+        await _signInManager.SignInAsync(admin, isPersistent: false);
+        HttpContext.Session.SetString("UserId", admin.Id);
+        if (_appLogger != null)
+        {
+            await _appLogger.InfoAsync($"Impersonation stopped: {admin.UserName} returned from testing as {current?.UserName}.");
+        }
+        return RedirectToAction("UserList");
+    }
+
     [HttpPost, AllowAnonymous]
     public async Task<IActionResult> UserLogin(string userId)
     {

@@ -73,6 +73,13 @@
     <!-- END HEAD -->
 
 <body class="page-header-fixed sidemenu-closed-hidelogo page-content-white page-md header-white dark-sidebar-color logo-indigo">
+    @if (Context.Session.GetString("ImpersonatorId") != null)
+    {
+        <div class="alert alert-warning text-center mb-0" role="alert" style="position:relative;z-index:2000;">
+            <i class="fa fa-user-secret"></i> You are testing as another user. Actions count as them.
+            <a asp-controller="Accounts" asp-action="StopImpersonation" class="btn btn-sm btn-danger ms-2">Stop &amp; return to my account</a>
+        </div>
+    }
     <script>
         // Re-apply the sidebar's collapsed state before the page paints, so it does not
         // flash open on every navigation. layout.js has its own save/restore for this,
