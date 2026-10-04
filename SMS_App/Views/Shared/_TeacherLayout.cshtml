@@ -25,20 +25,18 @@
         var user = await _userManager.GetUserAsync(User);
         if (user.UserType == 's')
         {
-            var stu = await _studentManager.GetByIdAsync(user.ReferenceId);
-            if (stu.Photo != null)
-            {
-                userImage = "/Images/Student/Photo/" + stu.Photo;
-            }
-            else
-            {
-                userImage = "/Images/noProfileImage.png";
-            }
+            // ReferenceId holds the student's UniqueId (not the PK) - look up by
+            // UniqueId exactly like the Profile page does; GetByIdAsync returns
+            // null here and crashed the whole page with a 500.
+            var stu = await _studentManager.GetStudentByUniqueIdAsync(user.ReferenceId.ToString());
+            userImage = !string.IsNullOrEmpty(stu?.Photo)
+                ? "/Images/Student/Photo/" + stu.Photo
+                : "/Images/noProfileImage.png";
         }
         if (user.UserType == 'e')
         {
             var emp = await _employeeManager.GetByIdAsync(user.ReferenceId);
-            if (emp.Image != null)
+            if (emp != null && emp.Image != null)
             {
                 userImage = "/Images/Employee/Photo/" + emp.Image;
             }

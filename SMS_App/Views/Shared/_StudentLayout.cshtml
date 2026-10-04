@@ -27,7 +27,7 @@
         if (user.UserType == 's')
         {
             var stu = await _studentManager.GetStudentByUniqueIdAsync(user.ReferenceId.ToString());
-            if (stu.Photo != null)
+            if (stu != null && stu.Photo != null)
             {
                 userImage = "/Images/Student/" + stu.Photo;
             }
