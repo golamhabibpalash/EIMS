@@ -16,7 +16,7 @@
         GlobalUI.Logo = info.FirstOrDefault().Logo;
     }
     string instituteName = GlobalUI.InstituteName != null ? GlobalUI.InstituteName : "Institute Name";
-    string instituteLogo = GlobalUI.Logo != null ? GlobalUI.Logo : "nobleLogo.png";
+    string instituteLogo = !string.IsNullOrEmpty(GlobalUI.Logo) ? GlobalUI.Logo : "instituteLogo.png";
 }
 @{
     string userImage = "";
@@ -113,7 +113,7 @@
                 <div class="left_col scroll-view">
 
                     <div class="navbar nav_title" style="overflow:hidden">
-                        <a asp-action="Index" asp-controller="Home" class="" style="font-size:20px;color:#fff;font-weight:bold;width:100%"><img class="img-circle img-fluid p-2" src="~/Images/Institute/@instituteLogo" alt="Logo" style="width:60px;" /> @instituteName</a>
+                        <a asp-action="Index" asp-controller="Home" class="" style="font-size:20px;color:#fff;font-weight:bold;width:100%"><img class="img-circle img-fluid p-2" src="~/Images/Institute/@instituteLogo" alt="Logo" style="width:60px;" onerror="this.onerror=null;this.src='/Images/Institute/instituteLogo.png';" /> @instituteName</a>
                     </div>
 
                     <div class="clearfix"></div>
@@ -122,7 +122,7 @@
                         <div class="menu_section">
                             <ul class="nav side-menu">
                                 <li>
-                                    <a asp-controller="Home" asp-action="Index"><i class="fas fa-home"></i> Home </a>
+                                    <a asp-controller="Home" asp-action="Index"><i class="fas fa-home"></i> Dashboard </a>
                                 </li>
                                 <li>
                                     <a><i class="fas fa-users"></i> Students <span class="fas fa-chevron-down"></span></a>
@@ -133,18 +133,29 @@
                                     </ul>
                                 </li>
                                 <li>
-                                    <a><i class="fas fa-user"></i> Employee <span class="fas fa-chevron-down"></span></a>
+                                    <a><i class="fas fa-clipboard-check"></i> Attendance <span class="fas fa-chevron-down"></span></a>
                                     <ul class="nav child_menu">
                                         <li>
-                                            <a asp-action="Index" asp-controller="Employees"><span class="glyphicon glyphicon-asterisk"></span> All Employee</a>
+                                            <a asp-action="Create" asp-controller="AttendanceMachines">Add Attendance</a>
+                                        </li>
+                                        <li>
+                                            <a asp-action="DailyAttendanceReport" asp-controller="Reports">Daily Report</a>
                                         </li>
                                     </ul>
                                 </li>
                                 <li>
-                                    <a><i class="fas fa-layer-group text-light fa-2x"></i> Modules <span class="fas fa-chevron-down"></span></a>
+                                    <a><i class="fas fa-pencil-alt"></i> Exams <span class="fas fa-chevron-down"></span></a>
                                     <ul class="nav child_menu">
                                         <li>
-                                            <a asp-action="Index" asp-controller="AcademicExams"><span class="glyphicon glyphicon-asterisk"></span> Exams</a>
+                                            <a asp-action="Index" asp-controller="AcademicExams">Examinations</a>
+                                        </li>
+                                    </ul>
+                                </li>
+                                <li>
+                                    <a><i class="fas fa-user-tie"></i> Employees <span class="fas fa-chevron-down"></span></a>
+                                    <ul class="nav child_menu">
+                                        <li>
+                                            <a asp-action="Index" asp-controller="Employees">All Employees</a>
                                         </li>
                                     </ul>
                                 </li>
@@ -158,28 +169,28 @@
                     <!-- /sidebar menu -->
                     <!-- /menu footer buttons -->
                     <div class="sidebar-footer hidden-small">
-                        <a data-toggle="tooltip" data-placement="top" title="Settings">
-                            <span class="glyphicon glyphicon-cog" aria-hidden="true"></span>
+                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="Settings">
+                            <i class="fa fa-cog" aria-hidden="true"></i>
                         </a>
-                        <a data-toggle="tooltip" data-placement="top" title="FullScreen">
-                            <span class="glyphicon glyphicon-fullscreen" aria-hidden="true"></span>
+                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="FullScreen" onclick="toggleFullScreen();return false;" href="#">
+                            <i class="fa fa-expand" aria-hidden="true"></i>
                         </a>
-                        <a data-toggle="tooltip" data-placement="top" title="Lock">
-                            <span class="glyphicon glyphicon-eye-close" aria-hidden="true"></span>
+                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="Lock" asp-action="LockScreen" asp-controller="Accounts">
+                            <i class="fa fa-lock" aria-hidden="true"></i>
                         </a>
                         @if (_signInManager.IsSignedIn(User))
                         {
                             <form asp-action="Logout" asp-controller="accounts" method="post">
-                                <button data-toggle="tooltip" data-placement="top" title="Logout" type="submit">
-                                    <span class="glyphicon glyphicon-off" aria-hidden="true"></span>
+                                <button data-bs-toggle="tooltip" data-bs-placement="top" title="Logout" type="submit" style="background:none;border:none;color:inherit;">
+                                    <i class="fa fa-power-off" aria-hidden="true"></i>
                                 </button>
                             </form>
                         }
                         else
                         {
 
-                            <a data-toggle="tooltip" data-placement="top" title="Login" asp-action="login" asp-controller="Accounts">
-                                <span class="glyphicon glyphicon-log-in" aria-hidden="true"></span>
+                            <a data-bs-toggle="tooltip" data-bs-placement="top" title="Login" asp-action="login" asp-controller="Accounts">
+                                <i class="fa fa-sign-in-alt" aria-hidden="true"></i>
                             </a>
                         }
 
@@ -320,8 +331,18 @@
 
 
 
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(function () { });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
         $(document).ready(function () {
             menuToggle();
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.forEach(function (el) { new bootstrap.Tooltip(el); });
             //$('#menu_toggle').click();
             $("[data-toggle=popover]").popover({
                 html: true,
