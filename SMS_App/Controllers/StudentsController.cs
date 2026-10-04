@@ -1138,7 +1138,8 @@ public class StudentsController : Controller
                 return RedirectToAction("AccessDenied", "Accounts");
             }
         }
-        var student = await _studentManager.GetStudentByUniqueIdAsync(id.ToString());
+        var student = await _studentManager.GetStudentByUniqueIdAsync(id.ToString())
+            ?? await _studentManager.GetByIdAsync(id);
         if (student == null)
         {
             return NotFound();

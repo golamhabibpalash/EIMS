@@ -227,7 +227,10 @@ public class HomeController : Controller
         var dashboard = new StudentDashboardVM();
         try
         {
-            var student = await _studentManager.GetStudentByUniqueIdAsync(user.ReferenceId.ToString());
+            // ReferenceId is inconsistently the UniqueId or the PK across users -
+            // try UniqueId first, then fall back to PK so neither shape 404s.
+            var student = await _studentManager.GetStudentByUniqueIdAsync(user.ReferenceId.ToString())
+                ?? await _studentManager.GetByIdAsync(user.ReferenceId);
             if (student == null)
             {
                 return NotFound();
