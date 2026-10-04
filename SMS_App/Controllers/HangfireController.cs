@@ -56,8 +56,18 @@ public class HangfireController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> AttendanceBackgroundJob()
     {
-        var jobs = JobStorage.Current.GetConnection().GetRecurringJobs();
+        if (JobStorage.Current == null)
+        {
+            return Content("Hangfire is not enabled on this server (Hangfire:IsEnabled=false). Enable it and restart before registering schedules.");
+        }
         Institute institute = await _instituteManager.GetFirstOrDefaultAsync();
+        if (institute == null)
+        {
+            return Content("Institute information not found. Complete the institute profile first.");
+        }
+        try
+        {
+        var jobs = JobStorage.Current.GetConnection().GetRecurringJobs();
         DateTime instituteStartTime = institute.StartingTime;
         DateTime instituteCloseTime = institute.ClosingTime;
         DateTime instituteLateTime = institute.LateTime;
@@ -88,9 +98,10 @@ public class HangfireController : ControllerBase
                     TimeZone = TimeZoneInfo.Local,
                 };
                 var smsTime = await _paramBusConfigManager.GetByParamSL(7);
-
-                var finalTimeHr = smsTime?.ParamValue.Substring(0, smsTime.ParamValue.IndexOf(':')) ?? (startTimeHr + 1).ToString();
-                var finalTimeMn = smsTime?.ParamValue.Substring(smsTime.ParamValue.IndexOf(':') + 1) ?? (startTimeMn + 5).ToString();
+                // ParamValue must be 24-hour "HH:mm". Anything else (empty, "11:05 AM",
+                // "08:00:00") falls back to one hour after opening so a bad row can
+                // never produce an invalid CRON and kill the whole registration.
+                var (finalTimeHr, finalTimeMn) = ParseClockTime(smsTime?.ParamValue, startTimeHr + 1, startTimeMn + 5);
 
                 var cronEx = $"{finalTimeMn} {finalTimeHr} * * 0-4,6";
                 RecurringJob.AddOrUpdate(recurringJobId, () => SMSSendDailyAttendanceSummary(), cronEx, options);
@@ -105,11 +116,9 @@ public class HangfireController : ControllerBase
                 };
                 var smsStartTime = await _paramBusConfigManager.GetByParamSL(1);
                 var smsEndStop = await _paramBusConfigManager.GetByParamSL(2);
+                var window = ParseHourWindow(smsStartTime?.ParamValue, smsEndStop?.ParamValue, startTimeHr - 1, startTimeHr + 1);
 
-                var smsStartTimeHr = smsStartTime?.ParamValue.Substring(0, smsStartTime.ParamValue.IndexOf(':')) ?? (startTimeHr - 1).ToString();
-                var smsStartTimeMn = smsStartTime?.ParamValue.Substring(smsStartTime.ParamValue.IndexOf(':') + 1) ?? (startTimeHr - 1).ToString();
-                var smsEndTimeHr = smsEndStop?.ParamValue.Substring(0, smsStartTime.ParamValue.IndexOf(':')) ?? (startTimeHr + 1).ToString();
-                var cronEx = $"*/10 {smsStartTimeHr}-{smsEndTimeHr} * * 0-4,6";
+                var cronEx = $"*/10 {window.FromHr}-{window.ToHr} * * 0-4,6";
                 RecurringJob.AddOrUpdate(recurringJobId, () => SendCheckInSMS(), cronEx, options);
                 //Every 10 minutes, between 08:00 AM and 09:59 AM, Saturday through Thursday
             }
@@ -124,10 +133,9 @@ public class HangfireController : ControllerBase
                 var checkOutEndTime = await _paramBusConfigManager.GetByParamSL(4);
 
                 int smsStartTime = (startTimeHr + instituteEndHr) / 2;
-                var smsStartTimeHr = checkOutStartTime?.ParamValue.Substring(0, checkOutStartTime.ParamValue.IndexOf(':')) ?? smsStartTime.ToString();
                 int smsEndTime = instituteEndHr + 1;
-                var smsEndTimeHr = checkOutEndTime?.ParamValue.Substring(0, checkOutEndTime.ParamValue.IndexOf(':')) ?? smsEndTime.ToString();
-                var cron = $"*/10 {smsStartTimeHr}-{smsEndTimeHr} * * 0-4,6";
+                var window = ParseHourWindow(checkOutStartTime?.ParamValue, checkOutEndTime?.ParamValue, smsStartTime, smsEndTime);
+                var cron = $"*/10 {window.FromHr}-{window.ToHr} * * 0-4,6";
                 RecurringJob.AddOrUpdate(recurringJobId, () => SendCheckOutSMS(), cron, options);
                 //Every 10 minutes, between 12:00 PM and 03:59 PM, Saturday through Thursday
             }
@@ -140,8 +148,7 @@ public class HangfireController : ControllerBase
                 };
                 var absentStudentNotifiactionTime = await _paramBusConfigManager.GetByParamSL(8);
                 int smsTimeHr = startTimeHr + 2;
-                var notificationTimeHr = absentStudentNotifiactionTime?.ParamValue.Substring(0, absentStudentNotifiactionTime.ParamValue.IndexOf(':')) ?? smsTimeHr.ToString();
-                var notificationTimeMn = absentStudentNotifiactionTime?.ParamValue.Substring(absentStudentNotifiactionTime.ParamValue.IndexOf(':') + 1) ?? "1";
+                var (notificationTimeHr, notificationTimeMn) = ParseClockTime(absentStudentNotifiactionTime?.ParamValue, smsTimeHr, 1);
                 var cron = $"{notificationTimeMn} {notificationTimeHr} * * 0-4,6";
                 RecurringJob.AddOrUpdate(recurringJobId, () => SendAbsentNotificationSMS(), cron, options);
                 //At 10:00:01 AM, Saturday through Thursday
@@ -154,11 +161,7 @@ public class HangfireController : ControllerBase
                     TimeZone = TimeZoneInfo.Local
                 };
                 var dailyCollectionSummmeryNotificationTime = await _paramBusConfigManager.GetByParamSL(9);
-                var smsTimeHr = "18";
-                var smsTimeMn = "1";
-                string[] timeParts = dailyCollectionSummmeryNotificationTime?.ParamValue.Split(':');
-                var notificationTimeHr = timeParts[0] ?? smsTimeHr.ToString();
-                var notifucationTimeMn = timeParts[1] ?? smsTimeMn.ToString();
+                var (notificationTimeHr, notifucationTimeMn) = ParseClockTime(dailyCollectionSummmeryNotificationTime?.ParamValue, 18, 1);
 
                 var cron = $"{notifucationTimeMn} {notificationTimeHr} * * 0-4,6";
                 RecurringJob.AddOrUpdate(recurringJobId, () => SendDailyCollectionSMS(), cron, options);
@@ -184,6 +187,55 @@ public class HangfireController : ControllerBase
         // Fingerprint Machine Jobs Finished xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
         return RedirectToAction("SMSControl", "Setup");
+        }
+        catch (Exception ex)
+        {
+            return Content("Could not register schedules: " + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Parses a ParamBusConfig "HH:mm" value defensively. Anything unparseable
+    /// (null, empty, "11:05 AM", "08:00:00") falls back to the supplied default,
+    /// so a bad config row can never build an invalid CRON expression and take
+    /// down the whole schedule registration with a 500.
+    /// </summary>
+    private static (string Hr, string Mn) ParseClockTime(string paramValue, int fallbackHr, int fallbackMn)
+    {
+        if (!string.IsNullOrWhiteSpace(paramValue))
+        {
+            var parts = paramValue.Trim().Split(':');
+            if (parts.Length >= 2)
+            {
+                string digitsHr = new string(parts[0].Where(char.IsDigit).ToArray());
+                string digitsMn = new string(parts[1].Where(char.IsDigit).ToArray());
+                if (int.TryParse(digitsHr, out int hr) && int.TryParse(digitsMn, out int mn)
+                    && hr >= 0 && hr <= 23 && mn >= 0 && mn <= 59)
+                    return (hr.ToString(), mn.ToString());
+            }
+        }
+        int total = fallbackHr * 60 + fallbackMn;
+        total = ((total % 1440) + 1440) % 1440;
+        return ((total / 60).ToString(), (total % 60).ToString());
+    }
+
+    /// <summary>
+    /// Parses a "from-to" hour window for range CRONs. Falls back (and never
+    /// emits a reversed range) when either side is missing or malformed.
+    /// </summary>
+    private static (string FromHr, string ToHr) ParseHourWindow(string fromValue, string toValue, int fallbackFromHr, int fallbackToHr)
+    {
+        var (fromHr, _) = ParseClockTime(fromValue, fallbackFromHr, 0);
+        var (toHr, _) = ParseClockTime(toValue, fallbackToHr, 0);
+        if (int.Parse(toHr) < int.Parse(fromHr))
+        {
+            var (fbFrom, _) = ParseClockTime(null, fallbackFromHr, 0);
+            var (fbTo, _) = ParseClockTime(null, fallbackToHr, 0);
+            if (int.Parse(fbTo) < int.Parse(fbFrom))
+                fbTo = fbFrom;
+            return (fbFrom, fbTo);
+        }
+        return (fromHr, toHr);
     }
 
     #region Fingerprint Machine Jobs Start ====================================
