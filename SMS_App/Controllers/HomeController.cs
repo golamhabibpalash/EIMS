@@ -16,7 +16,11 @@ using System.Linq;
 using System.Threading.Tasks;
 
 namespace SMS_App.Controllers;
-[Authorize(Roles = "SuperAdmin, Admin, Teacher, Student")]
+// Role gate removed: students often carry no role row at all, which made the
+// old SuperAdmin/Admin/Teacher list deny them before any code ran. Access is
+// now decided inside Index: students (by UserType) get their personal
+// dashboard, staff keeps the previous role requirement.
+[Authorize]
 public class HomeController : Controller
 {
     private readonly ILogger<HomeController> _logger;
@@ -67,10 +71,15 @@ public class HomeController : Controller
             HttpContext.Session.SetString("UserId", user.Id);
 
             // Students get their own dashboard (own attendance/result/fees only),
-            // never the school-wide admin tiles.
+            // never the school-wide admin tiles. UserType-based so it works even
+            // when the user holds no role rows at all.
             if (user.UserType == 's')
             {
                 return await StudentDashboard(user);
+            }
+            if (!User.IsInRole("SuperAdmin") && !User.IsInRole("Admin") && !User.IsInRole("Teacher"))
+            {
+                return RedirectToAction("AccessDenied", "Accounts");
             }
 
             // Money is restricted: only holders of a finance/accounts permission
