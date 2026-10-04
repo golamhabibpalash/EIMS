@@ -8,6 +8,7 @@ using SMS_App.ViewModels.Students;
 using SMS.BLL.Contracts;
 using SMS.Entities;
 using SMS.Entities.AdditionalModels;
+using SMS.Entities.AdditionalModels.StudentVM;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -15,7 +16,7 @@ using System.Linq;
 using System.Threading.Tasks;
 
 namespace SMS_App.Controllers;
-[Authorize(Roles = "SuperAdmin, Admin, Teacher")]
+[Authorize(Roles = "SuperAdmin, Admin, Teacher, Student")]
 public class HomeController : Controller
 {
     private readonly ILogger<HomeController> _logger;
@@ -31,8 +32,9 @@ public class HomeController : Controller
     private readonly IStudentPaymentManager _studentPaymentManager;
     private readonly ILogManager _logManager;
     private readonly IAcademicSessionManager _academicSessionManager;
+    private readonly IAcademicExamManager _academicExamManager;
 
-    public HomeController(ILogger<HomeController> logger, IStudentManager studentManager, IEmployeeManager employeeManager, UserManager<ApplicationUser> userManager, IInstituteManager instituteManager, IAcademicClassManager academicClassManager, IDesignationManager designationManager, IAttendanceManager attendanceManager, IAttendanceMachineManager attendanceMachineManager, IStudentPaymentManager studentPaymentManager, ILogManager logManager, IAcademicSectionManager academicSectionManager, IAcademicSessionManager academicSessionManager)
+    public HomeController(ILogger<HomeController> logger, IStudentManager studentManager, IEmployeeManager employeeManager, UserManager<ApplicationUser> userManager, IInstituteManager instituteManager, IAcademicClassManager academicClassManager, IDesignationManager designationManager, IAttendanceManager attendanceManager, IAttendanceMachineManager attendanceMachineManager, IStudentPaymentManager studentPaymentManager, ILogManager logManager, IAcademicSectionManager academicSectionManager, IAcademicSessionManager academicSessionManager, IAcademicExamManager academicExamManager)
     {
         _logger = logger;
         _studentManager = studentManager;
@@ -47,6 +49,7 @@ public class HomeController : Controller
         _logManager = logManager;
         _academicSectionManager = academicSectionManager;
         _academicSessionManager = academicSessionManager;
+        _academicExamManager = academicExamManager;
     }
 
     public async Task<IActionResult> Index()
@@ -62,6 +65,13 @@ public class HomeController : Controller
             }
             
             HttpContext.Session.SetString("UserId", user.Id);
+
+            // Students get their own dashboard (own attendance/result/fees only),
+            // never the school-wide admin tiles.
+            if (user.UserType == 's')
+            {
+                return await StudentDashboard(user);
+            }
 
             // Money is restricted: only holders of a finance/accounts permission
             // claim see collection figures; everyone else (teachers, other
@@ -201,6 +211,29 @@ public class HomeController : Controller
     public IActionResult Privacy()
     {
         return View();
+    }
+
+    private async Task<IActionResult> StudentDashboard(ApplicationUser user)
+    {
+        var dashboard = new StudentDashboardVM();
+        try
+        {
+            var student = await _studentManager.GetStudentByUniqueIdAsync(user.ReferenceId.ToString());
+            if (student == null)
+            {
+                return NotFound();
+            }
+            dashboard.Student = student;
+            dashboard.SessionName = (await _academicSessionManager.GetCurrentAcademicSessionAsync())?.Name ?? string.Empty;
+            try { dashboard.Attendance = await _studentManager.GetProfileAttendanceAsync(student.Id) ?? new ProfileAttendance(); } catch { }
+            try { dashboard.Result = await _academicExamManager.GetSingleStudentResultDetailForProfile(student.Id) ?? new ProfileResult(); } catch { }
+            try { dashboard.Payment = await _studentPaymentManager.GetProfilePaymentAsync(student.Id) ?? new ProfilePayment(); } catch { }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading student dashboard");
+        }
+        return View("IndexStudent", dashboard);
     }
 
     // HomeController is role-gated, so without this the error page itself bounces a
