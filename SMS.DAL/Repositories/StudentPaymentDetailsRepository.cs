@@ -37,7 +37,7 @@ namespace SMS.DAL.Repositories
             // Same zero-padding history as StudentPayment.UniqueId - match variants.
             var keys = AttendancePinMatcher.KeyVariants(studentUniqueId);
             return await _context.StudentPaymentDetails
-                .Where(d => keys.Contains(d.StudentPayment.UniqueId))
+                .Where(d => d.StudentPayment.UniqueId != null && keys.Contains(d.StudentPayment.UniqueId.Trim()))
                 .Include(d => d.StudentPayment)
                 .Include(d => d.StudentFeeHead)
                 .ToListAsync();

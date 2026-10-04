@@ -262,7 +262,7 @@ public class StudentPaymentRepository : Repository<StudentPayment>, IStudentPaym
             .Include(s => s.Student)
                 .ThenInclude(ss => ss.AcademicClass)
             .Include(s => s.Student.AcademicSession)
-            .Where(sp => keys.Contains(sp.UniqueId)).ToListAsync();
+            .Where(sp => sp.UniqueId != null && keys.Contains(sp.UniqueId.Trim())).ToListAsync();
         }
         catch (Exception)
         {
@@ -278,7 +278,7 @@ public class StudentPaymentRepository : Repository<StudentPayment>, IStudentPaym
             var keys = AttendancePinMatcher.KeyVariants(uniqueId);
             var paidAmount = await _context.StudentPaymentDetails
                 .Include(pd => pd.StudentPayment)
-                .Where(pd => keys.Contains(pd.StudentPayment.UniqueId)
+                .Where(pd => pd.StudentPayment.UniqueId != null && keys.Contains(pd.StudentPayment.UniqueId.Trim())
                     && pd.StudentPayment.AcademicSessionId == sessionId
                     && pd.StudentFeeHeadId == feeHeadId)
                 .SumAsync(pd => pd.PaidAmount);
