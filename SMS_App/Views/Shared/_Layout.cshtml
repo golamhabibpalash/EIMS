@@ -41,7 +41,8 @@
     {
         if (user.UserType == 's')
         {
-            var stu = await _studentManager.GetByIdAsync(user.ReferenceId);
+            var stu = await _studentManager.GetStudentByUniqueIdAsync(user.ReferenceId.ToString())
+                ?? await _studentManager.GetByIdAsync(user.ReferenceId);
             if (!string.IsNullOrEmpty(stu?.Photo))
                 userImage = $"/Images/Student/{stu.Photo}";
         }
@@ -49,12 +50,9 @@
 
         else if (user.UserType == 'e')
         {
-            // var emp = await _employeeManager.GetByIdAsync(user.ReferenceId);
-            // // Fix: Use Path.Combine from System.IO and ensure _webHostEnvironment is injected
-            // var imagePath = System.IO.Path.Combine(_webHostEnvironment.WebRootPath, "Images", "Employee", "Photo", emp?.Image);
-
-            // userImage = System.IO.File.Exists(imagePath) ? $"/Images/Employee/Photo/{emp?.Image}" : userImage;
-            
+            var emp = await _employeeManager.GetByIdAsync(user.ReferenceId);
+            if (!string.IsNullOrEmpty(emp?.Image))
+                userImage = $"/Images/Employee/photo/{emp.Image}";
         }
     }
     else
@@ -221,7 +219,7 @@
                             <li class="dropdown dropdown-user">
                                 <a class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
                                    data-close-others="true">
-                                    <img alt="" class="img-circle " src="@userImage" />
+                                    <img alt="" class="img-circle " src="@userImage" onerror="this.onerror=null;this.src='/Images/noProfileImage.png';" />
                                     <!--      <span class="username username-hide-on-mobile"> @userName</span> -->
                                 </a>
                                 <ul class="dropdown-menu dropdown-menu-default">
