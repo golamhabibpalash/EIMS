@@ -30,7 +30,7 @@
             // null here and crashed the whole page with a 500.
             var stu = await _studentManager.GetStudentByUniqueIdAsync(user.ReferenceId.ToString());
             userImage = !string.IsNullOrEmpty(stu?.Photo)
-                ? "/Images/Student/Photo/" + stu.Photo
+                ? "/Images/Student/" + stu.Photo
                 : "/Images/noProfileImage.png";
         }
         if (user.UserType == 'e')

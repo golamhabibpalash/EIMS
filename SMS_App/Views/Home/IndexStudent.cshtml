@@ -2,7 +2,7 @@
 @{
     ViewData["Title"] = "My Dashboard";
     GlobalUI.PageTitle = "My Dashboard";
-    var photo = !string.IsNullOrEmpty(Model.Student?.Photo) ? "/Images/Student/Photo/" + Model.Student.Photo : "/Images/noProfileImage.png";
+    var photo = !string.IsNullOrEmpty(Model.Student?.Photo) ? "/Images/Student/" + Model.Student.Photo : "/Images/noProfileImage.png";
     var due = Model.Payment?.TotalDue ?? 0;
 }
 @section Styles{

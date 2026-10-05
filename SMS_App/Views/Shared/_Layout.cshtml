@@ -43,7 +43,7 @@
         {
             var stu = await _studentManager.GetByIdAsync(user.ReferenceId);
             if (!string.IsNullOrEmpty(stu?.Photo))
-                userImage = $"/Images/Student/Photo/{stu.Photo}";
+                userImage = $"/Images/Student/{stu.Photo}";
         }
 
 
