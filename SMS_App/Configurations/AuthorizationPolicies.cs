@@ -277,6 +277,7 @@ public class AuthorizationPolicies
         options.AddPolicy("StudentPaymentReportsPolicy", policy => policy.RequireClaim("View Student payment Report"));
         options.AddPolicy("ReceiptPaymentReportsPolicy", policy => policy.RequireClaim("View Payment Receipt Report"));
         options.AddPolicy("AdmitCardReportsPolicy", policy => policy.RequireClaim("View Admit card Report"));
+        options.AddPolicy("SeatPlanReportsPolicy", policy => policy.RequireClaim("View Seat Plan Report"));
 
         //User Roles
         options.AddPolicy("IndexRolesPolicy", policy => policy.RequireClaim("View Roles"));

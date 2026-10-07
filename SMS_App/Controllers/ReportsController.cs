@@ -1177,6 +1177,65 @@ public class ReportsController : Controller
 
     #endregion Admit Card Reports
 
+    #region Seat Plan Reports
+
+    [Authorize(Policy = "SeatPlanReportsPolicy")]
+    public async Task<IActionResult> SeatPlanExport(string reportType, string fileName, int monthId, string academicClassId, string academicSectionId, int examTypeId, int examGroupId = 0, int genderId = 0, string roll = "", bool download = false, string sheet = "Legal")
+    {
+        var institute = await _instituteManager.GetByIdAsync(1);
+        if (institute == null)
+        {
+            return new JsonResult("Institute information not found!");
+        }
+
+        int.TryParse(academicClassId, out int aClassId);
+        int.TryParse(academicSectionId, out int aSectionId);
+
+        var seatPlanList = await _reportManager.GetAdmitCard(monthId, aClassId, aSectionId, examTypeId, examGroupId);
+        seatPlanList = seatPlanList.Where(s => s.StudentStauts == true).ToList();
+
+        // One card per student regardless of how many subjects the exam has.
+        seatPlanList = seatPlanList
+            .GroupBy(s => s.StudentId)
+            .Select(g => g.First())
+            .ToList();
+
+        // Gender filter (0 = All) matches on GenderId.
+        if (genderId > 0)
+        {
+            seatPlanList = seatPlanList.Where(s => s.GenderId == genderId).ToList();
+        }
+
+        // Roll filter produces an individual seat plan.
+        if (!string.IsNullOrWhiteSpace(roll) && int.TryParse(roll, out int rollNo))
+        {
+            seatPlanList = seatPlanList.Where(s => s.ClassRoll == rollNo).ToList();
+        }
+
+        seatPlanList = seatPlanList.OrderBy(s => s.ClassRoll).ToList();
+
+        if (!seatPlanList.Any())
+        {
+            return new JsonResult("No data found");
+        }
+
+        var seatSheet = string.Equals(sheet, "A4", StringComparison.OrdinalIgnoreCase)
+            ? SeatPlanSheet.A4
+            : SeatPlanSheet.Legal;
+
+        var seatPlanDoc = new SeatPlanPdfBuilder(institute, seatPlanList, seatSheet);
+        var result = seatPlanDoc.GeneratePdf();
+        fileName = (string.IsNullOrEmpty(fileName) ? "seat_plan" : fileName) + "_" + DateTime.Now.ToString("yyyyMMdd");
+
+        Response.Headers["Content-Disposition"] = download
+            ? $"attachment; filename=\"{fileName}.pdf\""
+            : $"inline; filename=\"{fileName}.pdf\"";
+
+        return File(result, "application/pdf");
+    }
+
+    #endregion Seat Plan Reports
+
     #region Common Methods
     private static RenderType GetRenderType(string reportType)
     {

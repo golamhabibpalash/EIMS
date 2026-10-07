@@ -26,6 +26,7 @@ namespace SMS.Entities.RptModels
         public string ExamGroupName { get; set; }
         public string InstituteName { get; set; }
         public string EIIN { get; set; }
+        public int GenderId { get; set; }
         public string Gender { get; set; }
         public string Religion { get; set; }
         public bool StudentStauts { get; set;}

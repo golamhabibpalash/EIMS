@@ -1,0 +1,266 @@
+@using System.Globalization
+@{
+    ViewData["Title"] = "Seat Plan";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+}
+
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="row">
+            <div class="col-md-12">
+                <form asp-action="SeatPlan" method="post">
+                    <fieldset class="border border-info p-2">
+                        <legend class="w-auto text-primary">Seat Plan</legend>
+
+                        <div class="form-group row">
+                            <label class="col-sm-3 col-form-label">Exam Type</label>
+                            <div class="col-sm-9">
+                                <select id="ExamTypeId" name="examTypeId" class="form-control" asp-items="ViewBag.ExamType">
+                                    <option disabled selected>-Select Exam Type-</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <label class="col-sm-3 col-form-label">Exam Month</label>
+                            <div class="col-sm-9">
+                                <select id="monthId" name="monthId" class="form-control">
+                                    <option disabled selected>--Select Month--</option>
+                                    @for (int i = 1; i <= 12; i++)
+                                    {
+                                        <option value="@i">@DateTimeFormatInfo.CurrentInfo.GetMonthName(i)</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label for="classId" class="col-sm-3 col-form-label">Academic Class</label>
+                            <div class="col-sm-9">
+                                <select id="AcademicClassId" class="form-control" asp-items="ViewBag.AcademicClass">
+                                    <option disabled selected>-Select Class-</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label for="classId" class="col-sm-3 col-form-label">Academic Section</label>
+                            <div class="col-sm-9">
+                                <select id="AcademicSectionId" class="form-control">
+                                    <option value="0">Section</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label class="col-sm-3 col-form-label">Exam</label>
+                            <div class="col-sm-9">
+                                <select id="ExamGroupId" name="examGroupId" class="form-control">
+                                    <option value="0">-Select Exam-</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label for="GenderId" class="col-sm-3 col-form-label">Gender</label>
+                            <div class="col-sm-9">
+                                <select id="GenderId" name="genderId" class="form-control" asp-items="ViewBag.Gender">
+                                    <option value="0" selected>All</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label for="RollNo" class="col-sm-3 col-form-label">Roll</label>
+                            <div class="col-sm-9">
+                                <input type="number" id="RollNo" name="roll" class="form-control" placeholder="Leave blank for all / enter a roll for one" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label for="SheetSize" class="col-sm-3 col-form-label">Paper Size</label>
+                            <div class="col-sm-9">
+                                <select id="SheetSize" name="sheet" class="form-control">
+                                    <option value="Legal" selected>Legal</option>
+                                    <option value="A4">A4</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span id="myButton" class="btn btn-sm btn-info">Load Report</span>
+                        </div>
+                    </fieldset>
+                </form>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12" id="InvalidForm" style="display:none">
+                <div><h2 class="text-danger"> Please Select all the field</h2></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8" id="iframe-container" style="display:none">
+        <div class="row" style="height:600px;">
+            <iframe id="myIframe" style="width: 100%; height: 100%;"></iframe>
+        </div>
+        <div class="row" id="exportOptions" style="display:none">
+            <div class="col-md-12 d-flex justify-content-end gap-2">
+                <button type="button" id="printButton" class="btn-sm btn btn-primary" data-toggle="tooltip" title="Print Seat Plan" data-placement="left"><i class="fas fa-print"></i> Print</button>
+                <form asp-action="SeatPlanExport" asp-controller="Reports" method="get" target="_blank">
+                    <input type="hidden" id="exportAcademicClassId" name="academicClassId" />
+                    <input type="hidden" id="exportAcademicSectionId" name="academicSectionId" />
+                    <input type="hidden" id="exportMonthId" name="monthId" />
+                    <input type="hidden" id="exportExamTypeId" name="examTypeId" />
+                    <input type="hidden" id="exportExamGroupId" name="examGroupId" />
+                    <input type="hidden" id="exportGender" name="genderId" />
+                    <input type="hidden" id="exportRoll" name="roll" />
+                    <input type="hidden" id="exportSheet" name="sheet" />
+                    <input type="hidden" name="download" value="true" />
+                    <input type="hidden" name="fileName" value="Seat Plan" />
+                    <button type="submit" class="btn-sm btn btn-danger" data-toggle="tooltip" title="Export PDF" data-placement="left"><i class="fas fa-file-pdf"></i> Export PDF</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8 text-center" id="loading" style="display:none">
+        <div class="d-flex justify-content-center h-100 align-content-center align-items-center">
+            <h2 class="text-danger"><span class="spinner-border" role="status" aria-hidden="true"></span> Please wait while the data is loading...</h2>
+        </div>
+    </div>
+</div>
+
+@section Scripts{
+    <script>
+        function loadExamGroups() {
+            let examTypeId = $('#ExamTypeId option:selected').val();
+            let monthId = $('#monthId option:selected').val();
+            let classId = $('#AcademicClassId option:selected').val();
+            let sectionId = $('#AcademicSectionId option:selected').val();
+
+            if (examTypeId > 0 && monthId > 0 && classId > 0) {
+                $.ajax({
+                    url: '/AcademicExams/GetExamGroupsForAdmitCard',
+                    data: { examTypeId: examTypeId, monthId: monthId, classId: classId, sectionId: sectionId },
+                    dataType: "JSON",
+                    type: "POST",
+                    cache: false,
+                    success: function (data) {
+                        $('#ExamGroupId').empty();
+                        $('#ExamGroupId').append('<option value="0">-Select Exam-</option>');
+                        if (data && data.length > 0) {
+                            $.each(data, function (i, obj) {
+                                var selected = i === 0 ? ' selected' : '';
+                                $('#ExamGroupId').append('<option value="' + obj.id + '"' + selected + '>' + obj.examGroupName + '</option>');
+                            });
+                        } else {
+                            $('#ExamGroupId').append('<option value="0" disabled>No exams found.</option>');
+                        }
+                    },
+                    error: function () {
+                        $('#ExamGroupId').empty();
+                        $('#ExamGroupId').append('<option value="0">-Select Exam-</option>');
+                    }
+                });
+            }
+        }
+
+        $(document).ready(function () {
+            // Kept so Print can fall back to a new tab if the embedded viewer blocks print().
+            let lastPreviewUrl = '';
+
+            $('#ExamTypeId, #monthId, #AcademicClassId, #AcademicSectionId').change(function () {
+                loadExamGroups();
+            });
+
+            $('#printButton').click(function () {
+                var iframe = document.getElementById('myIframe');
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch (e) {
+                    if (lastPreviewUrl) {
+                        window.open(lastPreviewUrl, '_blank');
+                    }
+                }
+            });
+
+            $('#myButton').click(function () {
+                let reportType = 'pdf';
+                let academicClassId = $('#AcademicClassId option:selected').val();
+                let aSection = $('#AcademicSectionId option:selected').val();
+                let monthId = $('#monthId option:selected').val();
+                let examTypeId = $('#ExamTypeId option:selected').val();
+                let examGroupId = $('#ExamGroupId option:selected').val();
+                let genderId = $('#GenderId option:selected').val() || '0';
+                let roll = $('#RollNo').val() || '';
+                let sheetSize = $('#SheetSize option:selected').val() || 'Legal';
+
+                if (academicClassId <= '0' || examGroupId <= '0') {
+                    $('#InvalidForm').show();
+                    $('#iframe-container').hide();
+                    $('#loading').hide();
+                }
+                else {
+                    $('#exportAcademicClassId').attr('value', academicClassId);
+                    $('#exportAcademicSectionId').attr('value', aSection);
+                    $('#exportMonthId').attr('value', monthId);
+                    $('#exportExamTypeId').attr('value', examTypeId);
+                    $('#exportExamGroupId').attr('value', examGroupId);
+                    $('#exportGender').attr('value', genderId);
+                    $('#exportRoll').attr('value', roll);
+                    $('#exportSheet').attr('value', sheetSize);
+
+                    lastPreviewUrl = '/Reports/SeatPlanExport?reportType=' + reportType +
+                        '&academicClassId=' + academicClassId +
+                        '&academicSectionId=' + aSection +
+                        '&monthId=' + monthId +
+                        '&examTypeId=' + examTypeId +
+                        '&examGroupId=' + examGroupId +
+                        '&genderId=' + genderId +
+                        '&roll=' + encodeURIComponent(roll) +
+                        '&sheet=' + sheetSize;
+
+                    $('#myIframe').attr('src', lastPreviewUrl);
+
+                    var iframe = document.getElementById('myIframe');
+                    $('#loading').show();
+                    $('#iframe-container').hide();
+                    $('#InvalidForm').hide();
+                    iframe.onload = function () {
+                        $('#loading').hide();
+                        $('#exportOptions').show();
+                        $('#iframe-container').show();
+                    };
+                }
+            });
+
+            $('#AcademicClassId').change(function () {
+                let id = $('#AcademicClassId option:selected').val();
+                let sessionId = $('#AcademicSessionId option:selected').val();
+
+                $.ajax({
+                    url: "/api/academicsections/getbyclasswithsessionId?classId=" + id + "&sessionId=" + sessionId,
+                    dataType: "JSON",
+                    type: "POST",
+                    cache: false,
+                    success: function (data) {
+                        $('#AcademicSectionId').empty();
+                        if (data != null || data != '') {
+                            var o = '<option disabled selected value="0">Select Section Name</option>';
+                            var o2 = '<option value="all">All Section</option>';
+                            $('#AcademicSectionId').append(o);
+                            $('#AcademicSectionId').append(o2);
+                            $.each(data, function (i, obj) {
+                                var op = '<option value="' + obj.id + '">' + obj.name + '</option>';
+                                $('#AcademicSectionId').append(op);
+                            });
+                        }
+                        else {
+                            var o = '<option disabled selected>Section Not Found</option>';
+                            $('#AcademicSectionId').append(o);
+                        }
+                    },
+                    error: function (err) {
+                        console.log(err);
+                    }
+                });
+            });
+        });
+    </script>
+}

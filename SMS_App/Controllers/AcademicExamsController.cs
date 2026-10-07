@@ -36,7 +36,8 @@ public class AcademicExamsController : Controller
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly IAcademicExamGroupManager _examGroupManager;
-    public AcademicExamsController(IAcademicExamManager examManager, IAcademicSessionManager sessionManager, IAcademicClassManager classManager, IAcademicExamTypeManager examTypeManager, IAcademicSubjectManager academicSubjectManager, IEmployeeManager employeeManager, IMapper mapper, IAcademicSectionManager academicSectionManager, IStudentManager studentManager, IAcademicExamDetailsManager academicExamDetailsManager, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, IAcademicExamGroupManager academicExamGroupManager)
+    private readonly IGenderManager _genderManager;
+    public AcademicExamsController(IAcademicExamManager examManager, IAcademicSessionManager sessionManager, IAcademicClassManager classManager, IAcademicExamTypeManager examTypeManager, IAcademicSubjectManager academicSubjectManager, IEmployeeManager employeeManager, IMapper mapper, IAcademicSectionManager academicSectionManager, IStudentManager studentManager, IAcademicExamDetailsManager academicExamDetailsManager, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, IAcademicExamGroupManager academicExamGroupManager, IGenderManager genderManager)
     {
         _examManager = examManager;
         _sessionManager = sessionManager;
@@ -51,6 +52,7 @@ public class AcademicExamsController : Controller
         _userManager = userManager;
         _roleManager = roleManager;
         _examGroupManager = academicExamGroupManager;
+        _genderManager = genderManager;
     }
 
     // GET: AcademicExamsController
@@ -823,6 +825,16 @@ public class AcademicExamsController : Controller
     {
         ViewData["ExamType"] = new SelectList(await _examTypeManager.GetAllAsync(), "Id", "ExamTypeName");
         ViewData["AcademicClass"] = new SelectList(await _classManager.GetAllAsync(), "Id", "Name");
+
+        return View();
+    }
+
+    [Authorize(Policy = "SeatPlanReportsPolicy")]
+    public async Task<ActionResult> SeatPlan()
+    {
+        ViewData["ExamType"] = new SelectList(await _examTypeManager.GetAllAsync(), "Id", "ExamTypeName");
+        ViewData["AcademicClass"] = new SelectList(await _classManager.GetAllAsync(), "Id", "Name");
+        ViewData["Gender"] = new SelectList(await _genderManager.GetAllAsync(), "Id", "Name");
 
         return View();
     }

@@ -84,6 +84,7 @@ namespace SMS.DAL.Repositories.Reports
                         ExamGroupName = e.AcademicExamGroup?.ExamGroupName,
                         InstituteName = institute?.Name,
                         EIIN = institute?.EIIN,
+                        GenderId = s.GenderId,
                         Gender = s.Gender?.Name,
                         Religion = s.Religion?.Name,
                         StudentStauts = s.Status
