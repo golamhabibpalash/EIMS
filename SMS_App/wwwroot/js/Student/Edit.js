@@ -27,26 +27,28 @@ $('#AcademicSessionId').change(function () {
 
 $('#AcademicClassId').change(function () {
     let id = $('#AcademicClassId option:selected').val();
+    let sessionId = $('#AcademicSessionId option:selected').val();
 
     $.ajax({
-        url: "/Students/GetSectionList/" + id,
+        url: "/api/academicsections/getbyclasswithsessionId?classId=" + id + "&sessionId=" + sessionId,
         dataType: "JSON",
         type: "POST",
         cache: false,
         success: function (data) {
             $('#AcademicSectionId').empty();
 
-            if (data != null || data != '') {
+            if (data != null && data.length > 0) {
                 var o = '<option disabled selected>Select Section Name</option>';
+                var o2 = '<option value="">No Section</option>';
                 $('#AcademicSectionId').append(o);
+                $('#AcademicSectionId').append(o2);
                 $.each(data, function (i, obj) {
-                    console.log(obj.name);
                     var op = '<option value="' + obj.id + '">' + obj.name + '</option>';
                     $('#AcademicSectionId').append(op);
                 });
             }
             else {
-                var o = '<option disabled selected>Section Not Found</option>';
+                var o = '<option value="">No Section</option>';
                 $('#AcademicSectionId').append(o);
             }
         },
