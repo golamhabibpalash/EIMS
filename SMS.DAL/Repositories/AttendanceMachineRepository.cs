@@ -155,7 +155,7 @@ namespace SMS.DAL.Repositories
 
         public async Task<List<Tran_MachineRawPunch>> GetCheckinDataByDateAsync(string date)
         {
-            DateTime parsedDate = DateTime.Parse(date);
+            DateTime parsedDate = DateTime.ParseExact(date, "dd-MM-yyyy", CultureInfo.InvariantCulture);
             try
             {
                 var result = await _context.Tran_MachineRawPunch
@@ -171,7 +171,7 @@ namespace SMS.DAL.Repositories
 
         public async Task<List<Tran_MachineRawPunch>> GetEmpCheckinDataByDateAsync(string date)
         {
-            DateTime parsedDate = DateTime.Parse(date);
+            DateTime parsedDate = DateTime.ParseExact(date, "dd-MM-yyyy", CultureInfo.InvariantCulture);
             try
             {
                 var result = await _context.Tran_MachineRawPunch
@@ -187,7 +187,7 @@ namespace SMS.DAL.Repositories
 
         public async Task<List<Tran_MachineRawPunch>> GetCheckOutDataByDateAsync(string date)
         {
-            DateTime parsedDate = DateTime.Parse(date);
+            DateTime parsedDate = DateTime.ParseExact(date, "dd-MM-yyyy", CultureInfo.InvariantCulture);
             try
             {
                 var result = await _context.Tran_MachineRawPunch
@@ -253,7 +253,9 @@ namespace SMS.DAL.Repositories
         // roll / id fallback).
         private async Task<HashSet<string>> GetPunchedPinsAsync(string date)
         {
-            if (!DateTime.TryParse(date, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
+            // Callers pass the date as "dd-MM-yyyy"; TryParseExact keeps this culture-independent
+            // (server culture is typically en-US, where plain TryParse reads it as MM-dd-yyyy and fails).
+            if (!DateTime.TryParseExact(date, "dd-MM-yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate))
                 parsedDate = DateTime.Today;
 
             var cardNos = await _context.Tran_MachineRawPunch
