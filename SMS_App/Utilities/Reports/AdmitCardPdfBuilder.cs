@@ -15,6 +15,13 @@ public enum AdmitCardSheet
 {
     Legal,
     A4,
+
+    /// <summary>
+    /// A4 paper carrying three cards instead of two. The card keeps the full A4 width
+    /// but is scaled down vertically so three fit on one sheet (A4 is 11.69in tall, so
+    /// each card gets a third of that). Everything on the card shrinks by <see cref="_scale"/>.
+    /// </summary>
+    A4ThreePerPage,
 }
 
 public class AdmitCardPdfBuilder : IDocument
@@ -23,9 +30,11 @@ public class AdmitCardPdfBuilder : IDocument
     // apart, because a printer fed with Legal/A4 paper rescales a small 8.5x4.5
     // page to fit the sheet - which is what made printed cards come out undersized.
     //
-    // Card height is always 4.5in. Card width follows the sheet width, so Legal
+    // Card height is normally 4.5in. Card width follows the sheet width, so Legal
     // gives the full 8.5in; A4 paper is only 8.27in wide and physically cannot
-    // carry an 8.5in card, so on A4 the card is 8.27in wide.
+    // carry an 8.5in card, so on A4 the card is 8.27in wide. The A4ThreePerPage
+    // mode keeps the 8.27in width but shrinks the card height to a third of the A4
+    // sheet and scales the card's contents to match.
     private const float CardHeightInches = 4.5f;
 
     private const float LegalWidthInches = 8.5f;
@@ -48,6 +57,14 @@ public class AdmitCardPdfBuilder : IDocument
     private readonly List<RptAdmitCardVM> _data;
     private readonly AdmitCardSheet _sheet;
 
+    // Multiplies every font, padding and fixed size on the card. 1.0 for the Legal/A4
+    // layouts (so their output is unchanged); less than 1 for the 3-per-A4 layout, which
+    // has to fit the same card design into two thirds of the former vertical space.
+    private readonly float _scale;
+
+    /// <summary>Scales a font/padding/fixed dimension by the card's scale factor.</summary>
+    private float Sz(float value) => value * _scale;
+
     private static string ToTitle(string s) =>
         string.IsNullOrWhiteSpace(s) ? ""
             : CultureInfo.CurrentCulture.TextInfo.ToTitleCase(s.ToLowerInvariant());
@@ -60,15 +77,21 @@ public class AdmitCardPdfBuilder : IDocument
         _signatureBase64 = signatureBase64;
         _data = data;
         _sheet = sheet;
+
+        // Three cards share an 11.69in sheet (3.9in each) instead of 4.5in, i.e. ~0.87
+        // of the height; scale a touch harder so the content clears its slot cleanly.
+        _scale = sheet == AdmitCardSheet.A4ThreePerPage ? 0.84f : 1f;
     }
 
-    // Legal fits 3 cards (13.5in of 14in); A4 fits 2 (9in of 11.69in).
-    private (float Width, float Height, int CardsPerSheet) SheetSpec => _sheet switch
+    // Legal fits 3 cards (13.5in of 14in); A4 fits 2 (9in of 11.69in); A4ThreePerPage
+    // fits 3 by giving each card exactly a third of the A4 height.
+    private (float Width, float Height, int CardsPerSheet, float CardHeight) SheetSpec => _sheet switch
     {
+        AdmitCardSheet.A4ThreePerPage => (A4WidthInches, A4HeightInches, 3, A4HeightInches / 3f),
         AdmitCardSheet.A4 => (A4WidthInches, A4HeightInches,
-            Math.Max(1, (int)Math.Floor(A4HeightInches / CardHeightInches))),
+            Math.Max(1, (int)Math.Floor(A4HeightInches / CardHeightInches)), CardHeightInches),
         _ => (LegalWidthInches, LegalHeightInches,
-            Math.Max(1, (int)Math.Floor(LegalHeightInches / CardHeightInches))),
+            Math.Max(1, (int)Math.Floor(LegalHeightInches / CardHeightInches)), CardHeightInches),
     };
 
     public DocumentMetadata GetMetadata() => DocumentMetadata.Default;
@@ -88,14 +111,14 @@ public class AdmitCardPdfBuilder : IDocument
             {
                 page.Size(spec.Width, spec.Height, Unit.Inch);
                 page.Margin(0);
-                page.DefaultTextStyle(x => x.FontSize(ValueFont));
+                page.DefaultTextStyle(x => x.FontSize(Sz(ValueFont)));
 
                 page.Content().Column(col =>
                 {
                     foreach (var (student, subjects) in sheet)
                     {
                         col.Item()
-                            .Height(CardHeightInches, Unit.Inch)
+                            .Height(spec.CardHeight, Unit.Inch)
                             .Element(c => ComposeCard(c, student, subjects));
                     }
                 });
@@ -103,25 +126,25 @@ public class AdmitCardPdfBuilder : IDocument
         }
     }
 
-    // Renders one card into a full-width, exactly 4.5in tall slot on the sheet.
+    // Renders one card into a full-width, fixed-height slot on the sheet.
     // Nothing here may use ExtendVertical: inside a fixed-height slot it expands to
     // the whole page and pushes every card onto its own sheet.
     private void ComposeCard(IContainer container, RptAdmitCardVM student, List<RptAdmitCardVM> subjects)
     {
-        container.Padding(14).Border(1).Padding(4).Column(card =>
+        container.Padding(Sz(14)).Border(1).Padding(Sz(4)).Column(card =>
         {
             ComposeBody(card, student, subjects);
 
             // Both portions hug the bottom of the row so the last direction line and
             // the "Controller of Examinations" line share a baseline regardless of
             // how many lines the directions wrap to.
-            card.Item().PaddingTop(4).Row(bottomRow =>
+            card.Item().PaddingTop(Sz(4)).Row(bottomRow =>
             {
                 bottomRow.RelativeItem(3).AlignBottom().Column(directions =>
                 {
-                    directions.Item().Text("Direction:").SemiBold().FontSize(DirectionFont);
-                    directions.Item().Text("1. The Examinee must bring the Admit Card in the Examination hall.").FontSize(DirectionFont);
-                    directions.Item().Text("2. The examinee must sign in the attendance sheet for each subject in the examination hall otherwise will be treated as absent in the respective subject(s).").FontSize(DirectionFont);
+                    directions.Item().Text("Direction:").SemiBold().FontSize(Sz(DirectionFont));
+                    directions.Item().Text("1. The Examinee must bring the Admit Card in the Examination hall.").FontSize(Sz(DirectionFont));
+                    directions.Item().Text("2. The examinee must sign in the attendance sheet for each subject in the examination hall otherwise will be treated as absent in the respective subject(s).").FontSize(Sz(DirectionFont));
                 });
 
                 bottomRow.RelativeItem(2).AlignBottom().AlignRight().Column(sig =>
@@ -130,13 +153,13 @@ public class AdmitCardPdfBuilder : IDocument
                     {
                         try
                         {
-                            sig.Item().Height(38).AlignRight().Image(
+                            sig.Item().Height(Sz(38)).AlignRight().Image(
                                 Convert.FromBase64String(_signatureBase64)).FitArea();
                         }
                         catch { }
                     }
-                    sig.Item().AlignCenter().Text("Controller of Examinations").SemiBold().FontSize(DirectionFont);
-                    sig.Item().AlignCenter().Text(_institute.Name ?? "").FontSize(DirectionFont);
+                    sig.Item().AlignCenter().Text("Controller of Examinations").SemiBold().FontSize(Sz(DirectionFont));
+                    sig.Item().AlignCenter().Text(_institute.Name ?? "").FontSize(Sz(DirectionFont));
                 });
             });
         });
@@ -146,10 +169,10 @@ public class AdmitCardPdfBuilder : IDocument
     {
         void InfoCell(IContainer c, string label, string value)
         {
-            c.Padding(1.5f).Text(t =>
+            c.Padding(Sz(1.5f)).Text(t =>
             {
-                t.Span(label).SemiBold().FontSize(LabelFont);
-                t.Span(value).FontSize(ValueFont);
+                t.Span(label).SemiBold().FontSize(Sz(LabelFont));
+                t.Span(value).FontSize(Sz(ValueFont));
             });
         }
 
@@ -158,29 +181,29 @@ public class AdmitCardPdfBuilder : IDocument
         {
             if (!string.IsNullOrEmpty(_logoBase64))
             {
-                try { headerRow.ConstantItem(50).Image(Convert.FromBase64String(_logoBase64)).FitArea(); } catch { }
+                try { headerRow.ConstantItem(Sz(50)).Image(Convert.FromBase64String(_logoBase64)).FitArea(); } catch { }
             }
             headerRow.RelativeItem().Column(c =>
             {
-                c.Item().AlignCenter().Text(_institute.Name ?? "").Bold().FontSize(InstituteNameFont);
+                c.Item().AlignCenter().Text(_institute.Name ?? "").Bold().FontSize(Sz(InstituteNameFont));
                 if (!string.IsNullOrEmpty(_institute.Address))
-                    c.Item().AlignCenter().Text(_institute.Address).FontSize(InstituteMetaFont);
+                    c.Item().AlignCenter().Text(_institute.Address).FontSize(Sz(InstituteMetaFont));
                 if (!string.IsNullOrEmpty(_institute.EIIN))
-                    c.Item().AlignCenter().Text($"EIIN: {_institute.EIIN}").FontSize(InstituteMetaFont);
+                    c.Item().AlignCenter().Text($"EIIN: {_institute.EIIN}").FontSize(Sz(InstituteMetaFont));
             });
         });
 
         // Title + exam info on same row
         col.Item().Row(titleRow =>
         {
-            titleRow.RelativeItem(2).AlignCenter().Text("ADMIT CARD").Bold().FontSize(TitleFont);
-            titleRow.RelativeItem(3).AlignCenter().Text($"{student.ExamGroupName ?? student.ExamTypeName}  |  {student.SessionName}").FontSize(ExamInfoFont);
+            titleRow.RelativeItem(2).AlignCenter().Text("ADMIT CARD").Bold().FontSize(Sz(TitleFont));
+            titleRow.RelativeItem(3).AlignCenter().Text($"{student.ExamGroupName ?? student.ExamTypeName}  |  {student.SessionName}").FontSize(Sz(ExamInfoFont));
         });
 
         col.Item().LineHorizontal(1);
 
         // Name fields in 2-column table (wider for long names)
-        col.Item().PaddingVertical(1.5f).Table(nameTable =>
+        col.Item().PaddingVertical(Sz(1.5f)).Table(nameTable =>
         {
             nameTable.ColumnsDefinition(c =>
             {
@@ -224,20 +247,20 @@ public class AdmitCardPdfBuilder : IDocument
 
         // Subjects in 4-column table. The card must never spill onto a second page,
         // so tighten the rows as the subject count grows.
-        // A4 is 0.23in narrower than Legal, so subject names wrap an extra line there;
-        // tighten one step earlier to keep the card inside its 4.5in slot.
+        // The A4 layouts are 0.23in narrower than Legal, so subject names wrap an extra
+        // line there; tighten one step earlier to keep the card inside its slot.
         var rowCount = (int)Math.Ceiling(subjects.Count / 4.0);
-        var density = rowCount + (_sheet == AdmitCardSheet.A4 ? 1 : 0);
+        var density = rowCount + (_sheet == AdmitCardSheet.Legal ? 0 : 1);
         var (subjectFont, subjectPadding) = density switch
         {
-            <= 3 => (SubjectFont, 1.5f),
-            4 => (8f, 1f),
-            5 => (7f, 0.75f),
-            _ => (6f, 0.5f),
+            <= 3 => (Sz(SubjectFont), Sz(1.5f)),
+            4 => (Sz(8f), Sz(1f)),
+            5 => (Sz(7f), Sz(0.75f)),
+            _ => (Sz(6f), Sz(0.5f)),
         };
 
-        col.Item().Text("Subjects:").SemiBold().FontSize(LabelFont);
-        col.Item().PaddingTop(1.5f).Table(t =>
+        col.Item().Text("Subjects:").SemiBold().FontSize(Sz(LabelFont));
+        col.Item().PaddingTop(Sz(1.5f)).Table(t =>
         {
             t.ColumnsDefinition(c =>
             {

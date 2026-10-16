@@ -1117,7 +1117,7 @@ public class ReportsController : Controller
 
     #region Admit Card Reports
     [Authorize(Policy = "AdmitCardReportsPolicy")]
-    public async Task<IActionResult> AdmitCardExport(string reportType, string fileName, int monthId, string academicClassId, string academicSectionId, int examTypeId, int examGroupId = 0, bool download = false, string sheet = "Legal")
+    public async Task<IActionResult> AdmitCardExport(string reportType, string fileName, int monthId, string academicClassId, string academicSectionId, int examTypeId, int examGroupId = 0, bool download = false, string sheet = "Legal", int studentId = 0)
     {
         var institute = await _instituteManager.GetByIdAsync(1);
         if (institute == null)
@@ -1153,16 +1153,27 @@ public class ReportsController : Controller
         var admitCardList = await _reportManager.GetAdmitCard(monthId, aClassId, aSectionId, examTypeId, examGroupId);
         admitCardList = admitCardList.Where(s => s.StudentStauts == true).ToList();
 
+        // Optional single-student filter: when a student is chosen on the screen only
+        // that one card is printed instead of the whole class/section.
+        if (studentId > 0)
+        {
+            admitCardList = admitCardList.Where(s => s.StudentId == studentId).ToList();
+        }
+
         if (!admitCardList.Any())
         {
             return new JsonResult("No data found");
         }
 
-        // Cards are tiled onto the chosen paper (3 per Legal sheet, 2 per A4) so they
-        // print at their true physical size instead of being rescaled by the printer.
-        var cardSheet = string.Equals(sheet, "A4", StringComparison.OrdinalIgnoreCase)
-            ? AdmitCardSheet.A4
-            : AdmitCardSheet.Legal;
+        // Cards are tiled onto the chosen paper (3 per Legal sheet, 2 per A4, 3 per A4
+        // when scaled down) so they print at their true physical size instead of being
+        // rescaled by the printer.
+        var cardSheet = sheet switch
+        {
+            var s when string.Equals(s, "A4-3", StringComparison.OrdinalIgnoreCase) => AdmitCardSheet.A4ThreePerPage,
+            var s when string.Equals(s, "A4", StringComparison.OrdinalIgnoreCase) => AdmitCardSheet.A4,
+            _ => AdmitCardSheet.Legal,
+        };
 
         var admitDoc = new AdmitCardPdfBuilder(institute, StripDataUriPrefix(imageParam), signatureParam, admitCardList, cardSheet);
         var result = admitDoc.GeneratePdf();
@@ -1173,6 +1184,35 @@ public class ReportsController : Controller
             : $"inline; filename=\"{fileName}.pdf\"";
 
         return File(result, "application/pdf");
+    }
+
+    /// <summary>
+    /// Distinct students that have an admit card for the chosen class/section/exam, used to
+    /// populate the "Student" filter on the screen so one card can be printed on its own.
+    /// Drawn from the same source as the export, so the list matches exactly what would print.
+    /// </summary>
+    [Authorize(Policy = "AdmitCardReportsPolicy")]
+    public async Task<JsonResult> GetStudentsForAdmitCard(int monthId, string academicClassId, string academicSectionId, int examTypeId, int examGroupId = 0)
+    {
+        int.TryParse(academicClassId, out int aClassId);
+        int.TryParse(academicSectionId, out int aSectionId);
+
+        var admitCardList = await _reportManager.GetAdmitCard(monthId, aClassId, aSectionId, examTypeId, examGroupId);
+
+        var students = admitCardList
+            .Where(s => s.StudentStauts == true)
+            .GroupBy(s => s.StudentId)
+            .Select(g => g.First())
+            .OrderBy(s => s.ClassRoll)
+            .Select(s => new
+            {
+                id = s.StudentId,
+                roll = s.ClassRoll,
+                name = s.StudentName
+            })
+            .ToList();
+
+        return Json(students);
     }
 
     #endregion Admit Card Reports
