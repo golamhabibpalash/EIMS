@@ -8,10 +8,11 @@ namespace SMS_App.Utilities.EmailServices;
 
 public static class EmailService
 {
-    private static readonly string FromEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL") 
-        ?? throw new InvalidOperationException("SMTP_EMAIL environment variable is not set.");
-    private static readonly string FromEmailPassword = Environment.GetEnvironmentVariable("SMTP_PASSWORD") 
-        ?? throw new InvalidOperationException("SMTP_PASSWORD environment variable is not set.");
+    // Resolved lazily rather than thrown at type-init: an unconfigured SMTP host must NOT crash
+    // callers (e.g. the daily attendance summary job, whose primary purpose is the SMS, or the
+    // login OTP path). When creds are missing we simply skip the email and return false.
+    private static readonly string FromEmail = Environment.GetEnvironmentVariable("SMTP_EMAIL");
+    private static readonly string FromEmailPassword = Environment.GetEnvironmentVariable("SMTP_PASSWORD");
     private static readonly string TemplateDirectory = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "EmailTemplates");
 
     public static bool SendAttendanceEmail(string toEmail, string subject, AttendanceSummary attendanceSummaryVM)
@@ -45,6 +46,10 @@ public static class EmailService
 
     private static bool SendEmailInternal(string toEmail, string subject, string templateFileName, (string Key, string Value)[] placeholders)
     {
+        // SMTP not configured on this host (SMS-only instances): skip email silently.
+        if (string.IsNullOrEmpty(FromEmail) || string.IsNullOrEmpty(FromEmailPassword))
+            return false;
+
         string templatePath = Path.Combine(TemplateDirectory, templateFileName);
 
         if (!File.Exists(templatePath))
