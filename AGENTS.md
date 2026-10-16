@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for OpenCode working in **EIMS** (Education Institute Management System) — ASP.NET Core 8.0 MVC, EF Core 7.0. See `CLAUDE.md` for the full write-up; this file is the compact operating guide.
+Guidance for OpenCode working in **EIMS** (Education Institute Management System) — ASP.NET Core 8.0 MVC, EF Core 7.0.11 running on .NET 8 (don't "fix" the version skew by upgrading EF independently). See `CLAUDE.md` for the full write-up; this file is the compact operating guide.
 
 ## Architecture (strict)
 
@@ -30,15 +30,19 @@ dotnet ef migrations add <Name> -o Migrations_SqlServer   # SqlServer only; run 
 ## Database: the biggest gotchas
 
 - `SMS_App/appsettings.json` → `DatabaseProvider` selects `"SqlServer"` or `"PostgreSQL"`. Only `DefaultConnection` is read, and it is **provider-dependent**:
-  - **SqlServer**: value is AES-encrypted; decrypted at runtime with env vars `AES_KEY`/`AES_IV` (defaults `"1234567890123456"`). Producing a new one requires the `Resources/deployment/EncryptConnString/` console app.
+  - **SqlServer**: value is AES-encrypted (AES-128-CBC/PKCS7, base64); decrypted at runtime with env vars `AES_KEY`/`AES_IV` (defaults `"1234567890123456"`). Produce/verify one with `dotnet run -- enc|dec|test "<value>"` from `Resources/deployment/EncryptConnString/`.
   - **PostgreSQL**: value is used as **plain text**.
-  - Named per-host variants sit alongside `DefaultConnection` (exact names drift — see `appsettings.json` and `README.md`); to switch hosts, copy the desired profile's value into `DefaultConnection` — the app otherwise ignores them.
+  - `Program.cs` reads `DefaultConnection` only. `README.md` lists historical per-host profiles (`Noble_…`, `Mac_Docker_…`, etc.) but the current `appsettings.json` contains just `DefaultConnection` — don't expect those keys; to switch hosts, replace the `DefaultConnection` value.
 - On startup `Program.cs` runs `CanConnectAsync()` → `EnsureCreatedAsync()` → `DbSeeder.SeedAsync()`. Schema is created from the EF model; **do not assume migrations are applied at runtime**.
 - **SqlServer** schema changes use code-first migrations (run from `SMS.DB/`, add with `-o Migrations_SqlServer`). **PostgreSQL is NOT migration-driven** — it is provisioned from a dump (`Resources/docker/setup-eims-postgres.ps1` creates a `postgres:16` container on port 5433 and restores `eimsdb_noble.dump`).
+  - Script gotchas: the dump path is hard-coded (`C:\Users\golam\Downloads\eimsdb_noble.dump`) and its port (5433) currently differs from `appsettings.json` (5434) — align them before running.
+- CI **never runs migrations** (see `Resources/deployment/CICD.md`); apply EF migrations manually per instance when a release includes schema changes.
 
 ## Auth & areas
 
 - Claim-based authorization, **not role-based**: policies live in `SMS_App/Configurations/AuthorizationPolicies.cs`, action policies named e.g. `[Authorize(Policy = "CreateStudentPolicy")]`. A global `AuthorizeFilter` in `Program.cs` requires an authenticated user on every route.
+- Permission claims are **not** stored in the login cookie (`AppClaimsPrincipalFactory` keeps it to id/name/roles/stamp; `PermissionClaimsTransformation` rehydrates permissions per request, memory-cached) — ~250 claims would otherwise overflow IIS header limits and cause 400s. Don't bake permissions back into the cookie.
+- Middleware order matters in `Program.cs`: `UseSession()` runs **before** routing/auth; session is 24h with `LoginPath=/Accounts/Login`.
 - Policy names contain historical typos (e.g. `CraeteAcademicExamTypePolicy`) referenced verbatim by controllers and `SiteMap.Config` — grep before renaming anything.
 - A new screen needs a `<item Controller Action Claim>` entry in `SMS_App/SiteMap.Config` or it won't appear in the nav menu.
 - `Controllers/IClockController.cs` serves `/iclock/*` ADMS push endpoints with hard-coded device-firmware routes: never rename/move them, keep responses plain text, it stays `[AllowAnonymous]` (trusts device `SN` only).

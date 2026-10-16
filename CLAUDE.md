@@ -44,6 +44,11 @@ database is provisioned from a dump (see `Resources/docker/setup-eims-postgres.p
 code-first migrations. `DesignTimeDbContextFactory` picks the provider and decrypts/loads the
 connection string the same way `Program.cs` does.
 
+At runtime, startup does **not** apply migrations: `Program.cs` runs `CanConnectAsync()` →
+`EnsureCreatedAsync()` → `DbSeeder.SeedAsync()`. On a fresh DB the schema is created from the
+current EF model (not the migration files), so a running app can diverge from the migration
+history. Use `dotnet ef database update` to apply migrations against an existing SqlServer DB.
+
 ## Architecture — 6-Layer Dependency Chain
 
 ```
