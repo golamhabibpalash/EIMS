@@ -110,6 +110,12 @@ public static class DependencyInjectionConfiguration
         services.AddScoped<ITicketCommentRepository, TicketCommentRepository>();
         services.AddScoped<ITicketAttachmentRepository, TicketAttachmentRepository>();
         services.AddScoped<ITicketManager, TicketManager>();
+
+        //Notifications (in-app notification centre)
+        services.AddScoped<IUserNotificationRepository, UserNotificationRepository>();
+        services.AddScoped<IUserNotificationManager, UserNotificationManager>();
+        services.AddScoped<SMS_App.Utilities.Notifications.INotificationService, SMS_App.Utilities.Notifications.NotificationService>();
+
         services.AddScoped<IZKTecoService, ZKTecoService>();
         services.AddScoped<IAttendanceMachineService, AttendanceMachineService>();
 

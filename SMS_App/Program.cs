@@ -203,6 +203,7 @@ builder.Services.AddAuthorization(o =>
 // MVC / Views / Automapper
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
+builder.Services.AddSignalR(); // real-time in-app notifications (NotificationHub)
 	builder.Services.AddAutoMapper(cfg => {
 		cfg.AddProfile<AutoMapperProfile>();
 	});
@@ -301,6 +302,9 @@ else
 
 // API controllers (attribute-routed)
 app.MapControllers();
+
+// Real-time notifications hub (groups keyed by the signed-in user's id)
+app.MapHub<SMS_App.Hubs.NotificationHub>("/hubs/notifications");
 
 // AREA routing
 app.MapControllerRoute(

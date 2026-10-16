@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using SchoolManagementSystem;
 using SMS_App.Utilities.LoggerService;
 using SMS_App.Utilities.MACIPServices;
+using SMS_App.Utilities.Notifications;
 using SMS_App.ViewModels.Tickets;
 using SMS.BLL.Contracts;
 using SMS.Entities;
@@ -39,17 +40,20 @@ public class TicketsController : Controller
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly IWebHostEnvironment _host;
     private readonly IAppLogger _appLogger;
+    private readonly INotificationService _notificationService;
 
     public TicketsController(
         ITicketManager ticketManager,
         UserManager<ApplicationUser> userManager,
         IWebHostEnvironment host,
-        IAppLogger appLogger)
+        IAppLogger appLogger,
+        INotificationService notificationService)
     {
         _ticketManager = ticketManager;
         _userManager = userManager;
         _host = host;
         _appLogger = appLogger;
+        _notificationService = notificationService;
     }
 
     // GET: Tickets
@@ -183,6 +187,10 @@ public class TicketsController : Controller
             ? "Ticket raised successfully."
             : $"Ticket raised, but {rejected.Count} file(s) were not attached: {string.Join("; ", rejected)}";
 
+        // Alert the SuperAdmins. Best-effort: NotifyTicketRaisedAsync swallows its own errors so
+        // a notification problem can never undo a successfully raised ticket.
+        await _notificationService.NotifyTicketRaisedAsync(ticket, userId, MACService.GetMAC());
+
         await _appLogger.InfoAsync($"Ticket #{ticket.Id} raised by {User?.Identity?.Name}");
         return RedirectToAction(nameof(Details), new { id = ticket.Id });
     }
@@ -270,6 +278,16 @@ public class TicketsController : Controller
         TempData[isChanged ? "success" : "fail"] = isChanged
             ? $"Ticket moved to {newStatus}."
             : "Status unchanged - the ticket is already in that status.";
+
+        if (isChanged)
+        {
+            // Tell the person who raised it (unless they are the one changing the status).
+            var ticket = await _ticketManager.GetByIdAsync(id);
+            if (ticket is not null)
+            {
+                await _notificationService.NotifyTicketStatusChangedAsync(ticket, newStatus, userId, MACService.GetMAC());
+            }
+        }
 
         return RedirectToAction(nameof(Details), new { id });
     }

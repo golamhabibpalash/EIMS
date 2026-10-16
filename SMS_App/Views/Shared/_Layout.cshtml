@@ -170,22 +170,24 @@
                                 <a class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
                                    data-close-others="true">
                                     <i data-feather="bell"></i>
-                                    <span class="badge headerBadgeColor1"> 0 </span>
+                                    <span class="badge headerBadgeColor1" id="notif-badge"> @(await Component.InvokeAsync("NotificationCount")) </span>
                                 </a>
                                 <ul class="dropdown-menu">
-                                    <li class="external">
-                                        <h3><span class="bold">Notifications</span></h3>
-                                        <span class="notification-label purple-bgcolor">0</span>
+                                    <li class="external d-flex justify-content-between align-items-center">
+                                        <h3 class="mb-0"><span class="bold">Notifications</span>
+                                            <span class="notification-label purple-bgcolor" id="notif-count-label">@(await Component.InvokeAsync("NotificationCount"))</span>
+                                        </h3>
+                                        <a href="javascript:void(0)" id="notif-mark-all" class="small">Mark all read</a>
                                     </li>
                                     <li>
-                                        <ul class="dropdown-menu-list small-slimscroll-style" data-handle-color="#637283">
-                                            <li class="text-center text-muted p-3">
+                                        <ul class="dropdown-menu-list small-slimscroll-style" data-handle-color="#637283" id="notif-list">
+                                            <li class="text-center text-muted p-3" data-notif-empty="1">
                                                 <p class="mb-0">No new notifications</p>
                                             </li>
                                         </ul>
                                     </li>
                                     <div class="dropdown-menu-footer">
-                                        <a href="javascript:void(0)"> All notifications </a>
+                                        <a href="/Notifications"> All notifications </a>
                                     </div>
                                 </ul>
                             </li>
@@ -744,6 +746,22 @@
                 });
             })();
         </script>
+
+        @* In-app notification centre: real-time bell. Token is read by notifications.js for the
+           POST endpoints (mark all read); the full /Notifications page works without any of this. *@
+        @Html.AntiForgeryToken()
+        <script>
+            window.EIMS_NOTIF = {
+                hubUrl: "/hubs/notifications",
+                recentUrl: "/Notifications/Recent",
+                markAllUrl: "/Notifications/MarkAllRead",
+                openUrlBase: "/Notifications/Open/",
+                allUrl: "/Notifications",
+                token: (document.querySelector('input[name="__RequestVerificationToken"]') || {}).value
+            };
+        </script>
+        <script src="~/lib/signalr/signalr.min.js"></script>
+        <script src="~/js/notifications.js" asp-append-version="true"></script>
 
         @await RenderSectionAsync("Scripts", required: false)
     </body>

@@ -88,6 +88,7 @@ namespace SMS.DB
         public DbSet<Nationality> Nationality { get; set; }
         public DbSet<NotificationEvent> NotificationEvents { get; set; }
         public DbSet<Notification> Notifications { get; set; }
+        public DbSet<UserNotification> UserNotifications { get; set; }
         #endregion
 
         #region O
