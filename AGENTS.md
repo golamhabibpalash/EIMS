@@ -41,10 +41,11 @@ dotnet ef migrations add <Name> -o Migrations_SqlServer   # SqlServer only; run 
 ## Auth & areas
 
 - Claim-based authorization, **not role-based**: policies live in `SMS_App/Configurations/AuthorizationPolicies.cs`, action policies named e.g. `[Authorize(Policy = "CreateStudentPolicy")]`. A global `AuthorizeFilter` in `Program.cs` requires an authenticated user on every route.
-- Permission claims are **not** stored in the login cookie (`AppClaimsPrincipalFactory` keeps it to id/name/roles/stamp; `PermissionClaimsTransformation` rehydrates permissions per request, memory-cached) — ~250 claims would otherwise overflow IIS header limits and cause 400s. Don't bake permissions back into the cookie.
+- Permission claims are **not** stored in the login cookie (`AppClaimsPrincipalFactory` keeps it to id/name/roles/stamp; `PermissionClaimsTransformation` rehydrates `AspNetUserClaims`/`AspNetRoleClaims` per request) — ~250 claims would otherwise overflow IIS header limits and cause 400s. Don't bake permissions back into the cookie.
+- The claims transformation caches results **15 min per user + security stamp**: claim edits may take up to 15 min to take effect; a security-stamp change (password change, stamp reset) busts the cache immediately.
 - Middleware order matters in `Program.cs`: `UseSession()` runs **before** routing/auth; session is 24h with `LoginPath=/Accounts/Login`.
-- Policy names contain historical typos (e.g. `CraeteAcademicExamTypePolicy`) referenced verbatim by controllers and `SiteMap.Config` — grep before renaming anything.
-- A new screen needs a `<item Controller Action Claim>` entry in `SMS_App/SiteMap.Config` or it won't appear in the nav menu.
+- Policy names contain historical typos (e.g. `CraeteAcademicExamTypePolicy`) referenced verbatim by controllers, `AuthorizationPolicies.cs`, and the ClaimStores seed SQL in `Resources/sql/` — grep before renaming anything.
+- A new screen needs a `<item Controller Action Claim>` entry in `SMS_App/SiteMap.Config` or it won't appear in the nav menu. The `Claim=` attribute holds a **policy name** (e.g. `IndexInstitutesPolicy`), not a claim string.
 - `Controllers/IClockController.cs` serves `/iclock/*` ADMS push endpoints with hard-coded device-firmware routes: never rename/move them, keep responses plain text, it stays `[AllowAnonymous]` (trusts device `SN` only).
 - Areas: `API`, `Identity`, `SMSAPP`, `Student` — routed `{area:exists}/{controller=Home}/{action=Index}/{id?}`.
 
@@ -66,11 +67,12 @@ dotnet ef migrations add <Name> -o Migrations_SqlServer   # SqlServer only; run 
 - Pushing to **`FinalDeployment`** deploys to **all** production instances (see `.github/workflows/deploy.yml`); use the workflow's manual dispatch to target one.
 - Data protection keys persist to `SMS_App/Keys/` (don't delete; shared-hosting stability).
 - Raw SQL (stored procs, views, data migration) lives in `Resources/sql*` and `Resources/StudentMigrationScripts/` — run outside EF.
-- `README.md` is stale in places (says run migrations from `SMS_App/`, says reports are RDLC — actually QuestPDF builders in `SMS_App/Utilities/Reports/`); trust this file and `CLAUDE.md` on those points.
+- `README.md` is stale in places (says run migrations from `SMS_App/` — actually from `SMS.DB/`; says Serilog uses a SQL sink — `appsettings.json` uses the File sink; lists per-host connection profiles that no longer exist). Trust this file and `CLAUDE.md`.
+- **Reports are both RDLC and QuestPDF**: `Controllers/ReportsController.cs` renders `wwwroot/Reports/**/*.rdlc` via `LocalReport` *and* newer reports via QuestPDF builders in `SMS_App/Utilities/Reports/`. Don't remove either path without checking which reports use it.
 
 ## References
 
 - `CLAUDE.md` — full architecture/CRUD feature checklist and settings reference
-- `CODING_STANDARDS.md` (+ per-layer copies) — naming, SOLID, layer responsibilities
+- `CODING_STANDARDS.md` (+ copies in `SMS.BLL/` and `SMS.DB/`) — naming, SOLID, layer responsibilities
 - `PERFORMANCE_FIXES.md` — N+1 optimization example for `StudentFeeAllocations`
 - `SMS_App/SiteMap.Config` — navigation menu structure

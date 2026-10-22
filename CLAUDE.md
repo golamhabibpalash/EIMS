@@ -88,6 +88,15 @@ SMS.Frameworks   → Shared utilities, tag helpers, encryption
 ### ZKTeco Attendance Machines
 `Controllers/IClockController.cs` serves the `/iclock/*` ADMS push endpoints that terminal firmware has hard-coded, so those routes can't be renamed or moved into an area. It is `[AllowAnonymous]` and trusts only a registered device serial (`SN`); responses must stay plain text. Direct-socket device access lives in `SMS.BLL/ZKTeco/ZkClient.cs`.
 
+### Real-Time Notifications (SignalR)
+In-app notifications are split deliberately across layers because Identity and the hub are presentation concerns:
+- `UserNotificationManager` (BLL) **only persists** `UserNotification` rows — it does not resolve recipients or push.
+- `SMS_App/Utilities/Notifications/NotificationService.cs` (presentation) is the orchestrator: it resolves recipients (e.g. all `SuperAdmin`s via `UserManager`), calls the manager to persist, then pushes over SignalR. **Persist first, push best-effort** — a stored row is the guaranteed floor; the live push is a bonus and its failure is swallowed/logged, never fatal.
+- The hub is `SMS_App/Hubs/NotificationHub.cs`, mapped at `/hubs/notifications` in `Program.cs` (`AddSignalR()` + `MapHub`). It is receive-only (no hub methods); each connection joins a per-user group `user:{Context.UserIdentifier}` so pushes target a user across all their tabs/devices.
+- Client script: `SMS_App/wwwroot/js/notifications.js`; vendored lib under `wwwroot/lib/signalr/`.
+- `INotificationService` is registered in `DependencyInjectionConfiguration.cs` alongside the manager/repository, not in `Program.cs`.
+- **Naming trap**: `SMS.Entities/StudentHub.cs` is a domain entity (student enrollment), unrelated to SignalR.
+
 ### AutoMapper
 - Profiles configured in `SMS_App/Utilities/AutoMapperConfiguration/AutoMapperProfile.cs`
 - Injected as `IMapper` into managers and controllers

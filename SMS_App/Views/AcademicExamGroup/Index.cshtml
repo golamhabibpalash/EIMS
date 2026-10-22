@@ -6,6 +6,36 @@
     int sl = 0;
     var allSessionData = Model.AcademicExamGroupIndexVMList.GroupBy(x => new{sessionId=x.AcademicSessionId, sessionName = x.AcademicSession.Name});
 }
+
+<style>
+    .session-toggle {
+        cursor: pointer;
+        border-radius: .35rem;
+        margin-bottom: .5rem;
+        padding: .75rem 1rem;
+        transition: filter .15s ease-in-out, box-shadow .15s ease-in-out;
+        user-select: none;
+    }
+
+    .session-toggle:hover {
+        filter: brightness(1.15);
+        box-shadow: 0 .25rem .5rem rgba(0, 0, 0, .25);
+    }
+
+    .session-toggle .session-toggle-chevron {
+        transition: transform .2s ease-in-out;
+    }
+
+    /* Bootstrap adds .collapsed to the toggle when the target is hidden */
+    .session-toggle:not(.collapsed) .session-toggle-chevron {
+        transform: rotate(180deg);
+    }
+
+    .session-toggle:not(.collapsed) .session-toggle-hint small {
+        display: none;
+    }
+</style>
+
     <div class="row">
         <div class="col-md-8">
             @if (Model.AcademicExamGroupIndexVMList.Any())
@@ -13,9 +43,9 @@
                 <div id="accordion">
                 @foreach (var session in allSessionData.OrderByDescending(c => c.Key.sessionId))
                 {
-                    <div class="well col-md-12 text-start bg-navy-blue d-flex justify-content-between" data-bs-toggle="collapse" href="#collapseExample_@session.Key.sessionId" role="button">
-                        <span>Session @session.Key.sessionName</span><span> <i class="fa fa-arrow-alt-down"></i> </span>
-                    
+                    <div class="well col-md-12 text-start bg-navy-blue d-flex justify-content-between align-items-center session-toggle collapsed" data-bs-toggle="collapse" href="#collapseExample_@session.Key.sessionId" role="button" aria-expanded="false" aria-controls="collapseExample_@session.Key.sessionId">
+                        <span class="fw-bold"><i class="fa fa-folder-open me-2"></i>Session @session.Key.sessionName</span>
+                        <span class="session-toggle-hint"><small class="me-2 text-white-50">Click to view exams</small><i class="fa fa-chevron-down session-toggle-chevron"></i></span>
                     </div>
                     <div class="collapse" id="collapseExample_@session.Key.sessionId" data-parent="#accordion">
                     <table class="table">
