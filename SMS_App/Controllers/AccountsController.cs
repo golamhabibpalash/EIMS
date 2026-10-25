@@ -281,6 +281,18 @@ public class AccountsController : Controller
                             result = await _signInManager.PasswordSignInAsync(existingStudent.UniqueId, model.Password, model.RememberMe, false);
                         }
                     }
+
+                    //02. Student ID typed with or without its leading zero ("0901..." vs "901...") -
+                    //    the login username is the stored UniqueId, which may differ only by zeros.
+                    var typedId = model.AppUser?.Trim();
+                    if (!result.Succeeded && !string.IsNullOrEmpty(typedId) && typedId.All(char.IsDigit))
+                    {
+                        var studentById = await _studentManager.GetStudentByUniqueIdAsync(typedId);
+                        if (studentById != null && studentById.UniqueId != typedId)
+                        {
+                            result = await _signInManager.PasswordSignInAsync(studentById.UniqueId, model.Password, model.RememberMe, false);
+                        }
+                    }
                 }
                 if (result.Succeeded)
                 {
