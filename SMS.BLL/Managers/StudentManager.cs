@@ -38,6 +38,10 @@ namespace SMS.BLL.Managers
         {
             return await _studentRepository.GetStudentByClassRollAsync(classRoll);
         }
+        public async Task<Student> GetStudentByAttendancePinAsync(string pin)
+        {
+            return await _studentRepository.GetStudentByAttendancePinAsync(pin);
+        }
         public async Task<Student> GetStudentByUniqueIdAsync(string uniqueId)
         {
             return await _studentRepository.GetStudentByUniqueIdAsync(uniqueId);
@@ -135,7 +139,7 @@ namespace SMS.BLL.Managers
             Dictionary<int, int> monthWiseAttendance = new Dictionary<int, int>();
             var institute = await _instituteManager.GetByIdAsync(1);
             
-            var currentSessonsAllAttendances = await _attendanceMachineManager.GetSessionWiseAttendanceByStudentUniqueIdAsync(currentSession.Id, student.UniqueId);
+            var currentSessonsAllAttendances = await _attendanceMachineManager.GetSessionWiseAttendanceByStudentUniqueIdAsync(currentSession.Id, student.UniqueId, student.MachineUserId, student.ClassRoll);
             if (currentSessonsAllAttendances!=null && currentSessonsAllAttendances?.Count>0)
             {
                 currentSessonsAllAttendances = currentSessonsAllAttendances.DistinctBy(s => s.PunchDatetime.Date).ToList();

@@ -200,8 +200,9 @@ namespace SMS_App.Utilities.ShortMessageService
             if (string.IsNullOrEmpty(pin))
                 return (null, null, false, "Punch has no PIN");
 
-            // 1. Student by UniqueId - the scheme the terminal is enrolled with.
-            var student = await _studentManager.GetStudentByUniqueIdAsync(pin);
+            // 1. Student by the PIN the terminal is enrolled with: MachineUserId if one was set on
+            //    the Machine Enrollment screen, otherwise UniqueId (leading-zero tolerant).
+            var student = await _studentManager.GetStudentByAttendancePinAsync(pin);
 
             // 2. Employee by MachineUserId.
             Employee employee = null;

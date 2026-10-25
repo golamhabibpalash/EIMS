@@ -105,7 +105,7 @@ namespace SMS.BLL.Managers
             return await _attendanceMachineRepository.GetTodaysAttendanceByUserIdAsync(attendanceId);
         }
 
-        public async Task<List<Tran_MachineRawPunch>> GetSessionWiseAttendanceByStudentUniqueIdAsync(int sessionId, string uniqueId)
+        public async Task<List<Tran_MachineRawPunch>> GetSessionWiseAttendanceByStudentUniqueIdAsync(int sessionId, string uniqueId, string machineUserId = null, int classRoll = 0)
         {
             var academicSession = await _academicSessionRepository.GetByIdAsync(sessionId);
             int sessionYear = Convert.ToInt32(academicSession.Name.Substring(academicSession.Name.Length - 4));
@@ -118,7 +118,7 @@ namespace SMS.BLL.Managers
                 .Where(s => s.PunchDatetime.Year == sessionYear)
                 .ToListAsync();
 
-            return yearPunches.Where(s => AttendancePinMatcher.Matches(s.CardNo, uniqueId)).ToList();
+            return yearPunches.Where(s => AttendancePinMatcher.MatchesStudent(s.CardNo, machineUserId, uniqueId, classRoll)).ToList();
         }
     }
 }

@@ -20,6 +20,7 @@ namespace SMS.BLL.Contracts
         Task<List<Tran_MachineRawPunch>> GetAttendanceByDateRangeAsync(string StartDate, string EndDate);
         Task<List<Employee>> GetTodaysAbsentEmployeeAsync(string date);
         Task<List<Tran_MachineRawPunch>> GetAttendanceByMonthSingleStudent(int studentId, string monthYear);
-        Task<List<Tran_MachineRawPunch>> GetSessionWiseAttendanceByStudentUniqueIdAsync(int sessionId, string uniqueId);
+        /// <summary>A student's punches in the session year, matched by MachineUserId / UniqueId / roll (leading-zero tolerant).</summary>
+        Task<List<Tran_MachineRawPunch>> GetSessionWiseAttendanceByStudentUniqueIdAsync(int sessionId, string uniqueId, string machineUserId = null, int classRoll = 0);
     }
 }

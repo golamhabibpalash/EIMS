@@ -106,7 +106,7 @@ namespace SMS.DAL.Repositories
                     Class_Designation = s.AcademicClass?.Name,
                     Phone = s.PhoneNo,
                     GuardianPhone = s.GuardianPhone,
-                    PunchTime = PunchTimeFor(s.UniqueId, s.ClassRoll.ToString()),
+                    PunchTime = PunchTimeFor(AttendancePinMatcher.StudentPins(s.MachineUserId, s.UniqueId, s.ClassRoll)),
                     SectionId = s.AcademicSectionId
                 }).ToList();
             }
@@ -233,10 +233,10 @@ namespace SMS.DAL.Repositories
                     .Where(s => s.Status)
                     .ToListAsync();
 
-                // A punch resolves through the enrolled PIN (UniqueId); legacy
-                // punches captured under the class roll still count.
+                // A punch resolves through the enrolled PIN (MachineUserId, else UniqueId);
+                // legacy punches captured under the class roll still count.
                 var absentStudents = activeStudents
-                    .Where(s => !HasPunch(punchedPins, s.UniqueId, s.ClassRoll.ToString()))
+                    .Where(s => !HasPunch(punchedPins, AttendancePinMatcher.StudentPins(s.MachineUserId, s.UniqueId, s.ClassRoll)))
                     .ToList();
 
                 return absentStudents;

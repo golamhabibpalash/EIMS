@@ -57,7 +57,44 @@ namespace SMS.Entities.Utilities
                 return System.Array.Empty<string>();
             }
 
-            return new[] { pin.Trim(), Normalize(pin) }.Distinct().ToArray();
+            var trimmed = pin.Trim();
+            var normalized = Normalize(trimmed);
+            var variants = new System.Collections.Generic.List<string> { trimmed, normalized };
+
+            // A numeric PIN may be stored with leading zeros the punch doesn't carry (or the other
+            // way round): "27826618" must also find a row holding "027826618" or "0027826618".
+            if (normalized.All(char.IsDigit))
+            {
+                for (var zeros = 1; zeros <= 3; zeros++)
+                {
+                    variants.Add(new string('0', zeros) + normalized);
+                }
+            }
+
+            return variants.Distinct().ToArray();
+        }
+
+        /// <summary>
+        /// Every PIN a student's punches may arrive under, in priority order: the PIN set on the
+        /// Machine Enrollment screen (MachineUserId - what the device sync enrolls), then the
+        /// UniqueId, then the class roll (legacy punches recorded before UniqueId enrolment).
+        /// Every place that ties a punch to a student must use this list, so a student enrolled
+        /// under a custom PIN is never shown absent on one screen and present on another.
+        /// </summary>
+        public static string[] StudentPins(string machineUserId, string uniqueId, int classRoll)
+        {
+            return new[] { machineUserId, uniqueId, classRoll > 0 ? classRoll.ToString(CultureInfo.InvariantCulture) : null }
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => p.Trim())
+                .ToArray();
+        }
+
+        /// <summary>True when the punch's PIN matches any of the student's PINs (see <see cref="StudentPins"/>).</summary>
+        public static bool MatchesStudent(string cardNo, string machineUserId, string uniqueId, int classRoll)
+        {
+            var normalizedCard = Normalize(cardNo);
+            return normalizedCard != null
+                && StudentPins(machineUserId, uniqueId, classRoll).Any(p => Normalize(p) == normalizedCard);
         }
     }
 }

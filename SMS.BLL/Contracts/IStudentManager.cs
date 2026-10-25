@@ -11,6 +11,8 @@ public interface IStudentManager : IManager<Student>
 {
     Task<Student> GetStudentByClassRollAsync(int classRoll);
     Task<Student> GetStudentByUniqueIdAsync(string uniqueId);
+    /// <summary>The student a machine punch belongs to (MachineUserId, then UniqueId; leading-zero tolerant).</summary>
+    Task<Student> GetStudentByAttendancePinAsync(string pin);
     Task<Student> GetStudentByClassRollAsync(int id, int classRoll);
     Task<List<Student>> GetStudentsByClassIdAndSessionIdAsync(int sessionId, int classId);
     Task<List<Student>> GetStudentsByClassSessionSectionAsync(int sessionId, int classId,int sectionId);

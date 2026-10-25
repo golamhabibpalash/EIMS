@@ -13,6 +13,11 @@ namespace SMS.DAL.Contracts
     {
         Task<Student> GetStudentByClassRollAsync(int classRoll);
         Task<Student> GetStudentByUniqueIdAsync(string uniqueId);
+        /// <summary>
+        /// The student a machine punch belongs to: by MachineUserId (the PIN set on the Machine
+        /// Enrollment screen) first, then by UniqueId. Leading-zero tolerant. Roll is not tried here.
+        /// </summary>
+        Task<Student> GetStudentByAttendancePinAsync(string pin);
         Task<Student> GetStudentByClassRollAsync(int id, int classRoll);
         Task<List<Student>> GetStudentsByClassIdAndSessionIdAsync(int sessionId, int classId);
         Task<List<Student>> GetStudentsByClassSessionSectionAsync(int sessionId, int classId, int sectionId);

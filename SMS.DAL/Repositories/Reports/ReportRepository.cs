@@ -6,6 +6,7 @@ using SMS.Entities.RptModels;
 using SMS.Entities.RptModels.AttendanceVM;
 using SMS.Entities.RptModels.Results;
 using SMS.Entities.RptModels.StudentPayment;
+using SMS.Entities.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -237,10 +238,13 @@ namespace SMS.DAL.Repositories.Reports
                 .Where(t => t.PunchDatetime.Date == date.Date)
                 .ToListAsync();
 
-            // One entry per PIN, holding that PIN's first and last punch of the day.
+            // One entry per PIN, holding that PIN's first and last punch of the day. Keyed by the
+            // normalized PIN (AttendancePinMatcher) so "0123" and "123" are the same person - a raw
+            // string key here showed students whose UniqueId starts with 0 as absent.
             var punchesByPin = punches
-                .Where(p => !string.IsNullOrWhiteSpace(p.CardNo))
-                .GroupBy(p => p.CardNo.Trim())
+                .Select(p => new { Pin = AttendancePinMatcher.Normalize(p.CardNo), p.PunchDatetime })
+                .Where(p => p.Pin != null)
+                .GroupBy(p => p.Pin)
                 .ToDictionary(
                     g => g.Key,
                     g => new
@@ -269,7 +273,8 @@ namespace SMS.DAL.Repositories.Reports
             {
                 foreach (var pin in candidatePins)
                 {
-                    if (string.IsNullOrWhiteSpace(pin) || !punchesByPin.TryGetValue(pin.Trim(), out var day))
+                    var normalized = AttendancePinMatcher.Normalize(pin);
+                    if (normalized == null || !punchesByPin.TryGetValue(normalized, out var day))
                         continue;
 
                     if (checkOut)
@@ -353,7 +358,7 @@ namespace SMS.DAL.Repositories.Reports
                         Class_Designation = s.AcademicClass?.Name,
                         Phone = s.PhoneNo,
                         GuardianPhone = s.GuardianPhone,
-                        PunchTime = PunchTimeFor(s.UniqueId, s.ClassRoll.ToString()),
+                        PunchTime = PunchTimeFor(AttendancePinMatcher.StudentPins(s.MachineUserId, s.UniqueId, s.ClassRoll)),
                         SortingOrder = s.AcademicClass?.ClassSerial.ToString(),
                         SMSSent = WasNotified(s.GuardianPhone) ? "Sent" : "Not Sent",
                         ClassSL = s.AcademicClass?.ClassSerial.ToString()

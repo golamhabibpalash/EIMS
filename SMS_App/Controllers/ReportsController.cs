@@ -549,8 +549,7 @@ public class ReportsController : Controller
         ViewBag.monthlyHolidays = monthlyHolidays;
         foreach (Student student in studentList.Where(s => s.Status == true))
         {
-            var studentUniqueId = student.UniqueId?.Trim();
-            var myAttendances = attendanceList.Where(t => CardNumbersMatch(t.CardNo, studentUniqueId)).ToList();
+            var myAttendances = attendanceList.Where(t => AttendancePinMatcher.MatchesStudent(t.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll)).ToList();
 
             IDictionary<int, bool> daysPresents = new Dictionary<int, bool>();
             MonthlyAttendanceFullClassDetails monthlyAttendanceFullClassDetails = new()
@@ -585,11 +584,6 @@ public class ReportsController : Controller
         ViewBag.studentList = studentList;
         return View(monthlyAttendanceFullClass);
     }
-
-    // CardNo (raw punch) and Student.UniqueId are string columns, and inconsistent about leading
-    // zeros ("0123" vs "123"). Delegates to the same normalizer the dashboard's absent-list uses
-    // (AttendanceMachineRepository) so the two can't independently drift the way they did before.
-    private static bool CardNumbersMatch(string cardNo, string uniqueId) => AttendancePinMatcher.Matches(cardNo, uniqueId);
 
     public IActionResult MonthlyAttendanceReport()
     {
@@ -648,37 +642,37 @@ public class ReportsController : Controller
             {
                 ClassRoll = student.ClassRoll.ToString(),
                 StudentName = student.Name,
-                Day1 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "01") ? "P" : ".",
-                Day2 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "02") ? "P" : ".",
-                Day3 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "03") ? "P" : ".",
-                Day4 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "04") ? "P" : ".",
-                Day5 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "05") ? "P" : ".",
-                Day6 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "06") ? "P" : ".",
-                Day7 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "07") ? "P" : ".",
-                Day8 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "08") ? "P" : ".",
-                Day9 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "09") ? "P" : ".",
-                Day10 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "10") ? "P" : ".",
-                Day11 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "11") ? "P" : ".",
-                Day12 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "12") ? "P" : ".",
-                Day13 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "13") ? "P" : ".",
-                Day14 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "14") ? "P" : ".",
-                Day15 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "15") ? "P" : ".",
-                Day16 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "16") ? "P" : ".",
-                Day17 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "17") ? "P" : ".",
-                Day18 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "18") ? "P" : ".",
-                Day19 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "19") ? "P" : ".",
-                Day20 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "20") ? "P" : ".",
-                Day21 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "21") ? "P" : ".",
-                Day22 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "22") ? "P" : ".",
-                Day23 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "23") ? "P" : ".",
-                Day24 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "24") ? "P" : ".",
-                Day25 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "25") ? "P" : ".",
-                Day26 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "26") ? "P" : ".",
-                Day27 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "27") ? "P" : ".",
-                Day28 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "28") ? "P" : ".",
-                Day29 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "29") ? "P" : ".",
-                Day30 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "30") ? "P" : ".",
-                Day31 = attendanceList.Any(s => AttendancePinMatcher.Matches(s.CardNo, student.UniqueId) && s.PunchDatetime.ToString("dd") == "31") ? "P" : ".",
+                Day1 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "01") ? "P" : ".",
+                Day2 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "02") ? "P" : ".",
+                Day3 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "03") ? "P" : ".",
+                Day4 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "04") ? "P" : ".",
+                Day5 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "05") ? "P" : ".",
+                Day6 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "06") ? "P" : ".",
+                Day7 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "07") ? "P" : ".",
+                Day8 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "08") ? "P" : ".",
+                Day9 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "09") ? "P" : ".",
+                Day10 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "10") ? "P" : ".",
+                Day11 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "11") ? "P" : ".",
+                Day12 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "12") ? "P" : ".",
+                Day13 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "13") ? "P" : ".",
+                Day14 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "14") ? "P" : ".",
+                Day15 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "15") ? "P" : ".",
+                Day16 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "16") ? "P" : ".",
+                Day17 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "17") ? "P" : ".",
+                Day18 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "18") ? "P" : ".",
+                Day19 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "19") ? "P" : ".",
+                Day20 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "20") ? "P" : ".",
+                Day21 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "21") ? "P" : ".",
+                Day22 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "22") ? "P" : ".",
+                Day23 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "23") ? "P" : ".",
+                Day24 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "24") ? "P" : ".",
+                Day25 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "25") ? "P" : ".",
+                Day26 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "26") ? "P" : ".",
+                Day27 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "27") ? "P" : ".",
+                Day28 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "28") ? "P" : ".",
+                Day29 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "29") ? "P" : ".",
+                Day30 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "30") ? "P" : ".",
+                Day31 = attendanceList.Any(s => AttendancePinMatcher.MatchesStudent(s.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll) && s.PunchDatetime.ToString("dd") == "31") ? "P" : ".",
 
             };
             monthlyAttendance.Add(monthlyAttendanceVM);

@@ -257,7 +257,7 @@ public class ExamResultsController : Controller
             examinationResultVM.TotalMarks = newManupulateResult.Where(s => s.studentId == student.Id).Sum(s => s.obtainMark);
             examinationResultVM.Grade = await GetGradeByPoint(examinationResultVM.CGPA);
             examinationResultVM.GradeComment = await GetGradeComments(examinationResultVM.CGPA);
-            var myAttendances = attendanceList.Where(t => t.CardNo == student.ClassRoll.ToString().PadLeft(8, '0')).ToList();
+            var myAttendances = attendanceList.Where(t => SMS.Entities.Utilities.AttendancePinMatcher.MatchesStudent(t.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll)).ToList();
             IDictionary<int, bool> daysPresents = new Dictionary<int, bool>();
             for (int i = 1; i <= monthDays; i++)
             {
@@ -911,7 +911,7 @@ public class ExamResultsController : Controller
 
             var attendanceList = await _attendanceMachineManager.GetAttendanceByDateRangeAsync(startDate.ToString(), endDate.ToString());
             List<DateTime> monthlyHolidays = await _OffDayManager.GetMonthlyHolidaysAsync(startDate.ToString("MMyyyy"));
-            var myAttendances = attendanceList.Where(t => t.CardNo == student.ClassRoll.ToString().PadLeft(8, '0')).ToList();
+            var myAttendances = attendanceList.Where(t => SMS.Entities.Utilities.AttendancePinMatcher.MatchesStudent(t.CardNo, student.MachineUserId, student.UniqueId, student.ClassRoll)).ToList();
             int monthDays = DateTime.DaysInMonth(DateTime.Today.Year, monthId);
             IDictionary<int, bool> daysPresents = new Dictionary<int, bool>();
             for (int i = 1; i <= monthDays; i++)

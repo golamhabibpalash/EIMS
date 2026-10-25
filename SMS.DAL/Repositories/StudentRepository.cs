@@ -102,6 +102,25 @@ namespace SMS.DAL.Repositories
                 .FirstOrDefaultAsync(s => s.ClassRoll == classRoll);
             return student;
         }
+        public async Task<Student> GetStudentByAttendancePinAsync(string pin)
+        {
+            if (string.IsNullOrWhiteSpace(pin))
+            {
+                return null;
+            }
+
+            var keys = AttendancePinMatcher.KeyVariants(pin);
+            var byMachineId = await _context.Student
+                .Include(s => s.AcademicClass)
+                .Include(s => s.AcademicSession)
+                .Include(s => s.AcademicSection)
+                .Where(s => s.MachineUserId != null && keys.Contains(s.MachineUserId.Trim()))
+                .OrderByDescending(s => s.Status)
+                .FirstOrDefaultAsync();
+
+            return byMachineId ?? await GetStudentByUniqueIdAsync(pin);
+        }
+
         public async Task<Student> GetStudentByUniqueIdAsync(string uniqueId)
         {
             // UniqueIds are inconsistently zero-padded across instances - and even

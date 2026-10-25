@@ -391,7 +391,7 @@ public class HangfireController : ControllerBase
                 {
                     foreach (Tran_MachineRawPunch attendance in todaysAllCheckInAttendance)
                     {
-                        Student student = await _studentManager.GetStudentByUniqueIdAsync(attendance.CardNo.Trim());
+                        Student student = await _studentManager.GetStudentByAttendancePinAsync(attendance.CardNo.Trim());
 
                         if (student == null || student.GenderId != 1 || student.Status == false || student.SMSService == false)
                         {
@@ -474,7 +474,7 @@ public class HangfireController : ControllerBase
                 {
                     foreach (Tran_MachineRawPunch attendance in todaysAllCheckInAttendance)
                     {
-                        Student student = await _studentManager.GetStudentByUniqueIdAsync(attendance.CardNo.Trim());
+                        Student student = await _studentManager.GetStudentByAttendancePinAsync(attendance.CardNo.Trim());
 
                         if (student == null || student.GenderId != 2 || student.Status == false || student.SMSService != true)
                         {
@@ -671,7 +671,7 @@ public class HangfireController : ControllerBase
                     //{
                     //    continue;
                     //}
-                    Student student = await _studentManager.GetStudentByUniqueIdAsync(attendance.CardNo.Trim());
+                    Student student = await _studentManager.GetStudentByAttendancePinAsync(attendance.CardNo.Trim());
                     if (student == null)
                     {
                         continue;
@@ -743,7 +743,7 @@ public class HangfireController : ControllerBase
                     //{
                     //    continue;
                     //}
-                    Student student = await _studentManager.GetStudentByUniqueIdAsync(attendance.CardNo.Trim());
+                    Student student = await _studentManager.GetStudentByAttendancePinAsync(attendance.CardNo.Trim());
                     if (student == null)
                     {
                         continue;
@@ -898,16 +898,14 @@ public class HangfireController : ControllerBase
                     var students = await _studentManager.GetAllAsync();
                     var employees = await _employeeManager.GetAllAsync();
 
-                    totalGirlsStudent = (from a in allCheckInAttendance
-                                         join s in students
-                                             .Where(s => s.Status == true && s.GenderId == 2)
-                                             on int.Parse(a.CardNo.Trim()) equals int.Parse(s.UniqueId.Trim())
-                                         select a).Count();
+                    // Same student-PIN rule as the attendance screens (MachineUserId / UniqueId / roll,
+                    // leading-zero tolerant). int.Parse here used to throw on any non-numeric PIN.
+                    var activeStudents = students.Where(s => s.Status == true).ToList();
+                    totalGirlsStudent = allCheckInAttendance.Count(a => activeStudents.Any(s => s.GenderId == 2
+                        && SMS.Entities.Utilities.AttendancePinMatcher.MatchesStudent(a.CardNo, s.MachineUserId, s.UniqueId, s.ClassRoll)));
 
-                    totalBoysStudent = (from a in allCheckInAttendance
-                                        join s in students.Where(s => s.Status == true) on int.Parse(a.CardNo.Trim()) equals int.Parse(s.UniqueId.Trim())
-                                        where s.GenderId == 1
-                                        select a).Count();
+                    totalBoysStudent = allCheckInAttendance.Count(a => activeStudents.Any(s => s.GenderId == 1
+                        && SMS.Entities.Utilities.AttendancePinMatcher.MatchesStudent(a.CardNo, s.MachineUserId, s.UniqueId, s.ClassRoll)));
 
                     totalStudent = totalBoysStudent + totalGirlsStudent;
 
