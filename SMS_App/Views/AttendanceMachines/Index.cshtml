@@ -127,7 +127,7 @@
                     </select>
                 </div>
                 <div class="col-md-2 classArea" style="display:none">
-                    <select class="form-control mb-2" name="aClassId" id="aClassId" onchange="classChanged()">
+                    <select class="form-control mb-2" name="aClassId" id="aClassId">
                         <option selected disabled>Select Class</option>
                         <option value="">All Class</option>
                         @foreach (AcademicClass academicClass in academicClassList)
@@ -165,26 +165,18 @@
                     </select>
                 </div>
 
-                <div class="col-md-2" id="submitArea">
+                <div class="col-md-auto mb-2" id="submitArea">
                     <input class="btn btn-info" value="Search" type="submit" />
                     <button type="button" class="btn btn-outline-info" onclick="window.print()" title="Print"><i class="fa fa-print"></i></button>
                     @if (Model.Any())
                     {
-                        <div class="btn-group">
-                            <button type="button" class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Export">
-                                <i class="fa fa-download"></i> Export
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                @foreach (var (format, label, icon) in new[] { ("pdf", "PDF", "fa-file-pdf text-danger"), ("xlsx", "Excel (.xlsx)", "fa-file-excel text-success"), ("docx", "Word (.docx)", "fa-file-word text-primary") })
-                                {
-                                    <li>
-                                        <a class="dropdown-item" href="@Url.Action("Export", "AttendanceMachines", new { format, attendanceFor = ViewBag.attendanceFor, dateTime = datetime, attendanceType = ViewBag.attendanceType, aSessionId = ViewBag.aSessionId, aClassId = ViewBag.aClassId, aSectionId = ViewBag.aSectionId })">
-                                            <i class="fa @icon"></i> @label
-                                        </a>
-                                    </li>
-                                }
-                            </ul>
-                        </div>
+                        @* Plain links, no dropdown JS: the admin and teacher layouts load different Bootstrap versions. *@
+                        foreach (var (format, label, icon, css) in new[] { ("pdf", "PDF", "fa-file-pdf", "btn-outline-danger"), ("xlsx", "Excel", "fa-file-excel", "btn-outline-success"), ("docx", "Word", "fa-file-word", "btn-outline-primary") })
+                        {
+                            <a class="btn @css" title="Export as @label" href="@Url.Action("Export", "AttendanceMachines", new { format, attendanceFor = ViewBag.attendanceFor, dateTime = datetime, attendanceType = ViewBag.attendanceType, aSessionId = ViewBag.aSessionId, aClassId = ViewBag.aClassId, aSectionId = ViewBag.aSectionId })">
+                                <i class="fa @icon"></i> @label
+                            </a>
+                        }
                     }
                 </div>
             </div>
