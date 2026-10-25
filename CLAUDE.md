@@ -34,8 +34,6 @@ dotnet run --project SMS_App/SMS_App.csproj
 # EF Core migrations — run from the SMS.DB directory (DesignTimeDbContextFactory lives there
 # and reads DatabaseProvider + connection string from ../SMS_App/appsettings.json)
 dotnet ef database update
-dotnet ef migrations add <MigrationName> -o Migrations_SqlServer
-dotnet ef migrations remove
 ```
 
 **Tests**: there is no automated test project in the solution (`SchoolManagementSystem.sln` has the 6 layer projects only). The remote `TestProject_ForTestingPurpose` branch is not merged. Verify changes by building and running the app.
@@ -50,9 +48,15 @@ At runtime, startup does **not** apply migrations: `Program.cs` runs `CanConnect
 current EF model (not the migration files), so a running app can diverge from the migration
 history. Use `dotnet ef database update` to apply migrations against an existing SqlServer DB.
 
-CI never applies schema changes. Recent features ship idempotent per-provider scripts instead
-(e.g. `Resources/sql/UserNotifications_{SqlServer,PostgreSQL}.sql`) that are run by hand on each
-instance, and code touching a new table should degrade gracefully if the table is missing.
+CI never applies schema changes, and `dotnet ef migrations add` can't currently scaffold (the
+migration history was squashed, so the model differ is out of step). New tables therefore ship as
+idempotent per-provider scripts in `Resources/sql/` (e.g. `UserNotifications_*`, `OnlineAdmission_*`)
+that are run by hand on each instance before deploying. To get exact DDL, build a throwaway console
+that references `SMS.DB`, constructs `ApplicationDbContext` with `UseSqlServer`/`UseNpgsql` and a
+dummy connection string, and prints `Database.GenerateCreateScript()` (no DB connection needed).
+Keep SQL Server scripts to a single batch with no `GO`, since shared-hosting consoles reject it.
+New menu items also need `ProjectModules`/`ProjectSubModules`/`ClaimStores` rows (see
+`Seed_Modules_SubModules_ClaimStores_FromSiteMap.sql`) or the nav hides them.
 
 ## Architecture — 6-Layer Dependency Chain
 
@@ -143,7 +147,7 @@ Persisted to `SMS_App/Keys/` for shared hosting stability. App name: `"SMS_App"`
 
 1. Define entity in `SMS.Entities/` with data annotations
 2. Add `DbSet<T>` to `SMS.DB/ApplicationDbContext.cs`
-3. `dotnet ef migrations add Add[EntityName]`
+3. Add an idempotent schema script per provider under `Resources/sql/` (see Build & Run above, not a migration)
 4. Create `I[Entity]Repository` in `SMS.DAL/Contracts/` and implement in `SMS.DAL/Repositories/`
 5. Create `I[Entity]Manager` in `SMS.BLL/Contracts/` and implement in `SMS.BLL/Managers/`
 6. Create ViewModels in `SMS_App/ViewModels/[Feature]/`
@@ -157,6 +161,7 @@ Persisted to `SMS_App/Keys/` for shared hosting stability. App name: `"SMS_App"`
 - All I/O operations use `async/await`; method names suffixed with `Async`
 - `[ValidateAntiForgeryToken]` on all POST/PUT/DELETE actions
 - `QueryTrackingBehavior.NoTracking` is set globally where the `DbContext` is registered in `Program.cs`; use `.AsTracking()` only when updating
+- EF `EnableRetryOnFailure` is on for both providers, so a bare `Database.BeginTransaction()` throws at runtime. Wrap explicit transactions in `CreateExecutionStrategy().ExecuteAsync(...)`, as `AdmissionRepository.ExecuteInTransactionAsync` does.
 - Avoid N+1 queries: pre-load all related data in the controller via `Dictionary<K,V>` caches or `.Include()`, never query the DB inside a view loop
 - ViewModel naming: `[Entity][Operation]VM` (e.g., `StudentCreateVM`, `StudentListVM`)
 - **Cross-platform (Linux deploy)**: format dates for `<input type="date">` with explicit `yyyy-MM-dd` (a culture-default `ToString()` breaks on Linux). PostgreSQL timestamp handling relies on `Npgsql.EnableLegacyTimestampBehavior` (set in `Program.cs`); be mindful of `DateTime` `Kind` when writing new date/time code.
@@ -165,6 +170,7 @@ Persisted to `SMS_App/Keys/` for shared hosting stability. App name: `"SMS_App"`
 
 - Pushing to **`FinalDeployment`** (the current branch) runs `.github/workflows/deploy.yml`, which builds once and deploys the identical package to **every** client instance (Noble, Mamitonnesa, DMCPS, Unityschoolbd, Curiosity). Treat a push there as a production release; use the workflow's manual "Run workflow" to target a single instance.
 - The pipeline strips `appsettings*.json` and never touches `Keys/`, `logs/`, or uploaded images on the servers — per-client config is edited on each server, not in the repo. Adding a client means adding a GitHub Environment plus entries in `deploy.yml` (see `Resources/deployment/CICD.md`).
+- Manual (non-CI) Linux deploy: `dotnet publish SMS_App/SMS_App.csproj -c Release` (framework-dependent, same as CI). Views compile into `SMS_App.dll`, so a patch is the six `SMS*.dll` files plus any changed `wwwroot`/`SiteMap.Config` files, unless NuGet packages changed. Several systemd services can run from one app folder, so check before replacing files. The app runs as `www-data` and creates `App_Data/AdmissionFiles` and `wwwroot/Uploads/Tickets` at startup; `rsync -a` from a Mac rewrites folder ownership, so copy with `--no-owner --no-group` (or `chown` afterwards).
 - The product version is `VersionPrefix` in `Directory.Build.props` (bumped by hand); CI appends build number, commit, and timestamp, and `SMS_App/BuildInfo.cs` reads them back for the UI footer. Local builds show build `0` / commit `local`.
 
 ## Notable Files
