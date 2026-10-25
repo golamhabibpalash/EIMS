@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -6,9 +7,11 @@ using SMS.BLL.Contracts;
 using SMS.Entities;
 using SMS.Entities.AdditionalModels;
 using SMS_App.Utilities.MACIPServices;
+using SMS_App.Utilities.Reports;
 using SMS_App.Utilities.ShortMessageService;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -27,8 +30,10 @@ public class AttendanceMachinesController : Controller
     private readonly IPhoneSMSManager _phoneSMSManager; 
     private readonly IParamBusConfigManager _paramBusConfigManager;
     private readonly IInstituteManager _instituteManager;
+    private readonly IAcademicSectionManager _academicSectionManager;
+    private readonly IWebHostEnvironment _host;
 
-    public AttendanceMachinesController(IHttpContextAccessor contextAccessor, IAttendanceMachineManager attendanceMachineManager, IEmployeeManager employeeManager, IStudentManager studentManager, IDesignationManager designationManager, IAcademicClassManager academicClassManager, IAcademicSessionManager academicSessionManager, IPhoneSMSManager phoneSMSManager, IInstituteManager instituteManager, IParamBusConfigManager paramBusConfigManager = null)
+    public AttendanceMachinesController(IHttpContextAccessor contextAccessor, IAttendanceMachineManager attendanceMachineManager, IEmployeeManager employeeManager, IStudentManager studentManager, IDesignationManager designationManager, IAcademicClassManager academicClassManager, IAcademicSessionManager academicSessionManager, IPhoneSMSManager phoneSMSManager, IInstituteManager instituteManager, IAcademicSectionManager academicSectionManager, IWebHostEnvironment host, IParamBusConfigManager paramBusConfigManager = null)
     {
         _contextAccessor = contextAccessor;
         _attendanceMachineManager = attendanceMachineManager;
@@ -39,17 +44,14 @@ public class AttendanceMachinesController : Controller
         _academicSessionManager = academicSessionManager;
         _phoneSMSManager = phoneSMSManager;
         _instituteManager = instituteManager;
+        _academicSectionManager = academicSectionManager;
+        _host = host;
         _paramBusConfigManager = paramBusConfigManager;
     }
     // GET: AttendanceMachinesController
     [Authorize(Policy = "IndexAttendanceMachinesPolicy")]
     public async Task<ActionResult> Index(string attendanceFor, DateTime dateTime, string attendanceType,  int? aSessionId, int? aClassId, int? aSectionId)
     {
-        string date = dateTime.ToString("yyyy-MM-dd");
-        
-        List<AttendanceVM> attendanceVMs = new List<AttendanceVM>();
-
-        
         ViewBag.attendanceDate = Convert.ToDateTime(dateTime).ToString("yyyy-MM-dd");
         attendanceType = String.IsNullOrEmpty(attendanceType) ? "all" : attendanceType;
 
@@ -59,14 +61,116 @@ public class AttendanceMachinesController : Controller
             ViewBag.attendanceType = attendanceType;
             ViewBag.aSessionId =aSessionId!=null? aSessionId:null;
             ViewBag.aClassId = aClassId!=null? aClassId:null;
-            var result = await _attendanceMachineManager.GetAttendanceByDateAsync(attendanceFor, date, attendanceType, aSessionId, aClassId, aSectionId);
+            ViewBag.aSectionId = aSectionId;
+        }
+        return View(await LoadAttendanceAsync(attendanceFor, dateTime, attendanceType, aSessionId, aClassId, aSectionId));
+    }
+
+    /// <summary>
+    /// The attendance list exactly as the Index page shows it (same filters, same order), so an
+    /// export always matches the screen.
+    /// </summary>
+    private async Task<List<AttendanceVM>> LoadAttendanceAsync(string attendanceFor, DateTime dateTime, string attendanceType, int? aSessionId, int? aClassId, int? aSectionId)
+    {
+        attendanceType = String.IsNullOrEmpty(attendanceType) ? "all" : attendanceType;
+        var attendanceVMs = new List<AttendanceVM>();
+        if (!string.IsNullOrEmpty(attendanceFor))
+        {
+            var result = await _attendanceMachineManager.GetAttendanceByDateAsync(attendanceFor, dateTime.ToString("yyyy-MM-dd"), attendanceType, aSessionId, aClassId, aSectionId);
             attendanceVMs.AddRange(result);
         }
         // PunchTime is null for absent rows (attendanceType "all"/"absent"); sort those last.
-        return View(attendanceVMs
+        return attendanceVMs
             .OrderBy(a => a.Class_Designation ?? string.Empty)
-            .ThenBy(n => string.IsNullOrEmpty(n.PunchTime) ? "99" : n.PunchTime.Substring(0, 2)));
+            .ThenBy(n => string.IsNullOrEmpty(n.PunchTime) ? "99" : n.PunchTime.Substring(0, 2))
+            .ToList();
     }
+
+    // GET: AttendanceMachines/Export?format=pdf|xlsx|docx&... (same filters as Index)
+    [Authorize(Policy = "IndexAttendanceMachinesPolicy")]
+    public async Task<ActionResult> Export(string format, string attendanceFor, DateTime dateTime, string attendanceType, int? aSessionId, int? aClassId, int? aSectionId)
+    {
+        format = (format ?? string.Empty).Trim().ToLowerInvariant();
+        if (format != "pdf" && format != "xlsx" && format != "docx")
+            return BadRequest("Choose an export format: pdf, xlsx or docx.");
+        if (attendanceFor != "students" && attendanceFor != "employees")
+            return BadRequest("Choose Employee or Student before exporting.");
+        if (dateTime == default)
+            dateTime = DateTime.Today;
+        attendanceType = String.IsNullOrEmpty(attendanceType) ? "all" : attendanceType;
+
+        var rows = await LoadAttendanceAsync(attendanceFor, dateTime, attendanceType, aSessionId, aClassId, aSectionId);
+        var sheet = await BuildSheetAsync(rows, attendanceFor, dateTime, attendanceType, aSessionId, aClassId, aSectionId);
+
+        var fileName = $"{(attendanceFor == "students" ? "student" : "employee")}_attendance_{dateTime:yyyy-MM-dd}";
+        return format switch
+        {
+            "xlsx" => File(AttendanceSheetExport.ToXlsx(sheet), AttendanceSheetExport.XlsxContentType, fileName + ".xlsx"),
+            "docx" => File(AttendanceSheetExport.ToDocx(sheet), AttendanceSheetExport.DocxContentType, fileName + ".docx"),
+            _ => File(AttendanceSheetExport.ToPdf(sheet), "application/pdf", fileName + ".pdf")
+        };
+    }
+
+    private async Task<AttendanceSheet> BuildSheetAsync(List<AttendanceVM> rows, string attendanceFor, DateTime dateTime, string attendanceType, int? aSessionId, int? aClassId, int? aSectionId)
+    {
+        var students = attendanceFor == "students";
+        var institute = await _instituteManager.GetFirstOrDefaultAsync();
+
+        byte[] logo = null;
+        if (!string.IsNullOrEmpty(institute?.Logo))
+        {
+            var logoPath = Path.Combine(_host.WebRootPath, "Images", "Institute", Path.GetFileName(institute.Logo));
+            if (System.IO.File.Exists(logoPath))
+                logo = await System.IO.File.ReadAllBytesAsync(logoPath);
+        }
+
+        var sheet = new AttendanceSheet
+        {
+            InstituteName = institute?.Name,
+            InstituteAddress = institute?.Address,
+            Logo = logo,
+            Title = students ? "Students Daily Attendance Sheet" : "Employees Daily Attendance Sheet"
+        };
+
+        sheet.Filters.Add($"Date: {dateTime:dd MMM yyyy}");
+        if (students)
+        {
+            var session = aSessionId.HasValue ? await _academicSessionManager.GetByIdAsync(aSessionId.Value) : null;
+            var academicClass = aClassId.HasValue ? await _academicClassManager.GetByIdAsync(aClassId.Value) : null;
+            var section = aSectionId.HasValue ? await _academicSectionManager.GetByIdAsync(aSectionId.Value) : null;
+            if (session != null) sheet.Filters.Add($"Session: {session.Name}");
+            sheet.Filters.Add($"Class: {academicClass?.Name ?? "All"}");
+            if (section != null) sheet.Filters.Add($"Section: {section.Name}");
+        }
+        sheet.Filters.Add("Showing: " + attendanceType switch { "attended" => "Attended only", "absent" => "Absent only", _ => "All" });
+
+        if (students)
+        {
+            sheet.Columns.AddRange(new[] { "SL", "Roll", "Student Name", "Class", "Phone", "Guardian Phone", "Punch Time", "Status" });
+            sheet.ColumnWidths.AddRange(new[] { 0.6f, 1.2f, 3f, 1.4f, 1.6f, 1.6f, 1.3f, 1.1f });
+        }
+        else
+        {
+            sheet.Columns.AddRange(new[] { "SL", "Card", "Employee Name", "Designation", "Phone", "Time", "Status" });
+            sheet.ColumnWidths.AddRange(new[] { 0.6f, 1.1f, 3f, 2f, 1.6f, 1.3f, 1.1f });
+        }
+
+        var sl = 1;
+        foreach (var a in rows)
+        {
+            var present = !string.IsNullOrWhiteSpace(a.PunchTime);
+            if (present) sheet.Present++; else sheet.Absent++;
+            var status = present ? "Present" : "Absent";
+
+            sheet.Rows.Add(students
+                ? new[] { (sl++).ToString(), a.CardNo, a.Name, a.Class_Designation, PadPhone(a.Phone), PadPhone(a.GuardianPhone), a.PunchTime, status }
+                : new[] { (sl++).ToString(), a.CardNo, a.Name, a.Class_Designation, a.Phone, a.PunchTime, status });
+        }
+        return sheet;
+    }
+
+    /// <summary>Student phones are stored without the leading 0; the page shows them padded to 11 digits.</summary>
+    private static string PadPhone(string phone) => string.IsNullOrWhiteSpace(phone) ? string.Empty : phone.Trim().PadLeft(11, '0');
 
 
     [Authorize(Policy = "DetailsAttendanceMachinesPolicy")]
