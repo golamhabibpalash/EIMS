@@ -342,6 +342,17 @@ public class AuthorizationPolicies
         options.AddPolicy("ChangeStatusTicketsPolicy", policy => policy.RequireClaim("Change Ticket Status"));
         options.AddPolicy("CommentTicketsPolicy", policy => policy.RequireClaim("Comment On Ticket"));
 
+        //Online Admission - separate claims so a school can split duties (officer / approver / finance)
+        options.AddPolicy("IndexAdmissionSetupPolicy", policy => policy.RequireClaim("View Admission Setup"));
+        options.AddPolicy("ManageAdmissionSetupPolicy", policy => policy.RequireClaim("Manage Admission Setup"));
+        options.AddPolicy("DashboardAdmissionPolicy", policy => policy.RequireClaim("View Admission Dashboard"));
+        options.AddPolicy("IndexAdmissionApplicationsPolicy", policy => policy.RequireClaim("View Admission Applications"));
+        options.AddPolicy("ReviewAdmissionApplicationsPolicy", policy => policy.RequireClaim("Review Admission Applications"));
+        options.AddPolicy("DecideAdmissionApplicationsPolicy", policy => policy.RequireClaim("Approve Admission Applications"));
+        options.AddPolicy("EnrolAdmissionApplicationsPolicy", policy => policy.RequireClaim("Enrol Admission Applicants"));
+        options.AddPolicy("IndexAdmissionPaymentsPolicy", policy => policy.RequireClaim("View Admission Payments"));
+        options.AddPolicy("VerifyAdmissionPaymentsPolicy", policy => policy.RequireClaim("Verify Admission Payments"));
+
         //Upazila
         options.AddPolicy("IndexUpazilasPolicy", policy => policy.RequireClaim("View Upazilas"));
         options.AddPolicy("DetailsUpazilasPolicy", policy => policy.RequireClaim("View Details Upazila"));

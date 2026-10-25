@@ -42,7 +42,6 @@ namespace SMS_App.Utilities.AutoMapperConfiguration
 
             CreateMap<ClaimStores, ClaimStoreVM>().ReverseMap();
 
-            CreateMap<AppliedStudent, AppliedStudentVM>().ReverseMap();
             CreateMap<AcademicExam, AcademicExamDetailVM>().ReverseMap();
 
             CreateMap<Log, ActivityLogVM>().ReverseMap();

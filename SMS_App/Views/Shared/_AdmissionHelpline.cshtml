@@ -1,0 +1,25 @@
+@using SMS_App.Utilities.OnlineAdmission
+@model AdmissionSetting
+@* Helpline / WhatsApp contact. Shows only what the school configured - never a placeholder number. *@
+@if (Model != null && (!string.IsNullOrEmpty(Model.HelplinePhone) || !string.IsNullOrEmpty(Model.WhatsAppNumber)))
+{
+    <div class="adm-helpline">
+        <span class="fw-semibold">Need help? / সাহায্য প্রয়োজন?</span>
+        @if (!string.IsNullOrEmpty(Model.HelplinePhone))
+        {
+            <a class="ms-2 text-decoration-none" href="@AdmissionDisplay.TelLink(Model.HelplinePhone)"><i class="fa fa-phone"></i> @Model.HelplinePhone</a>
+        }
+        @if (!string.IsNullOrEmpty(Model.WhatsAppNumber))
+        {
+            <a class="ms-2 text-decoration-none text-success" href="@AdmissionDisplay.WhatsAppLink(Model.WhatsAppNumber)" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WhatsApp</a>
+        }
+        @if (!string.IsNullOrEmpty(Model.SupportHours))
+        {
+            <span class="ms-2">(@Model.SupportHours)</span>
+        }
+        @if (!string.IsNullOrEmpty(Model.SupportMessage))
+        {
+            <div class="small">@Model.SupportMessage</div>
+        }
+    </div>
+}

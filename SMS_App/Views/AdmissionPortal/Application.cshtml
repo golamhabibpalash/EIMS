@@ -1,0 +1,117 @@
+@model AdmissionApplication
+@inject IAdmissionPaymentManager PaymentManager
+@{
+    ViewData["Title"] = "Application " + Model.ApplicationNo;
+    var stage = AdmissionDisplay.ProgressStage(Model.Status);
+    var blocker = PaymentManager.GetPaymentBlocker(Model);
+    var outstanding = PaymentManager.GetOutstanding(Model);
+}
+<nav class="small mb-2"><a asp-action="Index">My applications</a> / @Model.ApplicationNo</nav>
+<div class="card adm-card mb-3"><div class="card-body">
+    <div class="d-flex justify-content-between flex-wrap gap-2">
+        <div>
+            <div class="small text-muted">APPLICATION NUMBER / আবেদন নম্বর</div>
+            <div class="h4 mb-0">@Model.ApplicationNo</div>
+            <div class="small text-muted">@Model.Name · @Model.AdmissionProgram?.AcademicClass?.Name · @Model.AdmissionSession?.Title</div>
+        </div>
+        <div class="text-end">
+            <span class="badge fs-6 @AdmissionDisplay.StatusBadge(Model.Status)">@AdmissionDisplay.Name(Model.Status)</span>
+            <div class="small text-muted mt-1">Submitted @Model.SubmittedAt?.ToString("dd MMM yyyy")</div>
+        </div>
+    </div>
+    <div class="alert alert-info mt-3 mb-3"><i class="fa fa-circle-info"></i> <strong>Next step:</strong> @AdmissionDisplay.GuardianNextStep(Model)</div>
+
+    @if (Model.Status != AdmissionApplicationStatus.Withdrawn && Model.Status != AdmissionApplicationStatus.Expired)
+    {
+        <ol class="list-unstyled mb-0">
+            @for (var i = 0; i < AdmissionDisplay.ProgressStages.Length; i++)
+            {
+                var done = i < stage || (i == stage && Model.Status == AdmissionApplicationStatus.Enrolled);
+                var current = i == stage && !done;
+                <li class="d-flex align-items-center gap-2 mb-1 @(current ? "fw-semibold" : done ? "" : "text-muted")">
+                    <i class="fa @(done ? "fa-circle-check text-success" : current ? "fa-circle-dot text-primary" : "fa-circle text-secondary")"></i>
+                    @AdmissionDisplay.ProgressStages[i]
+                </li>
+            }
+        </ol>
+    }
+
+    <div class="d-flex flex-wrap gap-2 mt-3">
+        @if (Model.Status == AdmissionApplicationStatus.CorrectionRequired)
+        {
+            <a asp-action="Apply" asp-route-id="@Model.Id" asp-route-step="1" class="btn btn-warning">Make corrections</a>
+        }
+        @if (blocker == null)
+        {
+            <a asp-action="Payment" asp-route-id="@Model.Id" class="btn btn-success">Pay admission fee (BDT @outstanding.ToString("0"))</a>
+        }
+    </div>
+</div></div>
+
+@if (Model.Status == AdmissionApplicationStatus.CorrectionRequired)
+{
+    <div class="alert alert-warning prewrap"><strong>What to correct:</strong> @Model.CorrectionReason</div>
+}
+@if ((Model.Status == AdmissionApplicationStatus.Rejected || Model.Status == AdmissionApplicationStatus.Waitlisted) && !string.IsNullOrEmpty(Model.DecisionReason))
+{
+    <div class="alert alert-secondary prewrap"><strong>Message from the school:</strong> @Model.DecisionReason</div>
+}
+@if (Model.Status == AdmissionApplicationStatus.Enrolled && Model.Student != null)
+{
+    <div class="alert alert-success">
+        <strong>Admission confirmed.</strong> Student ID: <strong>@Model.Student.UniqueId</strong>. The student's login details were sent by SMS to @Model.GuardianPhone.
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="card adm-card h-100"><div class="card-body">
+            <h2 class="h6">Payments / ফি</h2>
+            @if (Model.AmountDue <= 0 && !Model.Payments.Any())
+            {
+                <p class="small text-muted mb-0">No fee is due at this stage.</p>
+            }
+            else
+            {
+                <div class="small mb-2">Due: BDT @Model.AmountDue.ToString("0.00") · Paid (verified): BDT @Model.AmountPaid.ToString("0.00") · Outstanding: <strong>BDT @outstanding.ToString("0.00")</strong></div>
+                @foreach (var p in Model.Payments.OrderByDescending(p => p.CreatedAt))
+                {
+                    <div class="border-top py-2 small d-flex justify-content-between gap-2">
+                        <div>
+                            BDT @((p.VerifiedAmount ?? p.Amount).ToString("0.00")) · @p.Channel · ref @p.TransactionReference
+                            <div class="text-muted">@p.PaidOn.ToString("dd MMM yyyy")</div>
+                            @if (!string.IsNullOrEmpty(p.ReviewRemarks) && p.Status != AdmissionPaymentStatus.Verified) { <div class="text-danger">@p.ReviewRemarks</div> }
+                        </div>
+                        <div class="text-end">
+                            <span class="badge @AdmissionDisplay.PaymentBadge(p.Status)">@AdmissionDisplay.Name(p.Status)</span>
+                            @if (p.Status == AdmissionPaymentStatus.Verified) { <div><a asp-action="Receipt" asp-route-id="@Model.Id" asp-route-paymentId="@p.Id">Receipt</a></div> }
+                        </div>
+                    </div>
+                }
+            }
+        </div></div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card adm-card h-100"><div class="card-body">
+            <h2 class="h6">Updates / হালনাগাদ</h2>
+            @foreach (var h in Model.History.OrderByDescending(h => h.CreatedAt))
+            {
+                <div class="border-top py-2 small">
+                    <div class="d-flex justify-content-between"><span class="fw-semibold">@h.Action</span><span class="text-muted">@h.CreatedAt.ToString("dd MMM yyyy HH:mm")</span></div>
+                    @if (!string.IsNullOrEmpty(h.Note) && h.ActorType != AdmissionActorType.Guardian) { <div class="prewrap">@h.Note</div> }
+                </div>
+            }
+        </div></div>
+    </div>
+</div>
+
+@if (!SMS.BLL.Managers.AdmissionRules.IsClosed(Model.Status) && Model.AmountPaid <= 0)
+{
+    <details class="mt-3 small">
+        <summary class="text-muted">Withdraw this application</summary>
+        <form asp-action="Withdraw" asp-route-id="@Model.Id" method="post" class="mt-2" onsubmit="return confirm('Withdraw this application? This cannot be undone.')">
+            <input name="reason" class="form-control form-control-sm mb-2" placeholder="Reason (optional)" maxlength="500" />
+            <button type="submit" class="btn btn-outline-danger btn-sm">Withdraw application</button>
+        </form>
+    </details>
+}

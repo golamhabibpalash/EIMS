@@ -1,0 +1,77 @@
+@model AdmissionProgramEditVM
+@{
+    var p = Model.Program;
+    ViewData["Title"] = (p.Id == 0 ? "Add class to " : "Edit class in ") + Model.Session.Title;
+    GlobalUI.PageTitle = "Admission - Class Offering";
+}
+<h5>@ViewData["Title"]</h5>
+<form asp-action="SaveProgram" method="post">
+    <input type="hidden" asp-for="Program.Id" />
+    <input type="hidden" asp-for="Program.AdmissionSessionId" />
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger small"></div>
+    <div class="card shadow-sm mb-3"><div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label asp-for="Program.AcademicClassId" class="form-label">Class *</label>
+                <select asp-for="Program.AcademicClassId" asp-items="Model.ClassList" class="form-select"><option value="">Select</option></select>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="Program.SeatCapacity" class="form-label">Seats (0 = unlimited)</label>
+                <input asp-for="Program.SeatCapacity" type="number" min="0" class="form-control" />
+            </div>
+            <div class="col-md-4">
+                <label asp-for="Program.CapacityPolicy" class="form-label">When seats are full</label>
+                <select asp-for="Program.CapacityPolicy" asp-items="Html.GetEnumSelectList<SeatCapacityPolicy>()" class="form-select"></select>
+                <div class="form-text">Approvals never exceed the seats, whichever option you choose.</div>
+            </div>
+        </div>
+    </div></div>
+    <div class="card shadow-sm mb-3"><div class="card-body">
+        <h6>Eligibility checks <small class="text-muted">(applicants are warned, not blocked; an approver can record an exception)</small></h6>
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label asp-for="Program.MinAgeYears" class="form-label">Minimum age (years)</label>
+                <input asp-for="Program.MinAgeYears" type="number" min="0" max="30" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Program.MaxAgeYears" class="form-label">Maximum age (years)</label>
+                <input asp-for="Program.MaxAgeYears" type="number" min="0" max="30" class="form-control" />
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Program.AgeCalculationDate" class="form-label">Age calculated on</label>
+                <input asp-for="Program.AgeCalculationDate" type="date" value="@p.AgeCalculationDate?.ToString("yyyy-MM-dd")" class="form-control" />
+                <div class="form-text">Empty = the application deadline.</div>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Program.MinPreviousGpa" class="form-label">Minimum previous GPA</label>
+                <input asp-for="Program.MinPreviousGpa" type="number" step="0.01" min="0" max="5" class="form-control" />
+            </div>
+            <div class="col-md-12">
+                <div class="form-check"><input asp-for="Program.RequirePreviousResult" class="form-check-input" /><label asp-for="Program.RequirePreviousResult" class="form-check-label">Previous class result required</label></div>
+            </div>
+            <div class="col-12">
+                <label asp-for="Program.EligibilityNotes" class="form-label">Other criteria for this class (shown on the Eligibility page)</label>
+                <textarea asp-for="Program.EligibilityNotes" rows="3" class="form-control"></textarea>
+            </div>
+        </div>
+    </div></div>
+    <div class="card shadow-sm mb-3"><div class="card-body">
+        <h6>Fee</h6>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label asp-for="Program.AdmissionFeeAmount" class="form-label">Admission fee (BDT)</label>
+                <input asp-for="Program.AdmissionFeeAmount" type="number" step="0.01" min="0" class="form-control" />
+            </div>
+            <div class="col-md-5">
+                <label asp-for="Program.AdmissionFeeHeadId" class="form-label">Post to fee head at enrolment</label>
+                <select asp-for="Program.AdmissionFeeHeadId" asp-items="Model.FeeHeadList" class="form-select"><option value="">Don't post to the fee ledger</option></select>
+                <div class="form-text">Verified admission payments are recorded as a student payment under this head.</div>
+            </div>
+            <div class="col-md-3 pt-md-4">
+                <div class="form-check"><input asp-for="Program.IsActive" class="form-check-input" /><label asp-for="Program.IsActive" class="form-check-label">Accepting applications</label></div>
+            </div>
+        </div>
+    </div></div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="Details" asp-route-id="@p.AdmissionSessionId" class="btn btn-outline-secondary">Cancel</a>
+</form>

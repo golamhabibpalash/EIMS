@@ -1,0 +1,146 @@
+@model AdmissionSessionDetailsVM
+@{
+    var s = Model.Session;
+    ViewData["Title"] = s.Title;
+    GlobalUI.PageTitle = "Admission Session";
+}
+<partial name="_AdmissionStaffAlerts" />
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+        <h4 class="mb-0">@s.Title</h4>
+        <div class="small text-muted">Academic session @s.AcademicSession?.Name · applications @s.ApplicationStartDate.ToString("dd MMM yyyy") - @s.ApplicationEndDate.ToString("dd MMM yyyy")</div>
+        <div class="small">Status: <strong>@s.Status</strong> · Public: <span class="badge @AdmissionDisplay.WindowBadge(Model.State)">@AdmissionDisplay.Name(Model.State)</span></div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a asp-action="Index" class="btn btn-sm btn-outline-secondary">All sessions</a>
+        @if (s.Status != AdmissionSessionStatus.Archived)
+        {
+            <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary"><i class="fa fa-pen"></i> Edit details</a>
+            @if (s.Status != AdmissionSessionStatus.Published)
+            {
+                <form asp-action="ChangeStatus" method="post" class="d-inline">
+                    <input type="hidden" name="id" value="@s.Id" /><input type="hidden" name="status" value="@AdmissionSessionStatus.Published" />
+                    <button class="btn btn-sm btn-success"><i class="fa fa-bullhorn"></i> Publish notice</button>
+                </form>
+            }
+            else
+            {
+                <form asp-action="ChangeStatus" method="post" class="d-inline">
+                    <input type="hidden" name="id" value="@s.Id" /><input type="hidden" name="status" value="@AdmissionSessionStatus.Unpublished" />
+                    <button class="btn btn-sm btn-warning" onclick="return confirm('Hide this notice from the public website?')">Unpublish</button>
+                </form>
+            }
+            <form asp-action="ChangeStatus" method="post" class="d-inline">
+                <input type="hidden" name="id" value="@s.Id" /><input type="hidden" name="status" value="@AdmissionSessionStatus.Archived" />
+                <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Archive this session? It will be hidden and can no longer be edited.')">Archive</button>
+            </form>
+        }
+    </div>
+</div>
+
+@if (s.Status == AdmissionSessionStatus.Published)
+{
+    <div class="alert alert-info small">
+        Public link for the school website's admission notice:
+        <a href="@Model.PublicUrl" target="_blank">@Model.PublicUrl</a>
+        <button type="button" class="btn btn-sm btn-link" onclick="navigator.clipboard.writeText('@Model.PublicUrl')">Copy</button>
+    </div>
+}
+
+<div class="card shadow-sm mb-3"><div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Classes offered</h5>
+        @if (s.Status != AdmissionSessionStatus.Archived) { <a asp-action="ProgramEdit" asp-route-sessionId="@s.Id" class="btn btn-sm btn-info"><i class="fa fa-plus"></i> Add class</a> }
+    </div>
+    <table class="table table-sm table-striped mb-0">
+        <thead><tr><th>Class</th><th>Seats</th><th>Taken / enrolled</th><th>When full</th><th>Eligibility</th><th>Fee</th><th>Fee head</th><th>Active</th><th></th></tr></thead>
+        <tbody>
+            @if (!s.Programs.Any()) { <tr><td colspan="9" class="text-muted text-center">Add at least one class before publishing.</td></tr> }
+            @foreach (var p in s.Programs)
+            {
+                Model.SeatUsage.TryGetValue(p.Id, out var u);
+                <tr>
+                    <td>@p.AcademicClass?.Name</td>
+                    <td>@(p.SeatCapacity > 0 ? p.SeatCapacity.ToString() : "Unlimited")</td>
+                    <td>@(u?.SeatsHeld ?? 0) / @(u?.Enrolled ?? 0)</td>
+                    <td class="small">@AdmissionDisplay.Name(p.CapacityPolicy)</td>
+                    <td class="small">
+                        @(p.MinAgeYears.HasValue || p.MaxAgeYears.HasValue ? $"Age {p.MinAgeYears?.ToString() ?? "-"}-{p.MaxAgeYears?.ToString() ?? "-"}" : "")
+                        @(p.MinPreviousGpa.HasValue ? $" GPA ≥ {p.MinPreviousGpa:0.00}" : "")
+                        @(p.RequirePreviousResult ? " Result required" : "")
+                    </td>
+                    <td>@p.AdmissionFeeAmount.ToString("0")</td>
+                    <td class="small">@(p.AdmissionFeeHead?.Name ?? "-")</td>
+                    <td>@(p.IsActive ? "Yes" : "No")</td>
+                    <td class="text-end text-nowrap">
+                        @if (s.Status != AdmissionSessionStatus.Archived)
+                        {
+                            <a asp-action="ProgramEdit" asp-route-sessionId="@s.Id" asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <form asp-action="RemoveProgram" method="post" class="d-inline">
+                                <input type="hidden" name="id" value="@p.Id" /><input type="hidden" name="sessionId" value="@s.Id" />
+                                <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this class from the session?')">Remove</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (s.PaymentStage != AdmissionPaymentStage.NotRequired && s.Programs.Any(p => !p.AdmissionFeeHeadId.HasValue))
+    {
+        <div class="small text-warning mt-2">Tip: choose a fee head for each class so verified admission fees are posted to the student's fee ledger at enrolment.</div>
+    }
+</div></div>
+
+<div class="card shadow-sm mb-3"><div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Documents applicants upload</h5>
+        @if (s.Status != AdmissionSessionStatus.Archived) { <a asp-action="DocumentEdit" asp-route-sessionId="@s.Id" class="btn btn-sm btn-info"><i class="fa fa-plus"></i> Add document</a> }
+    </div>
+    <p class="small text-muted">The student's photo is always required and does not need to be listed here.</p>
+    <table class="table table-sm table-striped mb-0">
+        <thead><tr><th>#</th><th>Document</th><th>Required</th><th>File types</th><th>Max size</th><th></th></tr></thead>
+        <tbody>
+            @if (!s.DocumentRequirements.Any()) { <tr><td colspan="6" class="text-muted text-center">No documents configured.</td></tr> }
+            @foreach (var d in s.DocumentRequirements)
+            {
+                <tr>
+                    <td>@d.SortOrder</td>
+                    <td>@d.Name<div class="small text-muted">@d.Description</div></td>
+                    <td>@(d.IsMandatory ? "Yes" : "Optional")</td>
+                    <td>@d.AllowedExtensions</td>
+                    <td>@d.MaxSizeKb KB</td>
+                    <td class="text-end text-nowrap">
+                        @if (s.Status != AdmissionSessionStatus.Archived)
+                        {
+                            <a asp-action="DocumentEdit" asp-route-sessionId="@s.Id" asp-route-id="@d.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                            <form asp-action="RemoveDocument" method="post" class="d-inline">
+                                <input type="hidden" name="id" value="@d.Id" /><input type="hidden" name="sessionId" value="@s.Id" />
+                                <button class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this document requirement?')">Remove</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div></div>
+
+<div class="row g-3">
+    <div class="col-lg-6"><div class="card shadow-sm h-100"><div class="card-body small">
+        <h6>Notice</h6>
+        <div class="fw-semibold">@s.NoticeSummary</div>
+        <div style="white-space:pre-line">@s.NoticeDetails</div>
+        <h6 class="mt-3">Important dates</h6>
+        <div style="white-space:pre-line">@s.ImportantDates</div>
+        <h6 class="mt-3">Payment</h6>
+        <div>@AdmissionDisplay.Name(s.PaymentStage) · offline @(s.AllowOfflinePayment ? "allowed" : "not allowed") · partial @(s.AllowPartialPayment ? "allowed" : "not allowed") · offer valid @(s.OfferValidityDays.HasValue ? s.OfferValidityDays + " days" : "no limit")</div>
+        <div style="white-space:pre-line" class="text-muted">@s.OfflinePaymentInstructions</div>
+    </div></div></div>
+    <div class="col-lg-6"><div class="card shadow-sm h-100"><div class="card-body small">
+        <h6>Eligibility</h6>
+        <div style="white-space:pre-line">@(string.IsNullOrEmpty(s.EligibilityContent) ? "Not written yet - required before publishing." : s.EligibilityContent)</div>
+        <h6 class="mt-3">Policy / guidelines (version @s.PolicyVersion)</h6>
+        <div style="white-space:pre-line">@(string.IsNullOrEmpty(s.PolicyContent) ? "Not written yet - required before publishing." : s.PolicyContent)</div>
+    </div></div></div>
+</div>

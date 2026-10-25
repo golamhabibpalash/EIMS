@@ -1,0 +1,100 @@
+@model AdmissionLandingVM
+@inject IAdmissionSetupManager SetupManager
+@{
+    var s = Model.Session;
+    ViewData["Title"] = s.Title;
+    var settings = await SetupManager.GetSettingsAsync();
+}
+<partial name="_SessionHeader" model="Model" />
+<div class="row g-3">
+    <div class="col-lg-8 order-2 order-lg-1">
+        @if (!string.IsNullOrEmpty(s.NoticeSummary) || !string.IsNullOrEmpty(s.NoticeDetails))
+        {
+            <div class="card adm-card mb-3"><div class="card-body">
+                <h2 class="h5">Admission notice / ভর্তি বিজ্ঞপ্তি</h2>
+                @if (!string.IsNullOrEmpty(s.NoticeSummary)) { <p class="lead fs-6">@s.NoticeSummary</p> }
+                @if (!string.IsNullOrEmpty(s.NoticeDetails)) { <div class="prewrap">@s.NoticeDetails</div> }
+            </div></div>
+        }
+
+        <div class="card adm-card mb-3"><div class="card-body">
+            <h2 class="h5">Classes, seats and fees / শ্রেণি, আসন ও ফি</h2>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Class</th><th>Seats</th><th>Age</th><th class="text-end">Admission fee</th></tr></thead>
+                    <tbody>
+                        @foreach (var p in s.Programs)
+                        {
+                            Model.SeatUsage.TryGetValue(p.Id, out var usage);
+                            var remaining = p.SeatCapacity > 0 ? Math.Max(0, p.SeatCapacity - (usage?.SeatsHeld ?? 0)) : (int?)null;
+                            <tr>
+                                <td>@p.AcademicClass?.Name</td>
+                                <td>@(p.SeatCapacity > 0 ? $"{p.SeatCapacity} ({remaining} left)" : "Open")</td>
+                                <td>@(p.MinAgeYears.HasValue || p.MaxAgeYears.HasValue ? $"{p.MinAgeYears?.ToString() ?? "-"} to {p.MaxAgeYears?.ToString() ?? "-"} yrs" : "-")</td>
+                                <td class="text-end">@(s.PaymentStage == AdmissionPaymentStage.NotRequired || p.AdmissionFeeAmount <= 0 ? "None" : $"BDT {p.AdmissionFeeAmount:0}")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (s.PaymentStage != AdmissionPaymentStage.NotRequired)
+            {
+                <p class="small text-muted mt-2 mb-0">
+                    The fee is paid @(s.PaymentStage == AdmissionPaymentStage.AtSubmission ? "after you submit the application" : "only after your application is approved").
+                    @(s.AllowPartialPayment ? "Payment in instalments is accepted." : "The full amount must be paid at once.")
+                </p>
+            }
+        </div></div>
+
+        <div class="card adm-card mb-3"><div class="card-body">
+            <h2 class="h5">How the application works / আবেদনের ধাপ</h2>
+            <ol class="mb-0">
+                <li>Read the <a asp-action="Eligibility" asp-route-id="@s.Id">eligibility</a> and <a asp-action="Guidelines" asp-route-id="@s.Id">admission guidelines</a>.</li>
+                <li>Create an account with your mobile number, or sign in.</li>
+                <li>Fill in the student, guardian and previous-school details (you can save a draft at any time).</li>
+                <li>Upload the student's photo and the documents listed below.</li>
+                <li>Review everything, accept the guidelines and submit. You will get an application number by SMS.</li>
+                <li>Track your application. If it is approved, pay the admission fee as instructed.</li>
+                <li>The school confirms the admission and sends the student ID.</li>
+            </ol>
+            <a asp-action="Manual" class="small">Read the full step-by-step guide</a>
+        </div></div>
+
+        @if (s.DocumentRequirements.Any())
+        {
+            <div class="card adm-card mb-3"><div class="card-body">
+                <h2 class="h5">Documents to upload / প্রয়োজনীয় কাগজপত্র</h2>
+                <ul class="mb-1">
+                    <li>Student's recent photo (JPG or PNG, up to 1 MB) - <em>required</em></li>
+                    @foreach (var d in s.DocumentRequirements)
+                    {
+                        <li>@d.Name @(d.IsMandatory ? "- required" : "(optional)") <span class="text-muted small">(@d.AllowedExtensions.Replace(",", ", "), up to @Math.Min(d.MaxSizeKb, settings.MaxUploadSizeKb) KB)</span>
+                            @if (!string.IsNullOrEmpty(d.Description)) { <div class="small text-muted">@d.Description</div> }
+                        </li>
+                    }
+                </ul>
+            </div></div>
+        }
+
+        @if (s.PaymentStage != AdmissionPaymentStage.NotRequired && !string.IsNullOrEmpty(s.OfflinePaymentInstructions))
+        {
+            <div class="card adm-card mb-3"><div class="card-body">
+                <h2 class="h5">How to pay / ফি পরিশোধ</h2>
+                <div class="prewrap">@s.OfflinePaymentInstructions</div>
+                <p class="small text-muted mb-0 mt-2">A payment is marked paid only after the school verifies it.</p>
+            </div></div>
+        }
+    </div>
+    <div class="col-lg-4 order-1 order-lg-2">
+        <partial name="_ApplyBox" model="Model" />
+        <div class="card adm-card mb-3"><div class="card-body">
+            <h2 class="h6">Important dates / গুরুত্বপূর্ণ তারিখ</h2>
+            <ul class="list-unstyled small mb-0">
+                <li><strong>Applications open:</strong> @s.ApplicationStartDate.ToString("dd MMM yyyy")</li>
+                <li><strong>Deadline:</strong> @s.ApplicationEndDate.ToString("dd MMM yyyy")</li>
+            </ul>
+            @if (!string.IsNullOrEmpty(s.ImportantDates)) { <div class="small prewrap mt-2">@s.ImportantDates</div> }
+        </div></div>
+        <div class="card adm-card"><div class="card-body small"><partial name="_AdmissionHelpline" model="settings" /></div></div>
+    </div>
+</div>

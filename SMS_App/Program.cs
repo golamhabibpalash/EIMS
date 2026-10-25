@@ -21,9 +21,12 @@ using SMS_App.Utilities.ShortMessageService;
 using SMS_App.Utilities.AutoMapperConfiguration;
 using SMS_App.Utilities.LoggerService;
 using SMS_App.ViewModels.ModuleSubModuleVM;
+using Microsoft.AspNetCore.RateLimiting;
+using SMS_App.Utilities.OnlineAdmission;
 using System;
 using System.IO;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -142,6 +145,35 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, AppClaimsPrincipalFactory>();
 builder.Services.AddScoped<Microsoft.AspNetCore.Authentication.IClaimsTransformation, PermissionClaimsTransformation>();
 
+// Online Admission guardian portal: its own cookie scheme, independent of staff/student
+// Identity logins (see GuardianPortalAuth).
+builder.Services.AddAuthentication()
+    .AddCookie(GuardianPortalAuth.Scheme, options =>
+    {
+        options.Cookie.Name = GuardianPortalAuth.CookieName;
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.ExpireTimeSpan = TimeSpan.FromHours(2);
+        options.SlidingExpiration = true;
+        options.LoginPath = "/AdmissionPortal/Login";
+        options.AccessDeniedPath = "/AdmissionPortal/Login";
+    });
+
+// Rate limits for the public admission endpoints (sign-in, OTP, tracking), per client IP.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(AdmissionRateLimits.Auth, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    options.AddPolicy(AdmissionRateLimits.Upload, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
+
 // Fix Auto Logout Issue
 builder.Services.Configure<SecurityStampValidatorOptions>(options =>
 {
@@ -258,6 +290,16 @@ catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
     Console.Error.WriteLine($"[STARTUP WARNING] Could not create wwwroot/Uploads/Tickets: {ex.Message}. Ticket attachments will be rejected until this is fixed.");
 }
 
+// Same for admission uploads (stored privately under App_Data, never under wwwroot).
+try
+{
+    Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "App_Data", "AdmissionFiles"));
+}
+catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+{
+    Console.Error.WriteLine($"[STARTUP WARNING] Could not create App_Data/AdmissionFiles: {ex.Message}. Admission uploads will fail until this is fixed.");
+}
+
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
@@ -280,6 +322,7 @@ app.UseStaticFiles();
 // ORDER IS IMPORTANT
 app.UseSession();      // Session BEFORE routing
 app.UseRouting();
+app.UseRateLimiter();
 
 // Auth middlewares
 app.UseAuthentication();

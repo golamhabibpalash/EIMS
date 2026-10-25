@@ -1,0 +1,77 @@
+@model OfflinePaymentVM
+@{
+    ViewData["Title"] = "Pay admission fee";
+    var a = Model.Application;
+    var s = a.AdmissionSession;
+}
+<nav class="small mb-2"><a asp-action="Index">My applications</a> / <a asp-action="Application" asp-route-id="@a.Id">@a.ApplicationNo</a> / Payment</nav>
+<h1 class="h4">Pay the admission fee / ভর্তি ফি পরিশোধ</h1>
+<div class="row g-3">
+    <div class="col-lg-5 order-lg-2">
+        <div class="card adm-card mb-3"><div class="card-body">
+            <div class="small text-muted">Amount due</div>
+            <div class="h3 mb-1">BDT @Model.Outstanding.ToString("0.00")</div>
+            <div class="small">@a.Name · @a.AdmissionProgram?.AcademicClass?.Name · @a.ApplicationNo</div>
+            @if (a.OfferExpiresAt.HasValue) { <div class="small text-danger mt-1">Pay by @a.OfferExpiresAt.Value.ToString("dd MMM yyyy")</div> }
+            @if (Model.PendingAmount > 0) { <div class="small mt-1">BDT @Model.PendingAmount.ToString("0.00") already submitted and waiting for verification.</div> }
+        </div></div>
+        @if (!string.IsNullOrEmpty(s?.OfflinePaymentInstructions))
+        {
+            <div class="card adm-card"><div class="card-body">
+                <h2 class="h6">How to pay</h2>
+                <div class="small prewrap">@s.OfflinePaymentInstructions</div>
+                <div class="small text-muted mt-2">Online card/mobile wallet checkout is not available yet. Cash can also be paid at the school office; the cashier will give you a receipt.</div>
+            </div></div>
+        }
+    </div>
+    <div class="col-lg-7 order-lg-1">
+        @if (Model.Blocker != null)
+        {
+            <div class="alert alert-info">@Model.Blocker</div>
+            <a asp-action="Application" asp-route-id="@a.Id" class="btn btn-outline-secondary">Back to application</a>
+        }
+        else
+        {
+            <div class="card adm-card"><div class="card-body">
+                <h2 class="h6">I have paid - send the details to the school</h2>
+                <p class="small text-muted">After paying by bKash, Nagad, Rocket or bank deposit, enter the details below. The payment shows as paid once the school's accounts office verifies it.</p>
+                <form asp-action="Payment" asp-route-id="@a.Id" method="post" enctype="multipart/form-data">
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small" role="alert"></div>
+                    <div class="mb-3">
+                        <label asp-for="Channel" class="form-label"></label>
+                        <select asp-for="Channel" class="form-select">
+                            <option value="">Select</option>
+                            @foreach (var c in OfflinePaymentVM.Channels) { <option value="@c">@c</option> }
+                        </select>
+                        <span asp-validation-for="Channel" class="text-danger small"></span>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-6 mb-3">
+                            <label asp-for="Amount" class="form-label"></label>
+                            <input asp-for="Amount" type="number" step="0.01" min="1" class="form-control" readonly="@(!(s?.AllowPartialPayment ?? false))" />
+                            <span asp-validation-for="Amount" class="text-danger small"></span>
+                        </div>
+                        <div class="col-sm-6 mb-3">
+                            <label asp-for="PaidOn" class="form-label"></label>
+                            <input asp-for="PaidOn" type="date" value="@Model.PaidOn.ToString("yyyy-MM-dd")" max="@DateTime.Today.ToString("yyyy-MM-dd")" class="form-control" />
+                            <span asp-validation-for="PaidOn" class="text-danger small"></span>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="TransactionReference" class="form-label"></label>
+                        <input asp-for="TransactionReference" class="form-control" placeholder="e.g. bKash TrxID 9ABC12DEF3" />
+                        <span asp-validation-for="TransactionReference" class="text-danger small"></span>
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="Proof" class="form-label"></label>
+                        <input asp-for="Proof" type="file" class="form-control" accept=".jpg,.jpeg,.png,.pdf" />
+                        <div class="form-text">A screenshot of the payment SMS or a photo of the bank slip. Uploading proof does not by itself mark the fee as paid.</div>
+                        <span asp-validation-for="Proof" class="text-danger small"></span>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Submit payment details</button>
+                </form>
+            </div></div>
+        }
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

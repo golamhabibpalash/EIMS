@@ -1,0 +1,73 @@
+@model GuardianDashboardVM
+@{
+    ViewData["Title"] = "My applications";
+}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-0">My applications</h1>
+        <div class="text-muted">আমার আবেদন · Signed in as @Model.Guardian.FullName (@Model.Guardian.MobileNumber)</div>
+    </div>
+</div>
+
+@if (Model.Applications.Any())
+{
+    <div class="row g-3 mb-4">
+        @foreach (var a in Model.Applications)
+        {
+            <div class="col-12 col-md-6">
+                <div class="card adm-card h-100"><div class="card-body d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div>
+                            <div class="fw-semibold">@(string.IsNullOrEmpty(a.Name) ? "New application" : a.Name)</div>
+                            <div class="small text-muted">@a.AdmissionProgram?.AcademicClass?.Name · @a.AdmissionSession?.Title</div>
+                            @if (!string.IsNullOrEmpty(a.ApplicationNo)) { <div class="small">Application no. <strong>@a.ApplicationNo</strong></div> }
+                        </div>
+                        <span class="badge @AdmissionDisplay.StatusBadge(a.Status)">@AdmissionDisplay.Name(a.Status)</span>
+                    </div>
+                    <p class="small my-2">@AdmissionDisplay.GuardianNextStep(a)</p>
+                    <div class="mt-auto d-flex gap-2 flex-wrap">
+                        @if (a.Status == AdmissionApplicationStatus.Draft || a.Status == AdmissionApplicationStatus.CorrectionRequired)
+                        {
+                            <a asp-action="Apply" asp-route-id="@a.Id" class="btn btn-primary btn-sm">@(a.Status == AdmissionApplicationStatus.Draft ? "Continue application" : "Make corrections")</a>
+                        }
+                        @if (a.Status != AdmissionApplicationStatus.Draft)
+                        {
+                            <a asp-action="Application" asp-route-id="@a.Id" class="btn btn-outline-primary btn-sm">View status</a>
+                        }
+                        @if (a.Status == AdmissionApplicationStatus.PaymentPending || (a.AmountDue > a.AmountPaid && a.AdmissionSession?.PaymentStage == AdmissionPaymentStage.AtSubmission && a.Status != AdmissionApplicationStatus.Draft && a.Status != AdmissionApplicationStatus.PaymentVerificationPending))
+                        {
+                            <a asp-action="Payment" asp-route-id="@a.Id" class="btn btn-success btn-sm">Pay fee</a>
+                        }
+                    </div>
+                </div></div>
+            </div>
+        }
+    </div>
+}
+
+<h2 class="h5">Apply for admission / নতুন আবেদন</h2>
+@if (!Model.OpenSessions.Any())
+{
+    <div class="card adm-card"><div class="card-body text-muted">No admission is open right now. <a asp-controller="Admission" asp-action="Index">See all admission notices</a>.</div></div>
+}
+@foreach (var n in Model.OpenSessions)
+{
+    <div class="card adm-card mb-3"><div class="card-body">
+        <div class="d-flex justify-content-between flex-wrap gap-2">
+            <div>
+                <div class="fw-semibold">@n.Session.Title</div>
+                <div class="small text-muted">Deadline @n.Session.ApplicationEndDate.ToString("dd MMM yyyy") · <a asp-controller="Admission" asp-action="Notice" asp-route-id="@n.Session.Id">details, eligibility &amp; guidelines</a></div>
+            </div>
+            <span class="badge align-self-start @AdmissionDisplay.WindowBadge(n.State)">@AdmissionDisplay.Name(n.State)</span>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+            @foreach (var p in n.Session.Programs.OrderBy(p => p.AcademicClass?.ClassSerial))
+            {
+                <form asp-action="Start" method="post">
+                    <input type="hidden" name="programId" value="@p.Id" />
+                    <button type="submit" class="btn btn-outline-primary btn-sm">Apply for @p.AcademicClass?.Name</button>
+                </form>
+            }
+        </div>
+    </div></div>
+}

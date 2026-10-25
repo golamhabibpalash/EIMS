@@ -1,0 +1,8 @@
+@model AdmissionApplication
+@{
+    ViewData["Title"] = "Receipt";
+    AdmissionPayment payment = ViewBag.Payment;
+    payment.AdmissionApplication = Model;
+}
+<nav class="small mb-2 no-print"><a asp-action="Application" asp-route-id="@Model.Id">Back to application</a></nav>
+<partial name="_AdmissionReceipt" model="payment" />

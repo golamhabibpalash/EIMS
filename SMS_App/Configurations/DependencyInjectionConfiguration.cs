@@ -188,8 +188,22 @@ public static class DependencyInjectionConfiguration
         services.AddScoped<IParamBusConfigManager, ParamBusConfigManager>();
         services.AddScoped<IParamBusConfigRepository, ParamBusConfigRepository>();
 
-        services.AddScoped<IAppliedStudentManager, AppliedStudentManager>();
-        services.AddScoped<IAppliedStudentRepository, AppliedStudentRepository>();
+        // Online Admission (replaces the retired AppliedStudent prototype; its table is kept for old data)
+        services.AddScoped<IAdmissionSettingRepository, AdmissionSettingRepository>();
+        services.AddScoped<IAdmissionSessionRepository, AdmissionSessionRepository>();
+        services.AddScoped<IAdmissionProgramRepository, AdmissionProgramRepository>();
+        services.AddScoped<IAdmissionDocumentRequirementRepository, AdmissionDocumentRequirementRepository>();
+        services.AddScoped<IAdmissionGuardianAccountRepository, AdmissionGuardianAccountRepository>();
+        services.AddScoped<IAdmissionApplicationRepository, AdmissionApplicationRepository>();
+        services.AddScoped<IAdmissionApplicationDocumentRepository, AdmissionApplicationDocumentRepository>();
+        services.AddScoped<IAdmissionPaymentRepository, AdmissionPaymentRepository>();
+        services.AddScoped<IAdmissionApplicationHistoryRepository, AdmissionApplicationHistoryRepository>();
+        services.AddScoped<IAdmissionSetupManager, AdmissionSetupManager>();
+        services.AddScoped<IAdmissionGuardianManager, AdmissionGuardianManager>();
+        services.AddScoped<IAdmissionApplicationManager, AdmissionApplicationManager>();
+        services.AddScoped<IAdmissionPaymentManager, AdmissionPaymentManager>();
+        services.AddSingleton<SMS_App.Utilities.OnlineAdmission.AdmissionFileStore>();
+        services.AddScoped<SMS_App.Utilities.OnlineAdmission.AdmissionNotifier>();
 
         services.AddScoped<ILogManager, LogManager>();
         services.AddScoped<ILogRepository, LogRepository>();

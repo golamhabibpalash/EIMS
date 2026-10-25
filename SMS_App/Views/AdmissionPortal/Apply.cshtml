@@ -1,0 +1,413 @@
+@model ApplicationFormVM
+@inject IAdmissionSetupManager SetupManager
+@{
+    var a = Model.Application;
+    var f = Model.Form;
+    ViewData["Title"] = "Application form";
+    var settings = await SetupManager.GetSettingsAsync();
+    var requirements = Model.Session.DocumentRequirements.OrderBy(d => d.SortOrder).ThenBy(d => d.Id).ToList();
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+    <div>
+        <h1 class="h4 mb-0">Application for @Model.Program?.AcademicClass?.Name</h1>
+        <div class="small text-muted">@Model.Session.Title · Deadline @Model.Session.ApplicationEndDate.ToString("dd MMM yyyy")
+            @if (!string.IsNullOrEmpty(a.ApplicationNo)) { <span>· Application no. <strong>@a.ApplicationNo</strong></span> }
+        </div>
+    </div>
+    <span class="badge @AdmissionDisplay.StatusBadge(a.Status)">@AdmissionDisplay.Name(a.Status)</span>
+</div>
+
+@if (a.Status == AdmissionApplicationStatus.CorrectionRequired)
+{
+    <div class="alert alert-warning">
+        <div class="fw-semibold">The school asked for a correction / সংশোধন প্রয়োজন</div>
+        <div class="prewrap">@a.CorrectionReason</div>
+        @if (a.CorrectionDeadline.HasValue) { <div class="small mt-1">Please resubmit by <strong>@a.CorrectionDeadline.Value.ToString("dd MMM yyyy")</strong>.</div> }
+        @foreach (var d in a.Documents.Where(d => d.VerificationStatus == DocumentVerificationStatus.Rejected))
+        {
+            <div class="small mt-1"><i class="fa fa-file-circle-xmark"></i> @(d.AdmissionDocumentRequirement?.Name ?? d.OriginalFileName): @d.VerificationRemarks</div>
+        }
+    </div>
+}
+
+<partial name="_FormSteps" model="Model" />
+
+<div asp-validation-summary="ModelOnly" class="alert alert-danger small" role="alert"></div>
+
+@if (Model.Step == 1)
+{
+    <div class="card adm-card mb-3"><div class="card-body">
+        <h2 class="h5">Student's photo / শিক্ষার্থীর ছবি</h2>
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+            @if (!string.IsNullOrEmpty(a.PhotoFileName))
+            {
+                <img src="@Url.Action("Download", new { id = a.Id, name = a.PhotoFileName })" alt="Student photo" class="rounded border" style="width:96px;height:120px;object-fit:cover" />
+            }
+            <form asp-action="UploadPhoto" asp-route-id="@a.Id" method="post" enctype="multipart/form-data" class="flex-grow-1">
+                <label class="form-label small mb-1" for="photo">Recent passport-size photo - JPG or PNG, up to @Math.Min(1024, settings.MaxUploadSizeKb) KB</label>
+                <div class="input-group">
+                    <input type="file" name="photo" id="photo" class="form-control" accept=".jpg,.jpeg,.png" capture="user" required />
+                    <button type="submit" class="btn btn-outline-primary">@(string.IsNullOrEmpty(a.PhotoFileName) ? "Upload" : "Replace")</button>
+                </div>
+            </form>
+        </div>
+    </div></div>
+
+    <form asp-action="Apply" asp-route-id="@a.Id" method="post">
+        <input type="hidden" name="step" value="1" />
+        <div class="card adm-card"><div class="card-body">
+            <h2 class="h5">Student information / শিক্ষার্থীর তথ্য</h2>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="Form_Name">Student's name (English) <span class="text-danger">*</span></label>
+                    <input asp-for="Form.Name" class="form-control" placeholder="As on the birth registration" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="Form_NameBangla">Student's name (বাংলা)</label>
+                    <input asp-for="Form.NameBangla" class="form-control" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="Form_DOB">Date of birth <span class="text-danger">*</span></label>
+                    <input asp-for="Form.DOB" type="date" value="@(f.DOB?.ToString("yyyy-MM-dd"))" max="@DateTime.Today.ToString("yyyy-MM-dd")" class="form-control" />
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label" for="Form_BirthCertificateNo">Birth registration number <span class="text-danger">*</span></label>
+                    <input asp-for="Form.BirthCertificateNo" class="form-control" inputmode="numeric" maxlength="17" placeholder="17 digits" />
+                    <div class="form-text">The 17-digit number on the online birth registration certificate.</div>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <label class="form-label" for="Form_GenderId">Gender <span class="text-danger">*</span></label>
+                    <select asp-for="Form.GenderId" asp-items="Model.GenderList" class="form-select"><option value="">Select</option></select>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <label class="form-label" for="Form_ReligionId">Religion <span class="text-danger">*</span></label>
+                    <select asp-for="Form.ReligionId" asp-items="Model.ReligionList" class="form-select"><option value="">Select</option></select>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <label class="form-label" for="Form_NationalityId">Nationality <span class="text-danger">*</span></label>
+                    <select asp-for="Form.NationalityId" asp-items="Model.NationalityList" class="form-select"><option value="">Select</option></select>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <label class="form-label" for="Form_BloodGroupId">Blood group</label>
+                    <select asp-for="Form.BloodGroupId" asp-items="Model.BloodGroupList" class="form-select"><option value="">Don't know</option></select>
+                </div>
+            </div>
+            <partial name="_FormButtons" model="Model" />
+        </div></div>
+    </form>
+}
+else if (Model.Step == 2)
+{
+    <form asp-action="Apply" asp-route-id="@a.Id" method="post">
+        <input type="hidden" name="step" value="2" />
+        <div class="card adm-card mb-3"><div class="card-body">
+            <h2 class="h5">Parents / guardian · পিতা-মাতা / অভিভাবক</h2>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="Form_FatherName">Father's name <span class="text-danger">*</span></label>
+                    <input asp-for="Form.FatherName" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="Form_FatherNameBangla">Father's name (বাংলা)</label>
+                    <input asp-for="Form.FatherNameBangla" class="form-control" />
+                </div>
+                <div class="col-sm-4">
+                    <label class="form-label" for="Form_FatherOccupation">Occupation</label>
+                    <input asp-for="Form.FatherOccupation" class="form-control" />
+                </div>
+                <div class="col-sm-4">
+                    <label class="form-label" for="Form_FatherPhone">Mobile</label>
+                    <input asp-for="Form.FatherPhone" class="form-control" inputmode="tel" placeholder="01XXXXXXXXX" />
+                </div>
+                <div class="col-sm-4">
+                    <label class="form-label" for="Form_FatherNID">NID</label>
+                    <input asp-for="Form.FatherNID" class="form-control" inputmode="numeric" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="Form_MotherName">Mother's name <span class="text-danger">*</span></label>
+                    <input asp-for="Form.MotherName" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="Form_MotherNameBangla">Mother's name (বাংলা)</label>
+                    <input asp-for="Form.MotherNameBangla" class="form-control" />
+                </div>
+                <div class="col-sm-4">
+                    <label class="form-label" for="Form_MotherOccupation">Occupation</label>
+                    <input asp-for="Form.MotherOccupation" class="form-control" />
+                </div>
+                <div class="col-sm-4">
+                    <label class="form-label" for="Form_MotherPhone">Mobile</label>
+                    <input asp-for="Form.MotherPhone" class="form-control" inputmode="tel" placeholder="01XXXXXXXXX" />
+                </div>
+                <div class="col-sm-4">
+                    <label class="form-label" for="Form_MotherNID">NID</label>
+                    <input asp-for="Form.MotherNID" class="form-control" inputmode="numeric" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="Form_GuardianPhone">Contact mobile for school updates <span class="text-danger">*</span></label>
+                    <input asp-for="Form.GuardianPhone" class="form-control" inputmode="tel" placeholder="01XXXXXXXXX" />
+                    <div class="form-text">SMS updates and the student's login are sent to this number.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="Form_Email">Email (optional)</label>
+                    <input asp-for="Form.Email" type="email" class="form-control" />
+                </div>
+            </div>
+        </div></div>
+
+        <div class="card adm-card"><div class="card-body">
+            <h2 class="h5">Address / ঠিকানা</h2>
+            @foreach (var kind in new[] { "Present", "Permanent" })
+            {
+                var divisionId = kind == "Present" ? f.PresentDivisionId : f.PermanentDivisionId;
+                var districtId = kind == "Present" ? f.PresentDistrictId : f.PermanentDistrictId;
+                var upazilaId = kind == "Present" ? f.PresentUpazilaId : f.PermanentUpazilaId;
+                <fieldset class="mb-3" data-address="@kind">
+                    <legend class="fs-6 fw-semibold">@(kind == "Present" ? "Present address / বর্তমান ঠিকানা" : "Permanent address / স্থায়ী ঠিকানা")</legend>
+                    @if (kind == "Permanent")
+                    {
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="sameAddress" />
+                            <label class="form-check-label" for="sameAddress">Same as present address</label>
+                        </div>
+                    }
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="Form_@(kind)AddressArea">Village / area / road</label>
+                            <input name="Form.@(kind)AddressArea" id="Form_@(kind)AddressArea" value="@(kind == "Present" ? f.PresentAddressArea : f.PermanentAddressArea)" class="form-control" maxlength="200" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="Form_@(kind)AddressPO">Post office</label>
+                            <input name="Form.@(kind)AddressPO" id="Form_@(kind)AddressPO" value="@(kind == "Present" ? f.PresentAddressPO : f.PermanentAddressPO)" class="form-control" maxlength="100" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="Form_@(kind)DivisionId">Division</label>
+                            <select name="Form.@(kind)DivisionId" id="Form_@(kind)DivisionId" class="form-select js-division" data-selected="@divisionId">
+                                <option value="">Select</option>
+                                @foreach (var d in Model.DivisionList)
+                                {
+                                    <option value="@d.Value" selected="@(d.Value == divisionId?.ToString())">@d.Text</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="Form_@(kind)DistrictId">District <span class="text-danger">*</span></label>
+                            <select name="Form.@(kind)DistrictId" id="Form_@(kind)DistrictId" class="form-select js-district" data-selected="@districtId"><option value="">Select</option></select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="Form_@(kind)UpazilaId">Upazila / thana <span class="text-danger">*</span></label>
+                            <select name="Form.@(kind)UpazilaId" id="Form_@(kind)UpazilaId" class="form-select js-upazila" data-selected="@upazilaId"><option value="">Select</option></select>
+                        </div>
+                    </div>
+                </fieldset>
+            }
+            <partial name="_FormButtons" model="Model" />
+        </div></div>
+    </form>
+}
+else if (Model.Step == 3)
+{
+    <form asp-action="Apply" asp-route-id="@a.Id" method="post">
+        <input type="hidden" name="step" value="3" />
+        <div class="card adm-card"><div class="card-body">
+            <h2 class="h5">Previous school / পূর্ববর্তী শিক্ষাপ্রতিষ্ঠান</h2>
+            <p class="small text-muted">Leave empty if the child has not been to school before.</p>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="Form_PreviousSchool">School name</label>
+                    <input asp-for="Form.PreviousSchool" class="form-control" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="Form_PreviousClass">Class completed</label>
+                    <input asp-for="Form.PreviousClass" class="form-control" placeholder="e.g. Class 5" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="Form_PreviousResult">Result</label>
+                    <input asp-for="Form.PreviousResult" class="form-control" placeholder="e.g. GPA 5.00 / Grade A+ / 85%" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="Form_PreviousGpa">GPA (if any)</label>
+                    <input asp-for="Form.PreviousGpa" type="number" step="0.01" min="0" max="5" class="form-control" />
+                </div>
+            </div>
+            <partial name="_FormButtons" model="Model" />
+        </div></div>
+    </form>
+}
+else if (Model.Step == 4)
+{
+    <div class="card adm-card mb-3"><div class="card-body">
+        <h2 class="h5">Upload documents / কাগজপত্র আপলোড</h2>
+        <p class="small text-muted">Upload a clear scan or phone photo of each document. Your other answers are kept if an upload fails - just try again.</p>
+        @if (!requirements.Any())
+        {
+            <p class="mb-0">No documents are required for this admission.</p>
+        }
+        @foreach (var r in requirements)
+        {
+            var doc = a.Documents.FirstOrDefault(d => d.AdmissionDocumentRequirementId == r.Id);
+            var limit = Math.Min(r.MaxSizeKb, settings.MaxUploadSizeKb);
+            <div class="border rounded p-2 mb-2">
+                <div class="d-flex justify-content-between flex-wrap gap-2">
+                    <div>
+                        <span class="fw-semibold">@r.Name</span> @if (r.IsMandatory) { <span class="text-danger">*</span> } else { <span class="text-muted small">(optional)</span> }
+                        <div class="small text-muted">@r.AllowedExtensions.Replace(",", ", ") · up to @limit KB @(string.IsNullOrEmpty(r.Description) ? "" : "· " + r.Description)</div>
+                    </div>
+                    @if (doc != null)
+                    {
+                        <div class="small text-end">
+                            <span class="badge @AdmissionDisplay.DocumentBadge(doc.VerificationStatus)">@(doc.VerificationStatus == DocumentVerificationStatus.Pending ? "Uploaded" : AdmissionDisplay.Name(doc.VerificationStatus))</span>
+                            <a href="@Url.Action("Download", new { id = a.Id, name = doc.StoredFileName })" target="_blank" class="ms-1">@doc.OriginalFileName</a>
+                            @if (doc.VerificationStatus == DocumentVerificationStatus.Rejected && !string.IsNullOrEmpty(doc.VerificationRemarks))
+                            {
+                                <div class="text-danger">@doc.VerificationRemarks</div>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="d-flex gap-2 mt-2 flex-wrap">
+                    <form asp-action="UploadDocument" asp-route-id="@a.Id" method="post" enctype="multipart/form-data" class="flex-grow-1">
+                        <input type="hidden" name="requirementId" value="@r.Id" />
+                        <div class="input-group">
+                            <input type="file" name="file" class="form-control" accept="@r.AllowedExtensions" required aria-label="Choose file for @r.Name" />
+                            <button type="submit" class="btn btn-outline-primary">@(doc == null ? "Upload" : "Replace")</button>
+                        </div>
+                    </form>
+                    @if (doc != null)
+                    {
+                        <form asp-action="RemoveDocument" asp-route-id="@a.Id" method="post">
+                            <input type="hidden" name="documentId" value="@doc.Id" />
+                            <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Remove this document?')">Remove</button>
+                        </form>
+                    }
+                </div>
+            </div>
+        }
+    </div></div>
+    <form asp-action="Apply" asp-route-id="@a.Id" method="post">
+        <input type="hidden" name="step" value="4" />
+        <partial name="_FormButtons" model="Model" />
+    </form>
+}
+else
+{
+    <div class="card adm-card mb-3"><div class="card-body">
+        <h2 class="h5">Review your application / আবেদন যাচাই করুন</h2>
+        <div class="row g-3 small">
+            <div class="col-md-6">
+                <div class="fw-semibold border-bottom mb-1">Student <a asp-action="Apply" asp-route-id="@a.Id" asp-route-step="1" class="ms-1">edit</a></div>
+                <div>@a.Name @(string.IsNullOrEmpty(a.NameBangla) ? "" : "(" + a.NameBangla + ")")</div>
+                <div>Born @a.DOB?.ToString("dd MMM yyyy") · @a.Gender?.Name · @a.Religion?.Name · @a.Nationality?.Name</div>
+                <div>Birth registration: @a.BirthCertificateNo</div>
+                <div>Photo: @(string.IsNullOrEmpty(a.PhotoFileName) ? "not uploaded" : "uploaded")</div>
+            </div>
+            <div class="col-md-6">
+                <div class="fw-semibold border-bottom mb-1">Guardian &amp; address <a asp-action="Apply" asp-route-id="@a.Id" asp-route-step="2" class="ms-1">edit</a></div>
+                <div>Father: @a.FatherName @(string.IsNullOrEmpty(a.FatherPhone) ? "" : "· " + a.FatherPhone)</div>
+                <div>Mother: @a.MotherName @(string.IsNullOrEmpty(a.MotherPhone) ? "" : "· " + a.MotherPhone)</div>
+                <div>Contact mobile: @a.GuardianPhone</div>
+                <div>Present: @a.PresentAddressArea, @a.PresentUpazila?.Name, @a.PresentDistrict?.Name</div>
+                <div>Permanent: @a.PermanentAddressArea, @a.PermanentUpazila?.Name, @a.PermanentDistrict?.Name</div>
+            </div>
+            <div class="col-md-6">
+                <div class="fw-semibold border-bottom mb-1">Previous school <a asp-action="Apply" asp-route-id="@a.Id" asp-route-step="3" class="ms-1">edit</a></div>
+                <div>@(string.IsNullOrEmpty(a.PreviousSchool) ? "None" : $"{a.PreviousSchool}, {a.PreviousClass}, {a.PreviousResult}")</div>
+            </div>
+            <div class="col-md-6">
+                <div class="fw-semibold border-bottom mb-1">Documents <a asp-action="Apply" asp-route-id="@a.Id" asp-route-step="4" class="ms-1">edit</a></div>
+                @foreach (var r in requirements)
+                {
+                    var uploaded = a.Documents.Any(d => d.AdmissionDocumentRequirementId == r.Id);
+                    <div><i class="fa @(uploaded ? "fa-check text-success" : "fa-xmark text-danger")"></i> @r.Name</div>
+                }
+            </div>
+        </div>
+    </div></div>
+
+    @if (Model.MissingItems.Any())
+    {
+        <div class="alert alert-danger">
+            <div class="fw-semibold">Please complete these before submitting:</div>
+            <ul class="mb-0">@foreach (var m in Model.MissingItems) { <li>@m</li> }</ul>
+        </div>
+    }
+    @if (Model.EligibilityWarnings.Any())
+    {
+        <div class="alert alert-warning">
+            <div class="fw-semibold">Eligibility check / যোগ্যতা যাচাই</div>
+            <p class="small mb-1">Based on your answers, these published criteria are not met. You can still submit; the school will review your case and decide.</p>
+            <ul class="mb-0">@foreach (var w in Model.EligibilityWarnings) { <li>@w</li> }</ul>
+        </div>
+    }
+
+    <form asp-action="Submit" asp-route-id="@a.Id" method="post" class="card adm-card"><div class="card-body">
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="eligibilityAcknowledged" value="true" id="ackEligibility" required />
+            <label class="form-check-label" for="ackEligibility">
+                I have read the <a asp-controller="Admission" asp-action="Eligibility" asp-route-id="@Model.Session.Id" target="_blank">admission eligibility</a>. / আমি ভর্তির যোগ্যতা পড়েছি।
+            </label>
+        </div>
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="policyAcknowledged" value="true" id="ackPolicy" required />
+            <label class="form-check-label" for="ackPolicy">
+                I have read and accept the <a asp-controller="Admission" asp-action="Guidelines" asp-route-id="@Model.Session.Id" target="_blank">admission policy &amp; guidelines</a> (version @Model.Session.PolicyVersion), and the information I gave is true. / আমি নীতিমালা পড়েছি ও তথ্য সঠিক।
+            </label>
+        </div>
+        <div class="d-flex flex-wrap gap-2 justify-content-between">
+            <a asp-action="Apply" asp-route-id="@a.Id" asp-route-step="4" class="btn btn-outline-secondary"><i class="fa fa-arrow-left"></i> Back</a>
+            <button type="submit" class="btn btn-success btn-lg" @(Model.MissingItems.Any() ? "disabled" : "")>
+                @(a.Status == AdmissionApplicationStatus.CorrectionRequired ? "Resubmit application" : "Submit application")
+            </button>
+        </div>
+    </div></form>
+}
+
+<div class="mt-3 small"><partial name="_AdmissionHelpline" model="settings" /></div>
+
+@section Scripts {
+    @if (Model.Step == 2)
+    {
+        <script>
+            (function () {
+                var districts = @Html.Raw(Model.DistrictsJson);
+                var upazilas = @Html.Raw(Model.UpazilasJson);
+
+                function fill(select, items, parentId, selected) {
+                    select.innerHTML = '<option value="">Select</option>';
+                    items.filter(function (i) { return !parentId || String(i.parentId) === String(parentId); })
+                        .forEach(function (i) {
+                            var o = document.createElement('option');
+                            o.value = i.id; o.textContent = i.name;
+                            if (String(i.id) === String(selected)) o.selected = true;
+                            select.appendChild(o);
+                        });
+                }
+
+                document.querySelectorAll('[data-address]').forEach(function (box) {
+                    var division = box.querySelector('.js-division');
+                    var district = box.querySelector('.js-district');
+                    var upazila = box.querySelector('.js-upazila');
+                    fill(district, districts, division.value, district.dataset.selected);
+                    fill(upazila, upazilas, district.value, upazila.dataset.selected);
+                    division.addEventListener('change', function () { fill(district, districts, division.value, null); fill(upazila, upazilas, null, null); upazila.innerHTML = '<option value="">Select</option>'; });
+                    district.addEventListener('change', function () { fill(upazila, upazilas, district.value, null); });
+                });
+
+                var same = document.getElementById('sameAddress');
+                if (same) {
+                    same.addEventListener('change', function () {
+                        if (!same.checked) return;
+                        ['AddressArea', 'AddressPO', 'DivisionId'].forEach(function (n) {
+                            document.getElementById('Form_Permanent' + n).value = document.getElementById('Form_Present' + n).value;
+                        });
+                        var pDistrict = document.getElementById('Form_PermanentDistrictId');
+                        var pUpazila = document.getElementById('Form_PermanentUpazilaId');
+                        fill(pDistrict, districts, document.getElementById('Form_PermanentDivisionId').value, document.getElementById('Form_PresentDistrictId').value);
+                        fill(pUpazila, upazilas, pDistrict.value, document.getElementById('Form_PresentUpazilaId').value);
+                    });
+                }
+            })();
+        </script>
+    }
+}

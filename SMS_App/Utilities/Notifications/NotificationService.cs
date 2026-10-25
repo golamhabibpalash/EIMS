@@ -95,6 +95,36 @@ namespace SMS_App.Utilities.Notifications
             }
         }
 
+        public async Task NotifyRolesAsync(IEnumerable<string> roles, string title, string message, string url,
+            NotificationCategory category, string excludeUserId, string macAddress)
+        {
+            try
+            {
+                var recipientIds = new HashSet<string>();
+                foreach (var role in roles ?? Enumerable.Empty<string>())
+                {
+                    foreach (var user in await _userManager.GetUsersInRoleAsync(role))
+                    {
+                        if (user.Id != excludeUserId)
+                        {
+                            recipientIds.Add(user.Id);
+                        }
+                    }
+                }
+
+                if (recipientIds.Count == 0)
+                {
+                    return;
+                }
+
+                await PersistAndPushAsync(recipientIds, title, message, url, category, excludeUserId ?? "System", macAddress);
+            }
+            catch (Exception ex)
+            {
+                await SafeLogAsync($"Failed to notify roles ({title})", ex);
+            }
+        }
+
         public async Task PushAsync(string recipientUserId, NotificationDto payload)
         {
             if (string.IsNullOrEmpty(recipientUserId) || payload is null)

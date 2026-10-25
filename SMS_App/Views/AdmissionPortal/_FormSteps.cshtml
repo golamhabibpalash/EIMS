@@ -1,0 +1,20 @@
+@model ApplicationFormVM
+@{
+    var labels = new[] { "Student", "Guardian & address", "Previous school", "Documents", "Review & submit" };
+}
+<div class="adm-steps mb-3" aria-label="Application progress">
+    @for (var i = 1; i <= labels.Length; i++)
+    {
+        var css = i == Model.Step ? "current" : (i < Model.Application.CurrentStep ? "done" : "");
+        <div class="step @css">
+            @if (i <= Model.Application.CurrentStep && i != Model.Step)
+            {
+                <a asp-action="Apply" asp-route-id="@Model.Application.Id" asp-route-step="@i" class="text-reset text-decoration-none"><span class="dot">@i</span>@labels[i - 1]</a>
+            }
+            else
+            {
+                <span class="dot">@i</span>@labels[i - 1]
+            }
+        </div>
+    }
+</div>

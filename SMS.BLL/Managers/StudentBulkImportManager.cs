@@ -664,7 +664,7 @@ namespace SMS.BLL.Managers
         /// Mirrors StudentsController.CreateRoll: last 2 digits of the session name,
         /// the 2-digit class serial, then the 3-digit roll typed by the user.
         /// </summary>
-        private static int BuildRoll(AcademicSession session, AcademicClass academicClass, int providedRoll)
+        internal static int BuildRoll(AcademicSession session, AcademicClass academicClass, int providedRoll)
         {
             string year = session.Name.Substring(session.Name.Length - 2);
             string classSerial = academicClass.ClassSerial.ToString("d2");
@@ -676,7 +676,7 @@ namespace SMS.BLL.Managers
         /// Mirrors StudentsController.GenerateUniquId: DOB as yyMMdd, the last
         /// character of the session name, then the last 2 digits of the full roll.
         /// </summary>
-        private static string BuildUniqueId(DateTime dob, AcademicSession session, int generatedRoll)
+        internal static string BuildUniqueId(DateTime dob, AcademicSession session, int generatedRoll)
         {
             string rollText = generatedRoll.ToString();
             string uniqueId = dob.ToString("yyMMdd")

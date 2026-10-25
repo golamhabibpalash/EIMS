@@ -1,0 +1,49 @@
+@model AdmissionTrackVM
+@{
+    ViewData["Title"] = "Track application";
+}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <h1 class="h3">Track application / আবেদনের অবস্থা</h1>
+        <div class="card adm-card mb-3"><div class="card-body">
+            <form asp-action="Track" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+                <div class="mb-3">
+                    <label asp-for="ApplicationNo" class="form-label"></label>
+                    <input asp-for="ApplicationNo" class="form-control text-uppercase" placeholder="e.g. ADM-2027-00012" autocomplete="off" />
+                    <span asp-validation-for="ApplicationNo" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="MobileNumber" class="form-label"></label>
+                    <input asp-for="MobileNumber" class="form-control" inputmode="tel" placeholder="01XXXXXXXXX" />
+                    <span asp-validation-for="MobileNumber" class="text-danger small"></span>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Check status</button>
+            </form>
+        </div></div>
+
+        @if (Model.Searched)
+        {
+            if (Model.Result == null)
+            {
+                <div class="alert alert-warning">No application matches this number and mobile. Please check both and try again.</div>
+            }
+            else
+            {
+                var a = Model.Result;
+                <div class="card adm-card"><div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <div class="small text-muted">Application</div>
+                            <div class="fw-semibold">@a.ApplicationNo · @a.AdmissionProgram?.AcademicClass?.Name</div>
+                        </div>
+                        <span class="badge @AdmissionDisplay.StatusBadge(a.Status)">@AdmissionDisplay.Name(a.Status)</span>
+                    </div>
+                    <p class="mb-2">@AdmissionDisplay.GuardianNextStep(a)</p>
+                    <p class="small text-muted mb-0">For details, messages from the school and payment, <a asp-controller="AdmissionPortal" asp-action="Login">sign in</a>.</p>
+                </div></div>
+            }
+        }
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

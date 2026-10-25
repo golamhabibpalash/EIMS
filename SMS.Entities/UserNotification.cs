@@ -39,6 +39,7 @@ namespace SMS.Entities
         General = 0,
 
         [Display(Name = "Ticket")]
-        Ticket = 1
+        Ticket = 1,
+        Admission = 2
     }
 }

@@ -17,6 +17,10 @@ namespace SMS_App.Utilities.Notifications
         /// <summary>Notify the ticket's owner that its status changed (unless they made the change).</summary>
         Task NotifyTicketStatusChangedAsync(Ticket ticket, TicketStatus newStatus, string actingUserId, string macAddress);
 
+        /// <summary>Notify every user in any of <paramref name="roles"/> (except <paramref name="excludeUserId"/>). Best-effort.</summary>
+        Task NotifyRolesAsync(System.Collections.Generic.IEnumerable<string> roles, string title, string message, string url,
+            NotificationCategory category, string excludeUserId, string macAddress);
+
         /// <summary>Push an already-persisted notification to one recipient's SignalR group (best-effort).</summary>
         Task PushAsync(string recipientUserId, NotificationDto payload);
     }

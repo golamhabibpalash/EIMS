@@ -1,0 +1,42 @@
+@model AdmissionLandingVM
+@{
+    var s = Model.Session;
+    var open = Model.State == AdmissionWindowState.Open || Model.State == AdmissionWindowState.ClosingSoon;
+}
+<div class="card adm-card mb-3">
+    <div class="card-body">
+        @if (open)
+        {
+            <h2 class="h5">Start your application / আবেদন শুরু করুন</h2>
+            <p class="small text-muted mb-2">Applications close on <strong>@s.ApplicationEndDate.ToString("dd MMM yyyy")</strong>. You can save a draft and finish later.</p>
+            @if (!Model.IsSignedIn)
+            {
+                <p class="small mb-2">First, create a free account with your mobile number (or sign in if you already have one).</p>
+                <a asp-controller="AdmissionPortal" asp-action="Register" asp-route-returnUrl="@Url.Action("Index", "AdmissionPortal")" class="btn btn-primary w-100 mb-2">Create account &amp; apply</a>
+                <a asp-controller="AdmissionPortal" asp-action="Login" asp-route-returnUrl="@Url.Action("Index", "AdmissionPortal")" class="btn btn-outline-primary w-100">I already have an account</a>
+            }
+            else
+            {
+                @foreach (var p in s.Programs)
+                {
+                    <form asp-controller="AdmissionPortal" asp-action="Start" method="post" class="mb-2">
+                        <input type="hidden" name="programId" value="@p.Id" />
+                        <button type="submit" class="btn btn-primary w-100">Apply for @p.AcademicClass?.Name</button>
+                    </form>
+                }
+            }
+        }
+        else if (Model.State == AdmissionWindowState.Upcoming)
+        {
+            <h2 class="h5">Applications open soon</h2>
+            <p class="mb-0">You can apply from <strong>@s.ApplicationStartDate.ToString("dd MMM yyyy")</strong> to <strong>@s.ApplicationEndDate.ToString("dd MMM yyyy")</strong>. Please read the eligibility and guidelines meanwhile.</p>
+        }
+        else
+        {
+            <h2 class="h5">Applications are closed</h2>
+            <p class="mb-0">The deadline was @s.ApplicationEndDate.ToString("dd MMM yyyy"). If you have already applied, you can still track your application.</p>
+        }
+        <hr />
+        <a asp-action="Track" class="btn btn-link px-0">Already applied? Track your application</a>
+    </div>
+</div>

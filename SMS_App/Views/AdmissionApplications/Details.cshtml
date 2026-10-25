@@ -1,0 +1,232 @@
+@model AdmissionApplicationDetailsVM
+@{
+    var a = Model.Application;
+    ViewData["Title"] = "Application " + a.ApplicationNo;
+    GlobalUI.PageTitle = "Admission Application";
+    var decidable = SMS.BLL.Managers.AdmissionRules.CanBeDecided(a.Status);
+    var closed = SMS.BLL.Managers.AdmissionRules.IsClosed(a.Status);
+    string Staff(string id) => string.IsNullOrEmpty(id) ? "" : (Model.StaffNames.TryGetValue(id, out var n) ? n : id);
+}
+<partial name="_AdmissionStaffAlerts" />
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div class="d-flex gap-3 align-items-center">
+        @if (!string.IsNullOrEmpty(a.PhotoFileName))
+        {
+            <img src="@Url.Action("Download", new { id = a.Id, name = a.PhotoFileName })" alt="Applicant photo" class="rounded border" style="width:72px;height:90px;object-fit:cover" />
+        }
+        <div>
+            <h4 class="mb-0">@a.Name <small class="text-muted">@a.NameBangla</small></h4>
+            <div class="small">@a.ApplicationNo · @a.AdmissionProgram?.AcademicClass?.Name · @a.AdmissionSession?.Title</div>
+            <div class="small text-muted">Submitted @a.SubmittedAt?.ToString("dd MMM yyyy HH:mm") @(a.LastSubmittedAt != a.SubmittedAt ? "· last resubmitted " + a.LastSubmittedAt?.ToString("dd MMM yyyy HH:mm") : "") · Seats taken in class: @Model.SeatsHeld@(a.AdmissionProgram?.SeatCapacity > 0 ? " / " + a.AdmissionProgram.SeatCapacity : "")</div>
+        </div>
+    </div>
+    <div class="text-end">
+        <span class="badge fs-6 @AdmissionDisplay.StatusBadge(a.Status)">@AdmissionDisplay.Name(a.Status)</span>
+        <div class="mt-2 d-flex gap-2 justify-content-end flex-wrap">
+            <a asp-action="Index" asp-route-Filter.AdmissionSessionId="@a.AdmissionSessionId" class="btn btn-sm btn-outline-secondary">Back to list</a>
+            @if (a.Status == AdmissionApplicationStatus.Submitted || a.Status == AdmissionApplicationStatus.Resubmitted)
+            {
+                <form asp-action="StartReview" asp-route-id="@a.Id" method="post"><button class="btn btn-sm btn-info">Start review</button></form>
+            }
+            @if (Model.EnrolmentBlocker == null)
+            {
+                <a asp-action="Enrol" asp-route-id="@a.Id" class="btn btn-sm btn-success"><i class="fa fa-user-check"></i> Enrol student</a>
+            }
+            @if (a.Student != null)
+            {
+                <a asp-controller="Students" asp-action="Details" asp-route-id="@a.StudentId" class="btn btn-sm btn-outline-success">Student @a.Student.UniqueId</a>
+            }
+        </div>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(a.EligibilityWarnings))
+{
+    <div class="alert @(a.EligibilityExceptionApproved ? "alert-secondary" : "alert-warning")">
+        <div class="fw-semibold">Eligibility criteria not met at submission</div>
+        <div style="white-space:pre-line" class="small">@a.EligibilityWarnings</div>
+        @if (a.EligibilityExceptionApproved)
+        {
+            <div class="small mt-1"><strong>Exception approved:</strong> @a.EligibilityExceptionReason</div>
+        }
+        else if (!closed)
+        {
+            <form asp-action="EligibilityException" asp-route-id="@a.Id" method="post" class="d-flex gap-2 mt-2">
+                <input name="reason" class="form-control form-control-sm" placeholder="Reason for the exception (required)" required maxlength="1000" />
+                <button class="btn btn-sm btn-outline-dark text-nowrap">Approve exception</button>
+            </form>
+        }
+    </div>
+}
+@if (Model.MissingItems.Any())
+{
+    <div class="alert alert-light border small"><strong>Incomplete:</strong> @string.Join(", ", Model.MissingItems)</div>
+}
+@if (Model.LastCorrectionChanges.Any())
+{
+    <div class="alert alert-info small">
+        <div class="fw-semibold">Changed in the last resubmission</div>
+        <table class="table table-sm mb-0"><thead><tr><th>Field</th><th>Before</th><th>After</th></tr></thead><tbody>
+        @foreach (var c in Model.LastCorrectionChanges) { <tr><td>@c.Field</td><td>@c.Before</td><td>@c.After</td></tr> }
+        </tbody></table>
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card shadow-sm mb-3"><div class="card-body small">
+            <h6>Applicant</h6>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div><strong>DOB:</strong> @a.DOB?.ToString("dd MMM yyyy") @(a.DOB.HasValue ? $"(age {SMS.BLL.Managers.AdmissionRules.AgeInYears(a.DOB.Value, DateTime.Today)})" : "")</div>
+                    <div><strong>Gender:</strong> @a.Gender?.Name · <strong>Religion:</strong> @a.Religion?.Name</div>
+                    <div><strong>Nationality:</strong> @a.Nationality?.Name · <strong>Blood:</strong> @a.BloodGroup?.Name</div>
+                    <div><strong>Birth reg.:</strong> @a.BirthCertificateNo</div>
+                    <div class="mt-2"><strong>Previous school:</strong> @a.PreviousSchool @a.PreviousClass</div>
+                    <div><strong>Result:</strong> @a.PreviousResult @(a.PreviousGpa.HasValue ? "· GPA " + a.PreviousGpa.Value.ToString("0.00") : "")</div>
+                </div>
+                <div class="col-sm-6">
+                    <div><strong>Father:</strong> @a.FatherName @a.FatherNameBangla · @a.FatherOccupation · @a.FatherPhone · NID @a.FatherNID</div>
+                    <div><strong>Mother:</strong> @a.MotherName @a.MotherNameBangla · @a.MotherOccupation · @a.MotherPhone · NID @a.MotherNID</div>
+                    <div><strong>Contact:</strong> @a.GuardianPhone @(string.IsNullOrEmpty(a.Email) ? "" : "· " + a.Email)</div>
+                    <div><strong>Account:</strong> @a.GuardianAccount?.FullName (@a.GuardianAccount?.MobileNumber@(a.GuardianAccount?.IsMobileVerified == true ? ", verified" : ""))</div>
+                    <div class="mt-2"><strong>Present:</strong> @a.PresentAddressArea, PO @a.PresentAddressPO, @a.PresentUpazila?.Name, @a.PresentDistrict?.Name</div>
+                    <div><strong>Permanent:</strong> @a.PermanentAddressArea, PO @a.PermanentAddressPO, @a.PermanentUpazila?.Name, @a.PermanentDistrict?.Name</div>
+                </div>
+            </div>
+            <div class="text-muted mt-2">Policy version accepted: @a.PolicyVersionAcknowledged on @a.AcknowledgedAt?.ToString("dd MMM yyyy HH:mm")</div>
+        </div></div>
+
+        <div class="card shadow-sm mb-3"><div class="card-body">
+            <h6>Documents</h6>
+            @if (!a.Documents.Any()) { <div class="small text-muted">No documents uploaded.</div> }
+            @foreach (var d in a.Documents.OrderBy(d => d.AdmissionDocumentRequirement?.SortOrder))
+            {
+                <div class="border-top py-2 small">
+                    <div class="d-flex justify-content-between flex-wrap gap-2">
+                        <div>
+                            <strong>@(d.AdmissionDocumentRequirement?.Name ?? "Document")</strong> ·
+                            <a href="@Url.Action("Download", new { id = a.Id, name = d.StoredFileName })" target="_blank">@d.OriginalFileName</a> (@(d.SizeBytes / 1024) KB)
+                            @if (d.VerifiedAt.HasValue) { <div class="text-muted">@AdmissionDisplay.Name(d.VerificationStatus) by @Staff(d.VerifiedBy) on @d.VerifiedAt.Value.ToString("dd MMM yyyy") @(string.IsNullOrEmpty(d.VerificationRemarks) ? "" : "- " + d.VerificationRemarks)</div> }
+                        </div>
+                        <span class="badge align-self-start @AdmissionDisplay.DocumentBadge(d.VerificationStatus)">@AdmissionDisplay.Name(d.VerificationStatus)</span>
+                    </div>
+                    @if (!closed)
+                    {
+                        <form asp-action="VerifyDocument" asp-route-id="@a.Id" method="post" class="d-flex gap-2 mt-1">
+                            <input type="hidden" name="documentId" value="@d.Id" />
+                            <input name="remarks" class="form-control form-control-sm" placeholder="Remarks (required to reject)" maxlength="1000" />
+                            <button name="status" value="@DocumentVerificationStatus.Verified" class="btn btn-sm btn-outline-success">Verify</button>
+                            <button name="status" value="@DocumentVerificationStatus.Rejected" class="btn btn-sm btn-outline-danger">Reject</button>
+                        </form>
+                    }
+                </div>
+            }
+        </div></div>
+
+        <div class="card shadow-sm mb-3"><div class="card-body">
+            <h6>History &amp; audit trail</h6>
+            @foreach (var h in a.History.OrderByDescending(h => h.CreatedAt).ThenByDescending(h => h.Id))
+            {
+                <div class="border-top py-2 small @(h.IsInternal ? "bg-light" : "")">
+                    <div class="d-flex justify-content-between">
+                        <span><strong>@h.Action</strong> @(h.ToStatus.HasValue ? $"→ {AdmissionDisplay.Name(h.ToStatus.Value)}" : "") @(h.IsInternal ? "(internal)" : "")</span>
+                        <span class="text-muted">@h.CreatedAt.ToString("dd MMM yyyy HH:mm") · @h.ActorType: @h.ActorName</span>
+                    </div>
+                    @if (!string.IsNullOrEmpty(h.Note)) { <div style="white-space:pre-line">@h.Note</div> }
+                </div>
+            }
+        </div></div>
+    </div>
+
+    <div class="col-lg-5">
+        @if (decidable)
+        {
+            <div class="card shadow-sm mb-3 border-primary"><div class="card-body">
+                <h6>Decision</h6>
+                <form asp-action="Approve" asp-route-id="@a.Id" method="post" class="mb-3">
+                    <textarea name="note" rows="2" class="form-control form-control-sm mb-1" placeholder="Note to include with the offer (optional)" maxlength="2000"></textarea>
+                    <button class="btn btn-sm btn-success w-100" onclick="return confirm('Approve this application and issue the offer?')">Approve &amp; issue offer</button>
+                </form>
+                <form asp-action="Waitlist" asp-route-id="@a.Id" method="post" class="mb-3">
+                    <input name="reason" class="form-control form-control-sm mb-1" placeholder="Note (optional)" maxlength="2000" />
+                    <button class="btn btn-sm btn-outline-dark w-100" @(a.Status == AdmissionApplicationStatus.Waitlisted ? "disabled" : "")>Waitlist</button>
+                </form>
+                <form asp-action="Reject" asp-route-id="@a.Id" method="post">
+                    <textarea name="reason" rows="2" class="form-control form-control-sm mb-1" placeholder="Reason for rejection (required, shown to the guardian)" required maxlength="2000"></textarea>
+                    <button class="btn btn-sm btn-outline-danger w-100" onclick="return confirm('Reject this application?')">Reject</button>
+                </form>
+            </div></div>
+
+            <div class="card shadow-sm mb-3"><div class="card-body">
+                <h6>Request correction</h6>
+                <form asp-action="RequestCorrection" asp-route-id="@a.Id" method="post">
+                    <textarea name="reason" rows="3" class="form-control form-control-sm mb-1" placeholder="What must the guardian fix? (shown to them)" required maxlength="2000"></textarea>
+                    <div class="d-flex gap-2">
+                        <input type="date" name="deadline" min="@DateTime.Today.ToString("yyyy-MM-dd")" class="form-control form-control-sm" aria-label="Correction deadline" title="Deadline (optional)" />
+                        <button class="btn btn-sm btn-warning text-nowrap">Send request</button>
+                    </div>
+                </form>
+            </div></div>
+        }
+
+        <div class="card shadow-sm mb-3"><div class="card-body small">
+            <h6>Fee &amp; payments</h6>
+            <div>Due BDT @a.AmountDue.ToString("0.00") · verified BDT @a.AmountPaid.ToString("0.00") · outstanding <strong>BDT @Model.Outstanding.ToString("0.00")</strong> @(Model.PendingAmount > 0 ? $"· pending BDT {Model.PendingAmount:0.00}" : "")</div>
+            @if (a.OfferExpiresAt.HasValue)
+            {
+                <div class="@(a.OfferExpiresAt < DateTime.Now ? "text-danger" : "")">Offer valid until @a.OfferExpiresAt.Value.ToString("dd MMM yyyy")</div>
+                @if (a.Status == AdmissionApplicationStatus.PaymentPending && a.OfferExpiresAt < DateTime.Now)
+                {
+                    <form asp-action="ExpireOffer" asp-route-id="@a.Id" method="post" class="mt-1"><button class="btn btn-sm btn-outline-danger" onclick="return confirm('Mark this offer as expired? The seat is released.')">Mark offer expired</button></form>
+                }
+            }
+            @foreach (var p in a.Payments.OrderByDescending(p => p.CreatedAt))
+            {
+                <div class="border-top py-1 d-flex justify-content-between">
+                    <span>BDT @((p.VerifiedAmount ?? p.Amount).ToString("0.00")) · @AdmissionDisplay.Name(p.Method) @p.Channel · @p.TransactionReference</span>
+                    <a asp-controller="AdmissionPayments" asp-action="Details" asp-route-id="@p.Id"><span class="badge @AdmissionDisplay.PaymentBadge(p.Status)">@AdmissionDisplay.Name(p.Status)</span></a>
+                </div>
+            }
+            @if (Model.Outstanding > 0 && !closed && a.AdmissionSession?.PaymentStage != AdmissionPaymentStage.NotRequired)
+            {
+                <form asp-controller="AdmissionPayments" asp-action="RecordCash" method="post" class="mt-2 border-top pt-2">
+                    <input type="hidden" name="applicationId" value="@a.Id" />
+                    <div class="fw-semibold mb-1">Record cash received at school</div>
+                    <div class="d-flex gap-2 mb-1">
+                        <input type="number" step="0.01" min="1" name="amount" value="@((Model.Outstanding - Model.PendingAmount).ToString("0.00"))" class="form-control form-control-sm" aria-label="Amount" required />
+                        <input type="date" name="paidOn" value="@DateTime.Today.ToString("yyyy-MM-dd")" max="@DateTime.Today.ToString("yyyy-MM-dd")" class="form-control form-control-sm" aria-label="Date" required />
+                    </div>
+                    <input name="reference" class="form-control form-control-sm mb-1" placeholder="Cash memo / reference (optional)" maxlength="100" />
+                    <button class="btn btn-sm btn-outline-success w-100" onclick="return confirm('Record this cash payment as received?')">Record cash &amp; issue receipt</button>
+                </form>
+            }
+        </div></div>
+
+        @if (a.Status == AdmissionApplicationStatus.Enrolled)
+        {
+            <div class="card shadow-sm mb-3"><div class="card-body small">
+                <h6>Enrolment</h6>
+                <div>Enrolled @a.EnrolledAt?.ToString("dd MMM yyyy HH:mm") by @Staff(a.EnrolledBy)</div>
+                @if (!string.IsNullOrEmpty(a.EnrolmentExceptionReason)) { <div class="text-warning">Exception: @a.EnrolmentExceptionReason</div> }
+            </div></div>
+        }
+        else if (!closed && Model.EnrolmentBlocker != null && a.Status != AdmissionApplicationStatus.Draft)
+        {
+            <div class="small text-muted mb-3"><i class="fa fa-circle-info"></i> Enrolment: @Model.EnrolmentBlocker
+                @if (Model.EnrolmentNeedsException) { <a asp-action="Enrol" asp-route-id="@a.Id">Enrol with exception</a> }
+            </div>
+        }
+
+        <div class="card shadow-sm"><div class="card-body">
+            <h6>Add note / message</h6>
+            <form asp-action="AddNote" asp-route-id="@a.Id" method="post">
+                <textarea name="note" rows="2" class="form-control form-control-sm mb-1" required maxlength="2000"></textarea>
+                <div class="d-flex gap-2">
+                    <button name="isInternal" value="true" class="btn btn-sm btn-outline-secondary">Internal note</button>
+                    <button name="isInternal" value="false" class="btn btn-sm btn-outline-primary">Message guardian</button>
+                </div>
+            </form>
+        </div></div>
+    </div>
+</div>

@@ -1,0 +1,48 @@
+@model AdmissionEnrolVM
+@{
+    var a = Model.Application;
+    ViewData["Title"] = "Enrol " + a.Name;
+    GlobalUI.PageTitle = "Enrol Admission Applicant";
+}
+<div style="max-width:760px">
+    <h5>Enrol @a.Name <small class="text-muted">(@a.ApplicationNo)</small></h5>
+    <p class="small text-muted">Creates the student record in @a.AdmissionProgram?.AcademicClass?.Name for academic session @a.AdmissionSession?.AcademicSession?.Name, copies the photo, posts verified admission fees to the fee ledger, creates the student login and texts it to @a.GuardianPhone.</p>
+    @if (Model.Blocker != null && !Model.NeedsException)
+    {
+        <div class="alert alert-warning">@Model.Blocker</div>
+        <a asp-action="Details" asp-route-id="@a.Id" class="btn btn-outline-secondary">Back</a>
+    }
+    else
+    {
+        <form asp-action="Enrol" asp-route-id="@a.Id" method="post" class="card shadow-sm"><div class="card-body">
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger small"></div>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label asp-for="RollNo" class="form-label"></label>
+                    <input asp-for="RollNo" type="number" min="1" max="999" class="form-control" required />
+                    <div class="form-text">Suggested: next free roll.</div>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="AcademicSectionId" class="form-label"></label>
+                    <select asp-for="AcademicSectionId" asp-items="Model.SectionList" class="form-select"><option value="">Assign later</option></select>
+                </div>
+                <div class="col-md-4">
+                    <label asp-for="AdmissionDate" class="form-label"></label>
+                    <input asp-for="AdmissionDate" type="date" value="@Model.AdmissionDate.ToString("yyyy-MM-dd")" class="form-control" required />
+                </div>
+                @if (Model.NeedsException)
+                {
+                    <div class="col-12">
+                        <div class="alert alert-warning small mb-2">The admission fee is not fully verified (outstanding BDT @((a.AmountDue - a.AmountPaid).ToString("0.00"))). Enrol only if an exception is authorised.</div>
+                        <label asp-for="ExceptionReason" class="form-label"></label>
+                        <textarea asp-for="ExceptionReason" rows="2" class="form-control" required maxlength="1000"></textarea>
+                    </div>
+                }
+            </div>
+            <div class="mt-3 d-flex gap-2">
+                <button type="submit" class="btn btn-success">Create student record</button>
+                <a asp-action="Details" asp-route-id="@a.Id" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </div></form>
+    }
+</div>

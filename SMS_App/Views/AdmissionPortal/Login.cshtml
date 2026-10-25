@@ -1,0 +1,32 @@
+@model GuardianLoginVM
+@{
+    ViewData["Title"] = "Sign in";
+}
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-5">
+        <h1 class="h3">Guardian sign in / অভিভাবক লগইন</h1>
+        <div class="card adm-card"><div class="card-body">
+            <form asp-action="Login" method="post">
+                <input type="hidden" asp-for="ReturnUrl" />
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small" role="alert"></div>
+                <div class="mb-3">
+                    <label asp-for="MobileNumber" class="form-label"></label>
+                    <input asp-for="MobileNumber" class="form-control" inputmode="tel" autocomplete="username" placeholder="01XXXXXXXXX" />
+                    <span asp-validation-for="MobileNumber" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Password" class="form-label"></label>
+                    <input asp-for="Password" class="form-control" autocomplete="current-password" />
+                    <span asp-validation-for="Password" class="text-danger small"></span>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 mb-2">Sign in</button>
+                <div class="d-flex justify-content-between small">
+                    <a asp-action="ForgotPassword">Forgot password?</a>
+                    <a asp-action="Register" asp-route-returnUrl="@Model.ReturnUrl">New here? Create an account</a>
+                </div>
+            </form>
+        </div></div>
+        <p class="small text-muted mt-2">This sign-in is for parents and guardians applying for admission. School staff and students use the main EIMS login.</p>
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

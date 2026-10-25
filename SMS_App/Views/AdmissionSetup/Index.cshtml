@@ -1,0 +1,38 @@
+@model AdmissionSessionListVM
+@{
+    ViewData["Title"] = "Admission Sessions";
+    GlobalUI.PageTitle = "Admission Sessions";
+}
+<partial name="_AdmissionStaffAlerts" />
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div class="small text-muted">An admission session holds the public notice, eligibility, guidelines, dates, fees, classes and documents for one admission round.</div>
+    <div class="d-flex gap-2">
+        <a asp-action="Index" asp-route-includeArchived="@(!Model.IncludeArchived)" class="btn btn-sm btn-outline-secondary">@(Model.IncludeArchived ? "Hide archived" : "Show archived")</a>
+        <a asp-action="Settings" class="btn btn-sm btn-outline-primary"><i class="fa fa-gear"></i> Portal settings</a>
+        <a asp-action="Create" class="btn btn-sm btn-info"><i class="fa fa-plus"></i> New admission session</a>
+    </div>
+</div>
+<table class="table table-responsive-sm table-striped shadow">
+    <thead class="table-info">
+        <tr><th>Title</th><th>Academic session</th><th>Application window</th><th>Classes</th><th>Status</th><th>Public state</th><th></th></tr>
+    </thead>
+    <tbody>
+        @if (!Model.Sessions.Any())
+        {
+            <tr><td colspan="7" class="text-center text-muted">No admission sessions yet. Create one to publish an admission notice.</td></tr>
+        }
+        @foreach (var s in Model.Sessions)
+        {
+            var state = SMS.BLL.Managers.AdmissionRules.GetWindowState(s, Model.Now);
+            <tr>
+                <td><a asp-action="Details" asp-route-id="@s.Id">@s.Title</a></td>
+                <td>@s.AcademicSession?.Name</td>
+                <td>@s.ApplicationStartDate.ToString("dd MMM yyyy") - @s.ApplicationEndDate.ToString("dd MMM yyyy")</td>
+                <td>@string.Join(", ", s.Programs.OrderBy(p => p.AcademicClass?.ClassSerial).Select(p => p.AcademicClass?.Name))</td>
+                <td>@s.Status</td>
+                <td><span class="badge @AdmissionDisplay.WindowBadge(state)">@AdmissionDisplay.Name(state)</span></td>
+                <td class="text-end"><a asp-action="Details" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">Open</a></td>
+            </tr>
+        }
+    </tbody>
+</table>

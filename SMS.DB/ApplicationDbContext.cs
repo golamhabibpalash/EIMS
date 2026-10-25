@@ -89,6 +89,18 @@ namespace SMS.DB
         public DbSet<NotificationEvent> NotificationEvents { get; set; }
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<UserNotification> UserNotifications { get; set; }
+
+        #region Online Admission
+        public DbSet<AdmissionSetting> AdmissionSettings { get; set; }
+        public DbSet<AdmissionSession> AdmissionSessions { get; set; }
+        public DbSet<AdmissionProgram> AdmissionPrograms { get; set; }
+        public DbSet<AdmissionDocumentRequirement> AdmissionDocumentRequirements { get; set; }
+        public DbSet<AdmissionGuardianAccount> AdmissionGuardianAccounts { get; set; }
+        public DbSet<AdmissionApplication> AdmissionApplications { get; set; }
+        public DbSet<AdmissionApplicationDocument> AdmissionApplicationDocuments { get; set; }
+        public DbSet<AdmissionPayment> AdmissionPayments { get; set; }
+        public DbSet<AdmissionApplicationHistory> AdmissionApplicationHistories { get; set; }
+        #endregion
         #endregion
 
         #region O
@@ -336,6 +348,8 @@ namespace SMS.DB
                     .OnDelete(DeleteBehavior.Restrict);
             });
 
+            ConfigureOnlineAdmission(builder);
+
             foreach (var entityType in builder.Model.GetEntityTypes())
             {
                 foreach (var foreignKey in entityType.GetForeignKeys())
@@ -347,6 +361,91 @@ namespace SMS.DB
                 }
             }
 
+        }
+    
+        /// <summary>
+        /// Online Admission tables. Kept in step with Resources/sql/OnlineAdmission_*.sql, which
+        /// creates the same schema on existing databases (startup only runs EnsureCreated).
+        /// </summary>
+        private static void ConfigureOnlineAdmission(ModelBuilder builder)
+        {
+            builder.Entity<AdmissionSession>(e =>
+            {
+                e.HasOne(x => x.AcademicSession).WithMany().HasForeignKey(x => x.AcademicSessionId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => x.Status);
+            });
+
+            builder.Entity<AdmissionProgram>(e =>
+            {
+                e.HasOne(x => x.AdmissionSession).WithMany(s => s.Programs).HasForeignKey(x => x.AdmissionSessionId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.AcademicClass).WithMany().HasForeignKey(x => x.AcademicClassId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.AdmissionFeeHead).WithMany().HasForeignKey(x => x.AdmissionFeeHeadId).OnDelete(DeleteBehavior.Restrict);
+                e.Property(x => x.AdmissionFeeAmount).HasPrecision(18, 2);
+                e.Property(x => x.MinPreviousGpa).HasPrecision(4, 2);
+                // A class can be offered only once per admission session.
+                e.HasIndex(x => new { x.AdmissionSessionId, x.AcademicClassId }).IsUnique();
+            });
+
+            builder.Entity<AdmissionDocumentRequirement>(e =>
+            {
+                e.HasOne(x => x.AdmissionSession).WithMany(s => s.DocumentRequirements).HasForeignKey(x => x.AdmissionSessionId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<AdmissionGuardianAccount>(e =>
+            {
+                e.HasIndex(x => x.MobileNumber).IsUnique();
+            });
+
+            builder.Entity<AdmissionApplication>(e =>
+            {
+                e.HasOne(x => x.AdmissionSession).WithMany().HasForeignKey(x => x.AdmissionSessionId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.AdmissionProgram).WithMany().HasForeignKey(x => x.AdmissionProgramId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.GuardianAccount).WithMany().HasForeignKey(x => x.GuardianAccountId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.Student).WithMany().HasForeignKey(x => x.StudentId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.Gender).WithMany().HasForeignKey(x => x.GenderId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.Religion).WithMany().HasForeignKey(x => x.ReligionId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.Nationality).WithMany().HasForeignKey(x => x.NationalityId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.BloodGroup).WithMany().HasForeignKey(x => x.BloodGroupId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.PresentDivision).WithMany().HasForeignKey(x => x.PresentDivisionId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.PresentDistrict).WithMany().HasForeignKey(x => x.PresentDistrictId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.PresentUpazila).WithMany().HasForeignKey(x => x.PresentUpazilaId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.PermanentDivision).WithMany().HasForeignKey(x => x.PermanentDivisionId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.PermanentDistrict).WithMany().HasForeignKey(x => x.PermanentDistrictId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.PermanentUpazila).WithMany().HasForeignKey(x => x.PermanentUpazilaId).OnDelete(DeleteBehavior.Restrict);
+
+                e.Property(x => x.AmountDue).HasPrecision(18, 2);
+                e.Property(x => x.AmountPaid).HasPrecision(18, 2);
+                e.Property(x => x.PreviousGpa).HasPrecision(4, 2);
+
+                // Both unique on nullable columns: SQL Server filters out NULLs automatically,
+                // PostgreSQL treats NULLs as distinct - so drafts / unenrolled rows never clash.
+                e.HasIndex(x => x.ApplicationNo).IsUnique();
+                e.HasIndex(x => x.StudentId).IsUnique();
+                e.HasIndex(x => new { x.AdmissionSessionId, x.Status });
+                e.HasIndex(x => x.GuardianAccountId);
+                e.HasIndex(x => x.BirthCertificateNo);
+            });
+
+            builder.Entity<AdmissionApplicationDocument>(e =>
+            {
+                e.HasOne(x => x.AdmissionApplication).WithMany(a => a.Documents).HasForeignKey(x => x.AdmissionApplicationId).OnDelete(DeleteBehavior.Restrict);
+                e.HasOne(x => x.AdmissionDocumentRequirement).WithMany().HasForeignKey(x => x.AdmissionDocumentRequirementId).OnDelete(DeleteBehavior.Restrict);
+            });
+
+            builder.Entity<AdmissionPayment>(e =>
+            {
+                e.HasOne(x => x.AdmissionApplication).WithMany(a => a.Payments).HasForeignKey(x => x.AdmissionApplicationId).OnDelete(DeleteBehavior.Restrict);
+                e.Property(x => x.Amount).HasPrecision(18, 2);
+                e.Property(x => x.VerifiedAmount).HasPrecision(18, 2);
+                e.HasIndex(x => x.ReceiptNo).IsUnique();
+                e.HasIndex(x => x.GatewayTransactionId).IsUnique();
+                e.HasIndex(x => x.Status);
+            });
+
+            builder.Entity<AdmissionApplicationHistory>(e =>
+            {
+                e.HasOne(x => x.AdmissionApplication).WithMany(a => a.History).HasForeignKey(x => x.AdmissionApplicationId).OnDelete(DeleteBehavior.Restrict);
+            });
         }
     }
 }

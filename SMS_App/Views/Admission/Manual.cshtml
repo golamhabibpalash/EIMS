@@ -1,0 +1,57 @@
+@inject IAdmissionSetupManager SetupManager
+@{
+    ViewData["Title"] = "How to apply";
+    var settings = await SetupManager.GetSettingsAsync();
+    var steps = new (string En, string Bn, string Detail)[]
+    {
+        ("Open the admission notice", "ভর্তি বিজ্ঞপ্তি খুলুন", "Go to Admission notices and open the notice for your child's class."),
+        ("Read before you apply", "আবেদনের আগে পড়ুন", "Read the eligibility, admission guidelines, deadline, fees and the list of documents. Keep the documents ready (scans or clear phone photos)."),
+        ("Create an account or sign in", "অ্যাকাউন্ট খুলুন বা লগইন করুন", "Use the guardian's mobile number. If the school asks for it, enter the 6-digit code sent by SMS. One account can apply for more than one child."),
+        ("Start the application", "আবেদন শুরু করুন", "Press \"Apply\" for the class. Applications can only be started while the notice says Open or Closing soon."),
+        ("Student details", "শিক্ষার্থীর তথ্য", "Name, date of birth (as on the birth registration), birth registration number (17 digits), and a recent photo (JPG/PNG, up to 1 MB)."),
+        ("Guardian and address", "অভিভাবক ও ঠিকানা", "Parents' names and mobile numbers, and the present and permanent address."),
+        ("Previous school", "পূর্ববর্তী শিক্ষা", "Previous school, class and result, if any."),
+        ("Upload documents", "কাগজপত্র আপলোড", "Upload each required document in the shown file type and size. If a file is too large, take the photo again at a lower resolution."),
+        ("Review and submit", "যাচাই করে জমা দিন", "Check the summary, fix anything missing, confirm that you have read the eligibility and guidelines, then submit. Save the application number you receive."),
+        ("Track the application", "আবেদনের অবস্থা দেখুন", "Sign in to see the status and anything the school asks you to do (for example, a correction). You can also use \"Track application\" with the application number and your mobile."),
+        ("Pay the admission fee", "ভর্তি ফি পরিশোধ", "When the application is approved, pay as instructed and enter the transaction number in the portal (or pay cash at the school). It shows as paid once the school verifies it."),
+        ("Admission confirmed", "ভর্তি নিশ্চিত", "The school confirms the admission and sends the student ID by SMS. The receipt stays available in the portal.")
+    };
+}
+<h1 class="h3">How to apply / কীভাবে আবেদন করবেন</h1>
+<p class="text-muted">A simple guide for first-time applicants. It takes about 10 minutes if your documents are ready.</p>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <ol class="list-group list-group-numbered">
+            @foreach (var step in steps)
+            {
+                <li class="list-group-item d-flex">
+                    <div class="ms-2">
+                        <div class="fw-semibold">@step.En <span class="text-muted fw-normal">/ @step.Bn</span></div>
+                        <div class="small">@step.Detail</div>
+                    </div>
+                </li>
+            }
+        </ol>
+        @if (!string.IsNullOrEmpty(ViewBag.ManualNotes as string))
+        {
+            <div class="card adm-card mt-3"><div class="card-body">
+                <h2 class="h6">Notes from the school</h2>
+                <div class="prewrap">@ViewBag.ManualNotes</div>
+            </div></div>
+        }
+    </div>
+    <div class="col-lg-4">
+        <div class="card adm-card mb-3"><div class="card-body">
+            <h2 class="h6">Tips</h2>
+            <ul class="small mb-0">
+                <li>Use "Save draft" any time - nothing is lost if your phone switches off.</li>
+                <li>You can go back to earlier steps without losing what you typed.</li>
+                <li>No payment is needed to save a draft.</li>
+                <li>Never share your password or SMS code with anyone, including school staff.</li>
+            </ul>
+        </div></div>
+        <div class="card adm-card"><div class="card-body small"><partial name="_AdmissionHelpline" model="settings" /></div></div>
+    </div>
+</div>

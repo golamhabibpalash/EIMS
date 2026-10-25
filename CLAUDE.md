@@ -10,13 +10,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Framework**: ASP.NET Core 8.0 MVC with Razor Views
 - **Language**: C# / .NET 8.0
-- **ORM**: Entity Framework Core 7.0 (code-first migrations)
+- **ORM**: Entity Framework Core 7.0.11 on .NET 8 (SDK pinned to 8.0.415 in `global.json`) — the version skew is intentional; don't upgrade EF on its own
 - **Database**: PostgreSQL or MS SQL Server — provider chosen at runtime via the `DatabaseProvider` setting in `SMS_App/appsettings.json` (currently `"SqlServer"`; deployed instances often flip this to `"PostgreSQL"`)
 - **Auth**: ASP.NET Core Identity with claim-based authorization policies
 - **Background Jobs**: Hangfire (disabled by default; storage matches the active DB provider)
 - **Logging**: Serilog
 - **Mapping**: AutoMapper 15.1.1
 - **PDF Reports**: QuestPDF (Community license) — builder classes in `SMS_App/Utilities/Reports/`
+- **Real-time**: SignalR — `NotificationHub` at `/hubs/notifications` pushes in-app notifications to per-user groups
 - **External**: GreenWeb SMS API, SMTP email
 
 ## Build & Run Commands
@@ -48,6 +49,10 @@ At runtime, startup does **not** apply migrations: `Program.cs` runs `CanConnect
 `EnsureCreatedAsync()` → `DbSeeder.SeedAsync()`. On a fresh DB the schema is created from the
 current EF model (not the migration files), so a running app can diverge from the migration
 history. Use `dotnet ef database update` to apply migrations against an existing SqlServer DB.
+
+CI never applies schema changes. Recent features ship idempotent per-provider scripts instead
+(e.g. `Resources/sql/UserNotifications_{SqlServer,PostgreSQL}.sql`) that are run by hand on each
+instance, and code touching a new table should degrade gracefully if the table is missing.
 
 ## Architecture — 6-Layer Dependency Chain
 
@@ -82,6 +87,7 @@ SMS.Frameworks   → Shared utilities, tag helpers, encryption
 - Decorate actions with `[Authorize(Policy = "[EntityName]Policy")]`
 - Policy name and claim string are different things: e.g. policy `IndexAcademicClassesPolicy` requires claim `"View Academic Class"`. Policy names contain historical typos (e.g. `CraeteAcademicExamTypePolicy`) that controllers and `SiteMap.Config` reference verbatim — grep before renaming.
 - Claims stored in `ClaimStores` entity and assigned via roles
+- Permission claims are **not** in the login cookie: `AppClaimsPrincipalFactory` keeps it to id/name/roles/stamp and `PermissionClaimsTransformation` reloads permissions per request (memory-cached). ~250 claims in the cookie overflow IIS header limits (HTTP 400), so don't put them back.
 - Global auth filter in `Program.cs` requires authenticated user for all routes
 - The sidebar/nav is data-driven from `SMS_App/SiteMap.Config` (loaded as a singleton `SiteMap`). Each `<item>` names a `Controller`, `Action`, and the policy in `Claim=`; a new screen isn't reachable from the menu until it has an entry there.
 
@@ -96,6 +102,13 @@ In-app notifications are split deliberately across layers because Identity and t
 - Client script: `SMS_App/wwwroot/js/notifications.js`; vendored lib under `wwwroot/lib/signalr/`.
 - `INotificationService` is registered in `DependencyInjectionConfiguration.cs` alongside the manager/repository, not in `Program.cs`.
 - **Naming trap**: `SMS.Entities/StudentHub.cs` is a domain entity (student enrollment), unrelated to SignalR.
+
+### Online Admission
+- Public pages `AdmissionController` (`/Admission`), guardian portal `AdmissionPortalController`, staff `AdmissionSetup` / `AdmissionApplications` / `AdmissionPayments`. Business rules live in `SMS.BLL/Managers/OnlineAdmission/` (`AdmissionRules` holds the pure ones).
+- Guardians are **not** Identity users: `AdmissionGuardianAccount` + its own cookie scheme (`GuardianPortalAuth`). Portal controllers derive from `GuardianPortalControllerBase` (`[AllowAnonymous]` + its own guardian check); mark open actions `[GuardianAnonymous]`.
+- Uploads are private under `App_Data/AdmissionFiles/{applicationId}/` (`AdmissionFileStore`) and only streamed by actions that check ownership/permission. Never move them under `wwwroot`.
+- Workflow changes go through `IAdmissionRepository.ExecuteInTransactionAsync` (EF retry-on-failure is on, so bare `BeginTransaction` throws). Every state change writes an `AdmissionApplicationHistory` row.
+- Schema ships as `Resources/sql/OnlineAdmission_{SqlServer,PostgreSQL}.sql` (generated from the EF model); permissions as `OnlineAdmission_Claims_*.sql`. Change the entity config and regenerate both scripts together.
 
 ### AutoMapper
 - Profiles configured in `SMS_App/Utilities/AutoMapperConfiguration/AutoMapperProfile.cs`
@@ -112,7 +125,7 @@ Four areas: `API`, `Identity`, `SMSAPP`, `Student` — routed as `{area:exists}/
 ### Connection Strings (provider-dependent)
 - **SqlServer**: the `DefaultConnection` value is AES-encrypted, decrypted in `Program.cs` via `AesEncryptionHelper.Decrypt()` with keys from env vars `AES_KEY` / `AES_IV` (defaults `"1234567890123456"`). Use the `Resources/deployment/EncryptConnString/` console app to produce an encrypted string.
 - **PostgreSQL**: the `DefaultConnection` value is used as-is (plain text, no decryption).
-- `appsettings.json` also carries several named per-host profiles (`Mac_Docker_DefaultConnection`, `Local_Desktop_DefaultConnection`, `Noble_DefaultConnection`, etc.); `Program.cs` reads `DefaultConnection` only, so swap the desired profile's value into `DefaultConnection` to switch hosts.
+- `appsettings.json` contains only `DefaultConnection` (the per-host profiles listed in `README.md` are gone); to switch hosts, replace its value. `EncryptConnString` supports `dotnet run -- enc|dec|test "<value>"`.
 
 ### Key appsettings.json Settings
 - `DatabaseProvider` — `"PostgreSQL"` or `"SqlServer"`
@@ -170,6 +183,7 @@ Persisted to `SMS_App/Keys/` for shared hosting stability. App name: `"SMS_App"`
 | `SMS_App/Controllers/ReportsController.cs` | Entry point that invokes the QuestPDF builders |
 | `Resources/docker/setup-eims-postgres.ps1` | Spins up a local PostgreSQL 16 container and restores the DB dump |
 | `Resources/deployment/` | Linux deploy assets: `deploy.sh`, `eims-instance.service` (systemd), `nginx-school.conf`, `EncryptConnString/` (connection-string encryptor) |
+| `README.md` | Partly stale: it says migrations run from `SMS_App/` and that reports are RDLC; trust this file instead |
 | `Resources/sql*`, `Resources/StudentMigrationScripts/` | Raw SQL — stored procs, views, functions, data-migration scripts run outside EF |
 | `SchoolManagementSystem.sln` | Solution file (also a stray `SMS_App/SMS_App.sln` — use the root one) |
 

@@ -1,0 +1,108 @@
+@using SMS_App.Utilities.OnlineAdmission
+@inject IInstituteManager InstituteManager
+@inject IAdmissionSetupManager AdmissionSetupManager
+@{
+    // Public, mobile-first layout for the Online Admission pages and the guardian portal.
+    var institute = await InstituteManager.GetFirstOrDefaultAsync();
+    var settings = await AdmissionSetupManager.GetSettingsAsync();
+    var schoolName = institute?.Name ?? "School";
+    var guardianName = ViewData["GuardianName"] as string;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - @schoolName Admission</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/bootstrap-5.3.8-dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/theme/smart/assets/fonts/font-awesome/v6/css/all.css" />
+    <style>
+        body { background: #f4f6f9; font-size: 1rem; }
+        .adm-brand img { height: 40px; width: auto; }
+        .adm-card { border: 0; border-radius: .75rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .adm-steps { display: flex; gap: .25rem; counter-reset: s; }
+        .adm-steps .step { flex: 1; text-align: center; font-size: .75rem; color: #6c757d; }
+        .adm-steps .step .dot { display: block; margin: 0 auto .25rem; width: 1.75rem; height: 1.75rem; line-height: 1.75rem; border-radius: 50%; background: #dee2e6; color: #495057; font-weight: 600; }
+        .adm-steps .step.done .dot { background: #198754; color: #fff; }
+        .adm-steps .step.current .dot { background: #0d6efd; color: #fff; }
+        .adm-steps .step.current { color: #0d6efd; font-weight: 600; }
+        .form-control, .form-select, .btn { min-height: 44px; } /* large tap targets on phones */
+        .prewrap { white-space: pre-line; }
+        .help-fab { position: fixed; right: 1rem; bottom: 1rem; z-index: 1030; }
+        @@media print { .no-print { display: none !important; } body { background: #fff; } }
+    </style>
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+    <nav class="navbar navbar-expand-md navbar-light bg-white border-bottom no-print">
+        <div class="container">
+            <a class="navbar-brand adm-brand d-flex align-items-center gap-2" asp-controller="Admission" asp-action="Index">
+                @if (!string.IsNullOrEmpty(institute?.Logo))
+                {
+                    <img src="~/Images/Institute/@institute.Logo" alt="" />
+                }
+                <span class="fw-semibold">@schoolName</span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#admNav" aria-controls="admNav" aria-expanded="false" aria-label="Menu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="admNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" asp-controller="Admission" asp-action="Index">Admission notices</a></li>
+                    <li class="nav-item"><a class="nav-link" asp-controller="Admission" asp-action="Manual">How to apply</a></li>
+                    <li class="nav-item"><a class="nav-link" asp-controller="Admission" asp-action="Track">Track application</a></li>
+                    @if (!string.IsNullOrEmpty(guardianName))
+                    {
+                        <li class="nav-item"><a class="nav-link" asp-controller="AdmissionPortal" asp-action="Index"><i class="fa fa-user"></i> My applications</a></li>
+                        <li class="nav-item">
+                            <form asp-controller="AdmissionPortal" asp-action="Logout" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-link nav-link">Sign out</button>
+                            </form>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="nav-item"><a class="nav-link" asp-controller="AdmissionPortal" asp-action="Login">Sign in</a></li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container py-3 py-md-4">
+        @if (TempData["success"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show prewrap" role="status">
+                @TempData["success"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["fail"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show prewrap" role="alert">
+                @TempData["fail"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @RenderBody()
+    </main>
+
+    <footer class="border-top bg-white py-3 mt-4 no-print">
+        <div class="container small text-muted d-md-flex justify-content-between">
+            <div>@schoolName @(string.IsNullOrEmpty(institute?.Address) ? "" : " - " + institute.Address)</div>
+            <partial name="_AdmissionHelpline" model="settings" />
+        </div>
+    </footer>
+
+    @if (!string.IsNullOrEmpty(settings.WhatsAppNumber))
+    {
+        <a class="btn btn-success rounded-pill shadow help-fab no-print" href="@AdmissionDisplay.WhatsAppLink(settings.WhatsAppNumber)" target="_blank" rel="noopener" aria-label="Chat with the school on WhatsApp">
+            <i class="fab fa-whatsapp"></i> Help
+        </a>
+    }
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/bootstrap-5.3.8-dist/js/bootstrap.bundle.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
