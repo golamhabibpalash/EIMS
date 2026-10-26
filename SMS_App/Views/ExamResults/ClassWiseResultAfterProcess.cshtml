@@ -13,6 +13,7 @@
     }
 
     int totalSubject = subjectNames.Count;
+    var heading = ViewBag.ResultHeading as SMS_App.ViewModels.ExamResult.ResultHeadingVM;
 }
 @section Styles{
     <link href="~/lib/DataTable/css/cdn.datatables.net_buttons_2.0.0_css_buttons.dataTables.min.css" rel="stylesheet" />
@@ -91,6 +92,18 @@
 
 @if (Model != null)
 {
+    @if (heading != null)
+    {
+        <div class="text-center my-3" id="resultHeading">
+            <h4 class="mb-0">@heading.InstituteName</h4>
+            @if (!string.IsNullOrWhiteSpace(heading.InstituteAddress))
+            {
+                <div class="small text-muted">@heading.InstituteAddress</div>
+            }
+            <h5 class="mt-2 mb-1">Class-Wise Result</h5>
+            <div class="fw-semibold">@heading.DetailsLine</div>
+        </div>
+    }
     <div class="table-responsive">
         <table class="table table-responsive table-bordered" id="myTable">
             <thead>
@@ -193,6 +206,19 @@
             // read the bottom header row, so the subject name is prefixed back on here.
             const subjectNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(subjectNames));
             const fixedLeadingColumns = 3; // #, Class Roll, Name
+
+            // School / exam / class / session heading, repeated at the top of every export.
+            const heading = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                institute = heading?.InstituteName ?? string.Empty,
+                address = heading?.InstituteAddress ?? string.Empty,
+                details = heading?.DetailsLine ?? string.Empty,
+                exam = heading?.ExamName ?? string.Empty,
+                className = heading?.ClassName ?? string.Empty
+            }));
+            const reportTitle = 'Class-Wise Result';
+            const exportFileName = ['Result', heading.exam, heading.className].filter(Boolean).join('_').replace(/[^A-Za-z0-9_\-]+/g, '_');
+            const exportMessage = [reportTitle, heading.details].filter(Boolean).join('  -  ');
             const exportOptions = {
                 columns: ':not(.action)',
                 format: {
@@ -220,11 +246,15 @@
                     'orderable': false, // set orderable false for selected columns
                 }],
                 buttons: [
-                    { extend: 'copy', exportOptions: exportOptions },
-                    { extend: 'excel', exportOptions: exportOptions },
-                    { extend: 'csv', exportOptions: exportOptions },
+                    { extend: 'copy', exportOptions: exportOptions, title: heading.institute, messageTop: exportMessage },
+                    { extend: 'excel', exportOptions: exportOptions, title: heading.institute, messageTop: exportMessage, filename: exportFileName },
+                    { extend: 'csv', exportOptions: exportOptions, filename: exportFileName },
                     {
                         extend: 'pdf',
+                        // The default title is the browser tab title (school name only); the full heading
+                        // is built in customize() instead.
+                        title: '',
+                        filename: exportFileName,
                         // Default header (Mark/GPA/Grade only): customize() rebuilds it as two rows so the
                         // subject name spans its three columns instead of being repeated in every one.
                         exportOptions: { columns: ':not(.action)' },
@@ -271,9 +301,27 @@
                                 paddingLeft: function () { return 1; }, paddingRight: function () { return 1; },
                                 paddingTop: function () { return 1; }, paddingBottom: function () { return 1; }
                             };
-                            doc.pageMargins = [10, 10, 10, 10];
+                            doc.pageMargins = [10, 10, 10, 18];
                             doc.defaultStyle.fontSize = fontSize;
                             doc.styles.tableHeader.fontSize = doc.defaultStyle.fontSize;
+
+                            // Heading: school, address, report title, exam / class / session.
+                            const headerBlocks = [{ text: heading.institute, alignment: 'center', bold: true, fontSize: 14 }];
+                            if (heading.address) headerBlocks.push({ text: heading.address, alignment: 'center', fontSize: 8 });
+                            headerBlocks.push({ text: reportTitle, alignment: 'center', bold: true, fontSize: 11, margin: [0, 4, 0, 0] });
+                            if (heading.details) headerBlocks.push({ text: heading.details, alignment: 'center', fontSize: 9, margin: [0, 2, 0, 6] });
+                            doc.content.unshift.apply(doc.content, headerBlocks);
+
+                            const generated = new Date().toLocaleString();
+                            doc.footer = function (currentPage, pageCount) {
+                                return {
+                                    columns: [
+                                        { text: heading.details, fontSize: 6, margin: [10, 4, 0, 0] },
+                                        { text: 'Page ' + currentPage + ' of ' + pageCount, alignment: 'center', fontSize: 6, margin: [0, 4, 0, 0] },
+                                        { text: 'Generated: ' + generated, alignment: 'right', fontSize: 6, margin: [0, 4, 10, 0] }
+                                    ]
+                                };
+                            };
                         }
                     }
                 ]

@@ -328,6 +328,20 @@ public class ExamResultsController : Controller
             return View();
         }
 
+        // Heading for the page and the exports (PDF/Excel/Copy): school, exam, class and session.
+        var institute = await _instituteManager.GetFirstOrDefaultAsync();
+        var examGroup = await _academicExamGroupManager.GetByIdAsync(examGroupId);
+        var academicClass = await _academicClassManager.GetByIdAsync(classId);
+        var session = examGroup != null ? await _sessionManager.GetByIdAsync(examGroup.AcademicSessionId) : null;
+        ViewBag.ResultHeading = new SMS_App.ViewModels.ExamResult.ResultHeadingVM
+        {
+            InstituteName = institute?.Name ?? string.Empty,
+            InstituteAddress = institute?.Address ?? string.Empty,
+            ExamName = examGroup?.ExamGroupName ?? string.Empty,
+            ClassName = academicClass?.Name ?? string.Empty,
+            SessionName = session?.Name ?? string.Empty
+        };
+
         ViewBag.IsLoading = true;
         return View(resultList);
     }
