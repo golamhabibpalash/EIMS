@@ -30,13 +30,13 @@ dotnet run --project Resources/deployment/EncryptConnString -- enc|dec|test "<va
 
 ## Database & schema (biggest gotchas)
 
-- `SMS_App/appsettings.json` → `DatabaseProvider` selects `"SqlServer"` (current) or `"PostgreSQL"`. Only `DefaultConnection` is read, but the file also contains unused `DefaultConnection_mac`/`DefaultConnection_contoba`; deployed instances keep their own `appsettings*.json` (CI strips them), so edits here never reach production.
-  - **SqlServer**: value is AES-encrypted (AES-128-CBC/PKCS7, base64), decrypted with env vars `AES_KEY`/`AES_IV` (defaults `"1234567890123456"`).
-  - **PostgreSQL**: value is used as **plain text**.
+- `SMS_App/appsettings.json` is **gitignored/local**, so every machine has its own; read `DatabaseProvider` before running. The local copy here is `"PostgreSQL"`; the tracked `appsettings.Production.json` says `"SqlServer"`. Deployed instances keep their own file (CI strips `appsettings*.json`), so edits never reach production.
+  - **SqlServer**: `DefaultConnection` is AES-encrypted (AES-128-CBC/PKCS7, base64), decrypted with env vars `AES_KEY`/`AES_IV` (defaults `"1234567890123456"`).
+  - **PostgreSQL**: `DefaultConnection` is used as **plain text**.
 - Startup only runs `EnsureCreatedAsync()`, which **never adds tables to an existing DB**. The migration history was squashed (`Migrations_SqlServer/…InitialCreate.cs` is empty and the model differ is out of step), so `dotnet ef migrations add` cannot scaffold and `dotnet ef database update` is not a deploy path. Don't "repair" migrations as part of an unrelated task.
 - New tables ship as **idempotent per-provider scripts** in `Resources/sql/` (see `UserNotifications_{SqlServer,PostgreSQL}.sql`, `OnlineAdmission_*`), run by hand on each instance **before** deploying. Keep them in sync with `SMS.DB/ApplicationDbContext.cs`; add `ProjectModules`/`ProjectSubModules`/`ClaimStores` rows for new screens (`Seed_Modules_SubModules_ClaimStores_FromSiteMap.sql`, `*_Claims_*.sql`). Code touching a new table should degrade gracefully when the table is absent — CI/deploy never creates schema.
   - Get exact DDL from `Database.GenerateCreateScript()` (per `CLAUDE.md`), not from EF migration SQL. SQL Server scripts must be a single batch with **no `GO`** (DBeaver/shared-hosting consoles reject it).
-- PostgreSQL is provisioned from a dump, not migrations (`Resources/docker/setup-eims-postgres.ps1`; hard-coded dump path `C:\Users\golam\Downloads\eimsdb_noble.dump` and port 5433 — edit both to match this machine before running).
+- PostgreSQL is provisioned from a dump, not migrations (`Resources/docker/setup-eims-postgres.ps1`; hard-coded dump path `C:\Users\golam\Downloads\eimsdb_noble.dump`, container port **5433** — but the local `appsettings.json` points at **5434**, so align both before running).
 
 ## Auth & areas
 
@@ -46,7 +46,6 @@ dotnet run --project Resources/deployment/EncryptConnString -- enc|dec|test "<va
 - Middleware order matters in `Program.cs`: `UseSession()` runs **before** routing/auth; session is 24h with `LoginPath=/Accounts/Login`.
 - Policy names contain historical typos (e.g. `CraeteAcademicExamTypePolicy`) referenced verbatim by controllers, `AuthorizationPolicies.cs`, `SiteMap.Config`, and the claim seed SQL — grep before renaming.
 - A screen is invisible until it has a `<item Controller Action Claim>` in `SMS_App/SiteMap.Config`. The `Claim=` attribute holds a **policy name** (e.g. `IndexInstitutesPolicy`), not a claim string.
-- `Controllers/IClockController.cs` serves `/iclock/*` ADMS push endpoints hard-coded in device firmware: never rename/move them, keep responses plain text, leave it `[AllowAnonymous]` (trusts only a registered device `SN`).
 - Areas: `API`, `Identity`, `SMSAPP`, `Student` — routed `{area:exists}/{controller=Home}/{action=Index}/{id?}`. Online Admission lives in root controllers, not an area.
 
 ## Online Admission (guardian portal)
@@ -62,6 +61,13 @@ dotnet run --project Resources/deployment/EncryptConnString -- enc|dec|test "<va
 - `UserNotificationManager` (BLL) only persists rows; `SMS_App/Utilities/Notifications/NotificationService.cs` resolves recipients, persists first, then pushes best-effort.
 - Hub `SMS_App/Hubs/NotificationHub.cs` is mapped at `/hubs/notifications`, is receive-only, and groups connections by `user:{Context.UserIdentifier}`. Client: `wwwroot/js/notifications.js` + vendored `wwwroot/lib/signalr/`.
 - `INotificationService` is registered in `DependencyInjectionConfiguration.cs`, not `Program.cs`. Naming trap: `SMS.Entities/StudentHub.cs` is a domain entity, not SignalR.
+
+## Attendance, tickets, bulk import
+
+- **All punch↔person matching must go through `SMS.Entities/Utilities/AttendancePinMatcher.cs`** (normalizes leading zeros; tries `MachineUserId` → `UniqueId` → class roll). Plain string compares caused students to show present on one screen and absent on another; don't add new ad-hoc matching.
+- Push-only attendance devices use `Controllers/IClockController.cs` (`/iclock/*`, `[AllowAnonymous]`, plain-text responses, trusts a registered `SN`). Staff screens are `AttendanceMachines` / `AttendanceMachineDevices`; direct-socket sync is `SMS.BLL/ZKTeco/ZkClient.cs`.
+- Ticket attachments go to `wwwroot/Uploads/Tickets` (created at startup; images/PDF only, max 2 MB). Admission uploads are the opposite: private under `App_Data/AdmissionFiles/`.
+- Student bulk import stages previews in `SMS_App/App_Data/BulkImports/` (gitignored).
 
 ## Conventions that differ from defaults
 
