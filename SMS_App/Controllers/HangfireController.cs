@@ -9,6 +9,7 @@ using SMS_App.Utilities.MACIPServices;
 using SMS_App.Utilities.ShortMessageService;
 using SMS.BLL.Contracts;
 using SMS.Entities;
+using SMS.Entities.Utilities;
 using SMS.Entities.AdditionalModels;
 using System;
 using System.Collections.Generic;
@@ -893,28 +894,34 @@ public class HangfireController : ControllerBase
             {
                 DateTime tDate = DateTime.Today;
                 var allCheckInAttendance = await _attendanceMachineManager.GetCheckinDataByDateAsync(tDate.ToString("dd-MM-yyyy"));
-                if (allCheckInAttendance != null || allCheckInAttendance.Count() > 0)
+                if (allCheckInAttendance != null && allCheckInAttendance.Count > 0)
                 {
                     var students = await _studentManager.GetAllAsync();
                     var employees = await _employeeManager.GetAllAsync();
 
-                    // Same student-PIN rule as the attendance screens (MachineUserId / UniqueId / roll,
-                    // leading-zero tolerant). int.Parse here used to throw on any non-numeric PIN.
-                    var activeStudents = students.Where(s => s.Status == true).ToList();
-                    totalGirlsStudent = allCheckInAttendance.Count(a => activeStudents.Any(s => s.GenderId == 2
-                        && SMS.Entities.Utilities.AttendancePinMatcher.MatchesStudent(a.CardNo, s.MachineUserId, s.UniqueId, s.ClassRoll)));
-
-                    totalBoysStudent = allCheckInAttendance.Count(a => activeStudents.Any(s => s.GenderId == 1
-                        && SMS.Entities.Utilities.AttendancePinMatcher.MatchesStudent(a.CardNo, s.MachineUserId, s.UniqueId, s.ClassRoll)));
-
-                    totalStudent = totalBoysStudent + totalGirlsStudent;
-
-                    var paddedEmployeeIds = employees
-                        .Select(e => e.Id.ToString().PadLeft(8, '0'))
+                    // Count PEOPLE, not punches: the machine sends every punch, so a student who
+                    // punched three times used to be counted three times (totals above the number
+                    // of students). Each active person counts once if any of their PINs punched
+                    // today, matched by the same rules as the attendance screens (leading-zero
+                    // tolerant; students by MachineUserId / UniqueId / roll, employees by
+                    // MachineUserId / Id).
+                    var punchedPins = allCheckInAttendance
+                        .Select(a => AttendancePinMatcher.Normalize(a.CardNo))
+                        .Where(pin => pin != null)
                         .ToHashSet();
 
-                    totalEmployee = allCheckInAttendance
-                        .Count(a => paddedEmployeeIds.Contains(a.CardNo.Trim()));
+                    bool Punched(params string[] pins) =>
+                        pins.Any(pin => { var n = AttendancePinMatcher.Normalize(pin); return n != null && punchedPins.Contains(n); });
+
+                    var presentStudents = students
+                        .Where(s => s.Status == true && Punched(AttendancePinMatcher.StudentPins(s.MachineUserId, s.UniqueId, s.ClassRoll)))
+                        .ToList();
+                    totalBoysStudent = presentStudents.Count(s => s.GenderId == 1);
+                    totalGirlsStudent = presentStudents.Count(s => s.GenderId == 2);
+                    totalStudent = totalBoysStudent + totalGirlsStudent;
+
+                    totalEmployee = employees
+                        .Count(e => e.Status && Punched(e.MachineUserId, e.Id.ToString()));
 
                     string msgText = string.Empty;
                     var instituteInfo = await _instituteManager.GetAllAsync();
