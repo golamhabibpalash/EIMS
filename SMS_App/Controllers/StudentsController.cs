@@ -497,7 +497,7 @@ public class StudentsController : Controller
 
                         // Validate size (1 MB = 1 * 1024 * 1024 bytes)
                         const long maxFileSize = 1 * 1024 * 1024;
-                        if (sPhoto.Length > maxFileSize)
+                        if (DOBFile.Length > maxFileSize)
                         {
                             throw new InvalidOperationException("File size must not exceed 1 MB.");
                         }
@@ -517,7 +517,7 @@ public class StudentsController : Controller
 
                         using (var stream = new FileStream(pathCombine, FileMode.Create))
                         {
-                            await sPhoto.CopyToAsync(stream);
+                            await DOBFile.CopyToAsync(stream);
                         }
                         newStudent.BirthCertificateImage = fileName;
                     }
@@ -1030,7 +1030,7 @@ public class StudentsController : Controller
                         // Save file name in DB
                         student.Photo = fileName;
                     }
-                    if (DOBFile != null)
+                    if (DOBFile != null && DOBFile.Length > 0)
                     {
                         string fileExt = Path.GetExtension(DOBFile.FileName);
                         string root = _host.WebRootPath;
@@ -1039,7 +1039,7 @@ public class StudentsController : Controller
                         string pathCombine = Path.Combine(root, folder, fileName);
                         using (var stream = new FileStream(pathCombine, FileMode.Create))
                         {
-                            await sPhoto.CopyToAsync(stream);
+                            await DOBFile.CopyToAsync(stream);
                         }
                         student.BirthCertificateImage = fileName;
                     }
