@@ -146,19 +146,15 @@
                             <td class="p-1">
                                 <a asp-action="Details" asp-route-id="@item.Id" asp-controller="Students">
                                     @{
-                                        var avatar = !string.IsNullOrEmpty(item.Photo) ? "/Images/Student/" + item.Photo :
-                                        "/Images/noProfileImage.png";
-                                    }
-                                    @{
-                                        string root = env.WebRootPath;
-                                        string folder = "Images/Student/";
+                                        var avatar = "/Images/noProfileImage.png";
                                         if (!string.IsNullOrEmpty(item.Photo))
                                         {
-                                            var path = System.IO.Path.Combine(root, folder, item.Photo);
-
-                                            if (!File.Exists(path))
+                                            var path = System.IO.Path.Combine(env.WebRootPath, "Images/Student/", item.Photo);
+                                            if (File.Exists(path))
                                             {
-                                                avatar = $"/Images/noProfileImage.png";
+                                                // Append the file's last-write time so an updated photo (which reuses the
+                                                // same filename) is fetched fresh instead of from the browser cache.
+                                                avatar = $"/Images/Student/{item.Photo}?v={System.IO.File.GetLastWriteTimeUtc(path).Ticks}";
                                             }
                                         }
                                     }
