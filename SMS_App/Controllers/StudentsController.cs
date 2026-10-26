@@ -99,8 +99,42 @@ public class StudentsController : Controller
     #region Index
     [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
     [Authorize(Policy = "IndexStudentsPolicy")]
-    public async Task<IActionResult> Index(int? academicSessionId, int? academicClassId, int? academicSectionId, string aStatus, string sortOrder, string searchString, int? pageNumber, int? pageSize, string aCategory)
+    public async Task<IActionResult> Index(int? academicSessionId, int? academicClassId, int? academicSectionId, string aStatus, string sortOrder, string searchString, int? pageNumber, int? pageSize, string aCategory, bool reset = false)
     {
+        // --- Remember the user's list context across navigation --------------------
+        // The list is fully described by its query string. We stash that query string in
+        // session so that returning to the list by ANY route (the left-nav menu, browser
+        // Back, or a redirect after an edit) restores the same filters/search/sort/page,
+        // not just via the "Back to List" button. "Reset" clears it.
+        const string filterSessionKey = "StudentsListFilter";
+
+        if (reset)
+        {
+            HttpContext.Session.Remove(filterSessionKey);
+            return RedirectToAction(nameof(Index));
+        }
+
+        bool hasRequestFilter = academicSessionId != null || academicClassId != null || academicSectionId != null
+            || !string.IsNullOrEmpty(aStatus) || !string.IsNullOrEmpty(searchString) || !string.IsNullOrEmpty(aCategory)
+            || !string.IsNullOrEmpty(sortOrder) || pageNumber != null || pageSize != null;
+
+        if (!hasRequestFilter)
+        {
+            // Bare /Students (sidebar menu, browser Back, etc.) - restore the last filter
+            // the user worked with, if any, so their context is not silently lost.
+            var savedFilter = HttpContext.Session.GetString(filterSessionKey);
+            if (!string.IsNullOrEmpty(savedFilter))
+            {
+                return LocalRedirect(Url.Action(nameof(Index)) + savedFilter);
+            }
+        }
+        else
+        {
+            // Remember exactly the list the user is looking at.
+            HttpContext.Session.SetString(filterSessionKey, Request.QueryString.Value ?? string.Empty);
+        }
+        // ---------------------------------------------------------------------------
+
         ViewData["searchString"] = searchString;
         ViewData["selectedAcademicClassId"] = academicClassId != null ? academicClassId.ToString() : "";
         ViewData["selectedAcademicSectionId"] = academicSectionId;
@@ -263,7 +297,20 @@ public class StudentsController : Controller
 
         ViewData["pageSize"] = pageSize;
 
-        return View(PaginatedList<SMS.Entities.AdditionalModels.StudentListVM>.Create(students.OrderByDescending(s => s.AcademicSessionId).ThenBy(s => s.ClassSerial).ThenBy(s => s.ClassRoll).ToList(), pageNumber ?? 1, (int)pSize));
+        var ordered = students.OrderByDescending(s => s.AcademicSessionId).ThenBy(s => s.ClassSerial).ThenBy(s => s.ClassRoll).ToList();
+
+        // Clamp a stale page number so that returning to the list after an update that
+        // shrank the result set lands on the last available page, not an empty one.
+        int requestedPage = pageNumber ?? 1;
+        if (pSize > 0)
+        {
+            int totalPages = (int)Math.Ceiling(ordered.Count / (double)pSize);
+            if (totalPages < 1) totalPages = 1;
+            if (requestedPage > totalPages) requestedPage = totalPages;
+        }
+        if (requestedPage < 1) requestedPage = 1;
+
+        return View(PaginatedList<SMS.Entities.AdditionalModels.StudentListVM>.Create(ordered, requestedPage, (int)pSize));
     }
 
     #endregion Index
@@ -384,8 +431,10 @@ public class StudentsController : Controller
     #region Create
     [Authorize(Roles = "SuperAdmin, Admin")]
     [Authorize(Policy = "CreateStudentsPolicy")]
-    public async Task<IActionResult> Create()
+    public async Task<IActionResult> Create(string returnUrl = null)
     {
+        // Carry the originating list context so a successful create / Back returns to it.
+        ViewData["ReturnUrl"] = returnUrl;
         StudentCreateVM student = new();
         student.AcademicSessionList = new SelectList(await _academicSessionManager.GetAllAsync(), "Id", "Name").ToList();
         student.AcademicClassList = new SelectList(await _academicClassManager.GetAllAsync(), "Id", "Name").ToList();
@@ -401,8 +450,10 @@ public class StudentsController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     [Authorize(Roles = "SuperAdmin, Admin")]
     [Authorize(Policy = "CreateStudentsPolicy")]
-    public async Task<IActionResult> Create([Bind("Id,Name,NameBangla,ClassRoll,FatherName,MotherName,AdmissionDate,Email,PhoneNo,Photo,DOB,BirthCertificateNo,BirthCertificateImage,ReligionId,GenderId,BloodGroupId,NationalityId,PresentAddressArea,PresentAddressPO,PresentUpazilaId,PresentDistrictId,PresentDivisionId,PermanentAddressArea,PermanentAddressPO,PermanentUpazilaId,PermanentDistrictId,PermanentDivisionId,AcademicSessionId,AcademicClassId,AcademicSectionId,AddressInfo,PreviousSchool,Status,CreatedBy,CreatedAt,EditedBy,EditedAt,GuardianPhone,MACAddress,IsResidential,SMSService, UniqueId")] StudentCreateVM newStudent, IFormFile sPhoto, IFormFile DOBFile)
+    public async Task<IActionResult> Create([Bind("Id,Name,NameBangla,ClassRoll,FatherName,MotherName,AdmissionDate,Email,PhoneNo,Photo,DOB,BirthCertificateNo,BirthCertificateImage,ReligionId,GenderId,BloodGroupId,NationalityId,PresentAddressArea,PresentAddressPO,PresentUpazilaId,PresentDistrictId,PresentDivisionId,PermanentAddressArea,PermanentAddressPO,PermanentUpazilaId,PermanentDistrictId,PermanentDivisionId,AcademicSessionId,AcademicClassId,AcademicSectionId,AddressInfo,PreviousSchool,Status,CreatedBy,CreatedAt,EditedBy,EditedAt,GuardianPhone,MACAddress,IsResidential,SMSService, UniqueId")] StudentCreateVM newStudent, IFormFile sPhoto, IFormFile DOBFile, string returnUrl = null)
     {
+        // Keep the originating list context available to the view if we have to re-render.
+        ViewData["ReturnUrl"] = returnUrl;
         newStudent.ClassRoll = await CreateRoll(newStudent.AcademicSessionId, newStudent.AcademicClassId, newStudent.ClassRoll);
         var rollIsExist = await _studentManager.GetStudentByClassRollAsync(newStudent.ClassRoll);
         if (rollIsExist == null)
@@ -585,7 +636,7 @@ public class StudentsController : Controller
                                 }
                             }
                         }
-                        return RedirectToAction(nameof(Index));
+                        return RedirectToList(returnUrl);
                     }
                 }
             }
@@ -931,7 +982,7 @@ public class StudentsController : Controller
 
     #region Edit
     [HttpGet, Authorize(Roles = "SuperAdmin, Admin", Policy = "EditStudentsPolicy")]
-    public async Task<IActionResult> Edit(int? id)
+    public async Task<IActionResult> Edit(int? id, string returnUrl = null)
     {
         if (id == null)
         {
@@ -942,6 +993,8 @@ public class StudentsController : Controller
         {
             return NotFound();
         }
+        // Carry the originating list context so Save/Back return to the same filtered list.
+        ViewData["ReturnUrl"] = returnUrl;
         List<AcademicSection> academicSections = (List<AcademicSection>)await _academicSectionManager.GetAllAsync();
 
         var newStudent = _mapper.Map<StudentEditVM>(student);
@@ -965,8 +1018,10 @@ public class StudentsController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     [Authorize(Roles = "SuperAdmin, Admin")]
     [Authorize(Policy = "EditStudentsPolicy")]
-    public async Task<IActionResult> Edit(int id, [Bind("Id,Name,NameBangla,ClassRoll,FatherName,MotherName,AdmissionDate,Email,PhoneNo,Photo,DOB,BirthCertificateNo,BirthCertificateImage,ReligionId,GenderId,BloodGroupId,NationalityId,PresentAddressArea,PresentAddressPO,PresentUpazilaId,PresentDistrictId,PresentDivisionId,PermanentAddressArea,PermanentAddressPO,PermanentUpazilaId,PermanentDistrictId,PermanentDivisionId,AcademicSessionId,AcademicClassId,AcademicSectionId,AddressInfo,PreviousSchool,CreatedBy,CreatedAt,EditedBy,EditedAt,GuardianPhone,Status,MACAddress,IsResidential,SMSService,UniqueId")] Student student, IFormFile sPhoto, IFormFile DOBFile)
+    public async Task<IActionResult> Edit(int id, [Bind("Id,Name,NameBangla,ClassRoll,FatherName,MotherName,AdmissionDate,Email,PhoneNo,Photo,DOB,BirthCertificateNo,BirthCertificateImage,ReligionId,GenderId,BloodGroupId,NationalityId,PresentAddressArea,PresentAddressPO,PresentUpazilaId,PresentDistrictId,PresentDivisionId,PermanentAddressArea,PermanentAddressPO,PermanentUpazilaId,PermanentDistrictId,PermanentDivisionId,AcademicSessionId,AcademicClassId,AcademicSectionId,AddressInfo,PreviousSchool,CreatedBy,CreatedAt,EditedBy,EditedAt,GuardianPhone,Status,MACAddress,IsResidential,SMSService,UniqueId")] Student student, IFormFile sPhoto, IFormFile DOBFile, string returnUrl = null)
     {
+        // Keep the originating list context available to the view if we have to re-render.
+        ViewData["ReturnUrl"] = returnUrl;
         if (id != student.Id)
         {
             return NotFound();
@@ -1052,7 +1107,7 @@ public class StudentsController : Controller
                     if (isUpdated == true)
                     {
                         TempData["updated"] = "Updated Successfully";
-                        return RedirectToAction(nameof(Index));
+                        return RedirectToList(returnUrl);
                     }
                 }
                 catch (DbUpdateConcurrencyException)
@@ -1084,7 +1139,7 @@ public class StudentsController : Controller
     #region Delete
     [Authorize(Roles = "SuperAdmin")]
     [Authorize(Policy = "DeleteStudentsPolicy")]
-    public async Task<IActionResult> Delete(int? id)
+    public async Task<IActionResult> Delete(int? id, string returnUrl = null)
     {
         if (id == null)
         {
@@ -1097,25 +1152,26 @@ public class StudentsController : Controller
         {
             return NotFound();
         }
-
+        // Carry the originating list context so Delete/Back return to the same filtered list.
+        ViewData["ReturnUrl"] = returnUrl;
         return View(student);
     }
 
     [Authorize(Roles = "SuperAdmin")]
     [HttpPost, ActionName("Delete"), ValidateAntiForgeryToken]
     [Authorize(Policy = "DeleteStudentsPolicy")]
-    public async Task<IActionResult> DeleteConfirmed(int id)
+    public async Task<IActionResult> DeleteConfirmed(int id, string returnUrl = null)
     {
         var student = await _studentManager.GetByIdAsync(id);
         bool isSaved = await _studentManager.RemoveAsync(student);
         if (isSaved == true)
         {
             TempData["delete"] = "Deleted Successfully.";
-            return RedirectToAction(nameof(Index));
+            return RedirectToList(returnUrl);
         }
         else
         {
-            return RedirectToAction("Delete", new { id });
+            return RedirectToAction("Delete", new { id, returnUrl });
         }
 
     }
@@ -1201,14 +1257,14 @@ public class StudentsController : Controller
     }
 
     [HttpPost]
-    public async Task<IActionResult> ChangeStatus(int studentId, string operationDate, bool studentStatus)
+    public async Task<IActionResult> ChangeStatus(int studentId, string operationDate, bool studentStatus, string returnUrl = null)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(operationDate))
             {
                 TempData["statusError"] = "Please select an operation date.";
-                return RedirectToAction("Edit", new { id = studentId });
+                return RedirectToAction("Edit", new { id = studentId, returnUrl });
             }
 
             DateTime opDate = Convert.ToDateTime(operationDate);
@@ -1217,13 +1273,13 @@ public class StudentsController : Controller
             if (existingStudent == null)
             {
                 TempData["statusError"] = "Student not found.";
-                return RedirectToAction("Edit", new { id = studentId });
+                return RedirectToAction("Edit", new { id = studentId, returnUrl });
             }
 
             if (existingStudent.AdmissionDate.Date > opDate.Date)
             {
                 TempData["statusError"] = "Operation date cannot be before the admission date.";
-                return RedirectToAction("Edit", new { id = studentId });
+                return RedirectToAction("Edit", new { id = studentId, returnUrl });
             }
 
             existingStudent.Status = studentStatus;
@@ -1236,7 +1292,7 @@ public class StudentsController : Controller
             if (!isUpdated)
             {
                 TempData["statusError"] = "Failed to update student status. Please try again.";
-                return RedirectToAction("Edit", new { id = studentId });
+                return RedirectToAction("Edit", new { id = studentId, returnUrl });
             }
 
             StudentActivateHist hist = new()
@@ -1255,7 +1311,7 @@ public class StudentsController : Controller
             if (!isHistAdded)
             {
                 TempData["statusError"] = "Status updated but history record failed. Please contact support.";
-                return RedirectToAction("Edit", new { id = studentId });
+                return RedirectToAction("Edit", new { id = studentId, returnUrl });
             }
 
             string statusLabel = studentStatus ? "activated" : "deactivated";
@@ -1270,7 +1326,7 @@ public class StudentsController : Controller
             TempData["statusError"] = $"Operation failed: {ex.Message}";
         }
 
-        return RedirectToAction("Edit", new { id = studentId });
+        return RedirectToAction("Edit", new { id = studentId, returnUrl });
     }
 
     public int StudentCount()
@@ -1535,6 +1591,20 @@ public class StudentsController : Controller
 
         DateTime today = DateTime.Today;
         return File(Encoding.UTF8.GetBytes(builder.ToString()), "text/csv", today.ToString("yyMMdd") + "Student List_.csv");
+    }
+
+    /// <summary>
+    /// Returns to the originating student list, preserving its filters, search, sort and
+    /// page as captured in <paramref name="returnUrl"/>. Falls back to a default list when
+    /// the URL is missing or not a local application URL (open-redirect guard).
+    /// </summary>
+    private IActionResult RedirectToList(string returnUrl)
+    {
+        if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+        {
+            return LocalRedirect(returnUrl);
+        }
+        return RedirectToAction(nameof(Index));
     }
 
     private PersonalDetails GetPersonalData(Student student)

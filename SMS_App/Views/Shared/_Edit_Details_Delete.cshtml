@@ -1,17 +1,23 @@
 ﻿@inject UserManager<ApplicationUser> _userManager;
 
 @model int
+@{
+    // Optional: a list page can set ViewData["ListReturnUrl"] to its own URL so these
+    // actions return to the current filtered/searched/paged list. Pages that don't set
+    // it (most list screens) are unaffected - no returnUrl is emitted.
+    var listReturnUrl = ViewData["ListReturnUrl"] as string;
+}
 <div class="btn-group btn-group-sm" role="group">
     @if (User.IsInRole("Admin") || User.IsInRole("SuperAdmin"))
     {
-        <a class="btn btn-sm mr-1" asp-action="Edit" asp-route-id="@Model" data-toggle="tooltip" data-placement="top"
+        <a class="btn btn-sm mr-1" asp-action="Edit" asp-route-id="@Model" asp-route-returnUrl="@listReturnUrl" data-toggle="tooltip" data-placement="top"
             title="Edit"><i class="fas fa-edit text-dark"></i> </a>
     }
-    <a class="btn  btn-sm mr-1" asp-action="Details" asp-route-id="@Model" data-toggle="tooltip" data-placement="top"
+    <a class="btn  btn-sm mr-1" asp-action="Details" asp-route-id="@Model" asp-route-returnUrl="@listReturnUrl" data-toggle="tooltip" data-placement="top"
         title="Details"><i class="fas fa-info-circle text-info"></i> </a>
     @if (User.IsInRole("SuperAdmin"))
     {
-        <a class="btn btn-sm " asp-action="Delete" asp-route-id="@Model" data-toggle="tooltip" data-placement="right"
+        <a class="btn btn-sm " asp-action="Delete" asp-route-id="@Model" asp-route-returnUrl="@listReturnUrl" data-toggle="tooltip" data-placement="right"
             title="Delete"><i class="fa fa-trash text-danger"></i> </a>
     }
 </div>

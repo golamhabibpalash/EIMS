@@ -2,6 +2,8 @@
 
 @{
     ViewData["Title"] = "Delete";
+    var returnUrl = ViewData["ReturnUrl"] as string;
+    var backToListUrl = string.IsNullOrEmpty(returnUrl) ? Url.Action("Index") : returnUrl;
 }
 
 <h1>Delete</h1>
@@ -195,7 +197,8 @@
     
     <form asp-action="Delete">
         <input type="hidden" asp-for="Id" />
+        <input type="hidden" name="returnUrl" value="@returnUrl" />
         <input type="submit" value="Delete" class="btn btn-danger" /> |
-        <a asp-action="Index">Back to List</a>
+        <a href="@backToListUrl">Back to List</a>
     </form>
 </div>

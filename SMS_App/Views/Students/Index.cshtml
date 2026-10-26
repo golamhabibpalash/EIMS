@@ -12,6 +12,11 @@
 @{
     ViewData["Title"] = "Students";
     GlobalUI.PageTitle = ViewBag.Title;
+    // The list is fully described by its own URL (filters, search, sort, page, page size).
+    // Hand that URL to the row action links so Edit/Details/Delete/Create can return to
+    // exactly this filtered view after an operation.
+    var listReturnUrl = $"{Context.Request.Path}{Context.Request.QueryString}";
+    ViewData["ListReturnUrl"] = listReturnUrl;
     string totalFound = ViewBag.totalFound == null ? "Nothing Found" : ViewBag.totalFound + " Found";
     TextInfo textInfo = new CultureInfo("en-US", false).TextInfo;
     string name = string.Empty;
@@ -85,7 +90,7 @@
                         id="findButton"><i class="fa fa-search"></i> Find</button>
                 </div>
                 <div class="col-md-3 col-sm-4 text-right"><a
-                        class="btn btn-sm  btn-warning form-control text-success col-md-5" asp-action="Index">Reset</a>
+                        class="btn btn-sm  btn-warning form-control text-success col-md-5" asp-action="Index" asp-route-reset="true">Reset</a>
                 </div>
                 <div class="col-md-2 text-md-start col-form-label">
                     <span>(Showing @showingCount of @ViewBag.totalFound)</span>
@@ -96,8 +101,8 @@
         {
             <div class="row text-center">
                 <h3 class="text-center mt-5">Student not found</h3>
-                <a asp-action="Create" class="p-2 btn-sm btn-info rounded-pill">
-                    <i class="fa fa-plus"></i> Add <i class="fa fa-user-alt"></i> 
+                <a asp-action="Create" asp-route-returnUrl="@listReturnUrl" class="p-2 btn-sm btn-info rounded-pill">
+                    <i class="fa fa-plus"></i> Add <i class="fa fa-user-alt"></i>
                 </a>
                 <h3 class="text-center">You are searching by <span class="text-danger" id="searchParameter"></span></h3>
             </div>
@@ -127,7 +132,7 @@
                         <th width="5%">Session </th>
                         <th width="5%">Gender </th>
                         <th width="5%">Status</th>
-                        <th width="5%"><a asp-action="Create" class="p-2 btn-sm btn-info rounded-pill"><i
+                        <th width="5%"><a asp-action="Create" asp-route-returnUrl="@listReturnUrl" class="p-2 btn-sm btn-info rounded-pill"><i
                                     class="fa fa-plus"></i> Add <i class="fa fa-user-alt"></i> </a>
                             <a asp-action="BulkUpload" class="p-2 btn-sm btn-secondary rounded-pill"
                                title="Import many students from a CSV or Excel file"><i

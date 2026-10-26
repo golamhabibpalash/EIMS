@@ -11,6 +11,11 @@
     string studentStatus = Model.Status == true ? "Active" : "Inactive";
     string isSelectedActive = Model.Status == true ? "Selected" : "";
     string isSelectedInActive = Model.Status == true ? "" : "Selected";
+
+    // Where "Back to List" and the status-change round trip should return to. Falls back
+    // to the default list when no originating list context was supplied.
+    var returnUrl = ViewData["ReturnUrl"] as string;
+    var backToListUrl = string.IsNullOrEmpty(returnUrl) ? Url.Action("Index") : returnUrl;
 }
 @if (ViewBag.msg != null)
 {
@@ -35,6 +40,7 @@
         <form asp-action="Edit" asp-controller="Students" enctype="multipart/form-data">
             @Html.AntiForgeryToken();
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
             <input type="hidden" asp-for="Id" />
             <input type="hidden" asp-for="UniqueId" />
             <input type="hidden" asp-for="Status" value="@Model.Status" />
@@ -358,7 +364,7 @@
             <div class="form-group text-right">
                 @*<partial name="_Update_Back" model="@Model.Id" />*@
                 <button class="btn btn-sm btn-warning rounded-1 mr-2" type="submit" value="Update" data-toggle="tooltip" data-placement="bottom" title="Update"><i class="fa fa-edit"></i> Update</button>
-                <a asp-action="Index" class="btn btn-info btn-sm rounded-1" data-toggle="tooltip" data-placement="right" title="List"><i class="fa fa-list"></i> Back to List</a>
+                <a href="@backToListUrl" class="btn btn-info btn-sm rounded-1" data-toggle="tooltip" data-placement="right" title="List"><i class="fa fa-list"></i> Back to List</a>
             </div>
         </form>
     </div>
@@ -378,6 +384,7 @@
                 </div>
                 <div class="modal-body">
                     <input type="hidden" name="studentId" value="@Model.Id" />
+                    <input type="hidden" name="returnUrl" value="@returnUrl" />
                     <div class="form-group row">
                         <label class="col-md-3 col-form-label">Date</label>
                         <div class="col-md-9">

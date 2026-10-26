@@ -14,6 +14,7 @@
         <form asp-action="Create" asp-controller="Students" enctype="multipart/form-data">
             @Html.AntiForgeryToken();
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
             <div class="row">
                 <div class="col-md-10 offset-md-2">
                     <h6 class="alert alert-heading alert-info">Academic Information</h6>
