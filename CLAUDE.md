@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Framework**: ASP.NET Core 8.0 MVC with Razor Views
 - **Language**: C# / .NET 8.0
 - **ORM**: Entity Framework Core 7.0.11 on .NET 8 (SDK pinned to 8.0.415 in `global.json`) — the version skew is intentional; don't upgrade EF on its own
-- **Database**: PostgreSQL or MS SQL Server — provider chosen at runtime via the `DatabaseProvider` setting in `SMS_App/appsettings.json` (currently `"SqlServer"`; deployed instances often flip this to `"PostgreSQL"`)
+- **Database**: PostgreSQL or MS SQL Server — provider chosen at runtime via the `DatabaseProvider` setting in `SMS_App/appsettings.json` (currently `"PostgreSQL"`; some instances flip this to `"SqlServer"`)
 - **Auth**: ASP.NET Core Identity with claim-based authorization policies
 - **Background Jobs**: Hangfire (disabled by default; storage matches the active DB provider)
 - **Logging**: Serilog
