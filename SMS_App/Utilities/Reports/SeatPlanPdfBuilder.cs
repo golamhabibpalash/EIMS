@@ -34,11 +34,13 @@ public class SeatPlanPdfBuilder : IDocument
     private const float A4WidthInches = 8.26772f;   // 210mm
     private const float A4HeightInches = 11.69291f; // 297mm
 
-    private const float InstituteFont = 9f;
-    private const float ExamFont = 7.5f;
-    private const float TitleFont = 9f;
-    private const float LabelFont = 8f;
-    private const float ValueFont = 8f;
+    private const float InstituteFont = 11f;
+    private const float ExamFont = 8f;
+    private const float BannerFont = 11f;   // "SEAT PLAN" on the black banner
+    private const float RollLabelFont = 8f; // "ROLL NO."
+    private const float RollFont = 22f;     // the large roll number
+    private const float NameFont = 11f;
+    private const float ClassFont = 8.5f;
 
     private readonly Institute _institute;
     private readonly List<RptAdmitCardVM> _data;
@@ -82,7 +84,7 @@ public class SeatPlanPdfBuilder : IDocument
             page.Size(spec.Width, spec.Height, Unit.Inch);
             page.MarginVertical(0.25f, Unit.Inch);
             page.MarginHorizontal(horizontalMargin, Unit.Inch);
-            page.DefaultTextStyle(x => x.FontSize(ValueFont));
+            page.DefaultTextStyle(x => x.FontSize(ClassFont));
 
             page.Content().Table(table =>
             {
@@ -108,9 +110,18 @@ public class SeatPlanPdfBuilder : IDocument
 
     private void ComposeCard(IContainer container, RptAdmitCardVM student)
     {
-        container.Padding(5).Column(card =>
+        // Roll is displayed as 6 digits (the leading digit of the stored 7-digit
+        // class roll is dropped), matching the Admit Card.
+        var classRollDigits = student.ClassRoll.ToString("D7", CultureInfo.InvariantCulture);
+        var rollDisplay = classRollDigits.Length > 6 ? classRollDigits[^6..] : classRollDigits;
+        var classLine = $"Class: {student.ClassName}" +
+            (string.IsNullOrWhiteSpace(student.SectionName) ? "" : " - " + student.SectionName);
+
+        container.Padding(6).Column(card =>
         {
-            // Header: Institute Name, Exam Name, "SEAT PLAN"
+            card.Spacing(2);
+
+            // Institute + exam, centred.
             card.Item().AlignCenter().Text(student.InstituteName ?? _institute?.Name ?? "")
                 .Bold().FontSize(InstituteFont);
 
@@ -118,25 +129,17 @@ public class SeatPlanPdfBuilder : IDocument
             if (!string.IsNullOrWhiteSpace(examName))
                 card.Item().AlignCenter().Text(examName).FontSize(ExamFont);
 
-            card.Item().AlignCenter().Text("SEAT PLAN").Bold().FontSize(TitleFont);
+            // "SEAT PLAN" as a white-on-black banner spanning the card width.
+            card.Item().PaddingTop(1).Background(Colors.Black).PaddingVertical(3)
+                .AlignCenter().Text("SEAT PLAN").FontColor(Colors.White).Bold().FontSize(BannerFont);
 
-            card.Item().PaddingVertical(2).LineHorizontal(0.75f).LineColor(Colors.Black);
+            // Roll number: small label over a large, bold, centred number.
+            card.Item().PaddingTop(1).AlignCenter().Text("ROLL NO.").FontSize(RollLabelFont);
+            card.Item().AlignCenter().Text(rollDisplay).Bold().FontSize(RollFont);
 
-            void InfoLine(string label, string value) =>
-                card.Item().Text(t =>
-                {
-                    t.Span(label).SemiBold().FontSize(LabelFont);
-                    t.Span(value).FontSize(ValueFont);
-                });
-
-            // Roll is displayed as 6 digits (the leading digit of the stored 7-digit
-            // class roll is dropped), matching the Admit Card.
-            var classRollDigits = student.ClassRoll.ToString("D7", CultureInfo.InvariantCulture);
-            var rollDisplay = classRollDigits.Length > 6 ? classRollDigits[^6..] : classRollDigits;
-
-            InfoLine("Name: ", ToTitle(student.StudentName));
-            InfoLine("Roll: ", rollDisplay);
-            InfoLine("Class: ", $"{student.ClassName}{(string.IsNullOrWhiteSpace(student.SectionName) ? "" : " - " + student.SectionName)}");
+            // Student name (bold, centred) and class line.
+            card.Item().AlignCenter().Text(ToTitle(student.StudentName)).Bold().FontSize(NameFont);
+            card.Item().AlignCenter().Text(classLine).FontSize(ClassFont);
         });
     }
 }
