@@ -104,7 +104,7 @@ public class StudentsController : Controller
         // --- Remember the user's list context across navigation --------------------
         // The list is fully described by its query string. We stash that query string in
         // session so that returning to the list by ANY route (the left-nav menu, browser
-        // Back, or a redirect after an edit) restores the same filters/search/sort/page,
+        // Back, or a redirect after an edit) restores the same filters/search/page,
         // not just via the "Back to List" button. "Reset" clears it.
         const string filterSessionKey = "StudentsListFilter";
 
@@ -135,40 +135,26 @@ public class StudentsController : Controller
         }
         // ---------------------------------------------------------------------------
 
+        // The grid itself is fed asynchronously by the List action (server-side
+        // DataTables processing). Index only renders the shell and the filter controls,
+        // pre-selected from the query string so a restored/bookmarked URL shows the same
+        // filters and the grid's first AJAX call picks them up from the dropdowns.
+        var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
+        if (academicSessionId == null)
+        {
+            academicSessionId = currentSession?.Id;
+        }
+
         ViewData["searchString"] = searchString;
         ViewData["selectedAcademicClassId"] = academicClassId != null ? academicClassId.ToString() : "";
         ViewData["selectedAcademicSectionId"] = academicSectionId;
         ViewData["selectedAcademicSessionId"] = academicSessionId;
         ViewData["categoryId"] = aCategory;
         ViewData["statusId"] = aStatus;
-        ViewData["pageRowCount"] = pageSize;
+        ViewData["pageSize"] = pageSize ?? 20;
 
-
-
-        var students = new List<SMS.Entities.AdditionalModels.StudentListVM>();
-        var allStudent = await _studentManager.GetAllAsync();
-        var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
-        if (academicSessionId != null)
-        {
-            allStudent = allStudent?.Where(s => s.AcademicSessionId == academicSessionId).ToList();
-        }
-        else
-        {
-            allStudent = allStudent?.Where(s => s.AcademicSessionId == currentSession.Id).ToList();
-            academicSessionId = currentSession?.Id;
-        }
-        if (!String.IsNullOrEmpty(searchString))
-        {
-            allStudent = allStudent.Where(s => s.Name.ToLower().Contains(searchString.ToLower())
-            || s.ClassRoll.ToString().Contains(searchString)
-            || s.UniqueId.ToString().Contains(searchString)
-            || (s.PhoneNo?.Contains(searchString) ?? false)
-            || (s.GuardianPhone?.Contains(searchString) ?? false))
-                .ToList();
-        }
         if (academicClassId != null)
         {
-            allStudent = allStudent.Where(s => s.AcademicClassId == Convert.ToInt32(academicClassId)).ToList();
             var sections = await _academicSectionManager.GetAllByClassWithSessionId(Convert.ToInt32(academicClassId), currentSession.Id);
             ViewBag.SectionList = new SelectList(sections, "Id", "Name", academicSectionId);
             ViewBag.selectedClassId = academicClassId;
@@ -177,41 +163,88 @@ public class StudentsController : Controller
         {
             ViewBag.selectedClassId = "";
         }
+
+        var isActiveVMs = new List<IsActiveVM>
+        {
+            new IsActiveVM { Id = 0, sName = "Inactive" },
+            new IsActiveVM { Id = 1, sName = "Active" },
+            new IsActiveVM { Id = 2, sName = "All" },
+        };
+
+        ViewBag.academicSessionId = new SelectList(await _academicSessionManager.GetAllAsync(), "Id", "Name", academicSessionId);
+        var classes = await _academicClassManager.GetAllAsync();
+        ViewBag.academicClassId = new SelectList(classes.Where(s => s.Status == true), "Id", "Name", academicClassId).ToList();
+        ViewBag.aStatus = new SelectList(isActiveVMs, "Id", "sName", aStatus);
+
+        var studentCategory = new List<SelectListItem>
+        {
+            new SelectListItem { Text = "all", Value = "all" },
+            new SelectListItem { Text = "residential", Value = "residential" },
+            new SelectListItem { Text = "nonResidential", Value = "nonResidential" }
+        };
+        ViewBag.aCategory = new SelectList(studentCategory, "Value", "Text", aCategory);
+
+        return View();
+    }
+
+    /// <summary>
+    /// Server-side DataTables endpoint for the student grid. Applies the filter dropdowns,
+    /// the global search box, column sorting, and paging on the server so only one page of
+    /// rows is ever serialized to the browser. Returns the shape the DataTables client
+    /// expects: { draw, recordsTotal, recordsFiltered, data }.
+    /// </summary>
+    [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
+    [Authorize(Policy = "IndexStudentsPolicy")]
+    public async Task<IActionResult> List(int? academicSessionId, int? academicClassId, int? academicSectionId,
+        string aStatus, string aCategory)
+    {
+        // DataTables request parameters (nested names like search[value] / order[0][dir]).
+        int draw = int.TryParse(Request.Query["draw"], out var d) ? d : 0;
+        int start = int.TryParse(Request.Query["start"], out var s0) ? s0 : 0;
+        int length = int.TryParse(Request.Query["length"], out var len) ? len : 20;
+        string search = Request.Query["search[value]"];
+        int orderColIdx = int.TryParse(Request.Query["order[0][column]"], out var oc) ? oc : -1;
+        string orderDir = Request.Query["order[0][dir]"];
+        string orderCol = orderColIdx >= 0 ? Request.Query[$"columns[{orderColIdx}][data]"].ToString() : null;
+
+        // Persist the live filter state so a bare /Students (menu, Back) restores it.
+        var restoreQs = BuildStudentListQueryString(academicSessionId, academicClassId, academicSectionId, aStatus, aCategory, search);
+        HttpContext.Session.SetString("StudentsListFilter", restoreQs);
+
+        var allStudent = await _studentManager.GetAllAsync();
+        var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
+
+        allStudent = (academicSessionId != null
+            ? allStudent?.Where(s => s.AcademicSessionId == academicSessionId)
+            : allStudent?.Where(s => s.AcademicSessionId == currentSession.Id)).ToList();
+
+        if (academicClassId != null)
+            allStudent = allStudent.Where(s => s.AcademicClassId == academicClassId.Value).ToList();
         if (academicSectionId != null)
-        {
-            allStudent = allStudent.Where(s => s.AcademicSectionId == Convert.ToInt32(academicSectionId)).ToList();
-        }
-        if (!string.IsNullOrEmpty(aCategory))
-        {
-            if (aCategory == "residential")
-            {
-                allStudent = allStudent.Where(s => s.IsResidential).ToList();
-            }
-            else if (aCategory == "nonResidential")
-            {
-                allStudent = allStudent.Where(s => s.IsResidential == false).ToList();
-            }
-        }
-
-
+            allStudent = allStudent.Where(s => s.AcademicSectionId == academicSectionId.Value).ToList();
+        if (aCategory == "residential")
+            allStudent = allStudent.Where(s => s.IsResidential).ToList();
+        else if (aCategory == "nonResidential")
+            allStudent = allStudent.Where(s => !s.IsResidential).ToList();
         if (aStatus == "0" || aStatus == "1")
         {
-            bool isActive = aStatus == "1" ? true : false;
+            bool isActive = aStatus == "1";
             allStudent = allStudent.Where(s => s.Status == isActive).ToList();
         }
-        students = allStudent.Select(s => new SMS.Entities.AdditionalModels.StudentListVM()
+
+        var rows = allStudent.Select(s => new SMS.Entities.AdditionalModels.StudentListVM
         {
             Id = s.Id,
             ClassRoll = s.ClassRoll,
             Photo = s.Photo,
             StudentName = s.Name,
             NameBangla = s.NameBangla,
-            ClassName = s.AcademicClass.Name,
+            ClassName = s.AcademicClass?.Name,
             SectionName = s.AcademicSection?.Name,
             PhoneNo = s.PhoneNo,
             GuardianPhone = s.GuardianPhone,
             SessionName = s.AcademicSession?.Name,
-            Gender = s.Gender.Name,
+            Gender = s.Gender?.Name,
             Status = s.Status,
             ClassSerial = s.AcademicClass?.ClassSerial,
             IsResidential = s.IsResidential,
@@ -219,98 +252,84 @@ public class StudentsController : Controller
             AcademicSessionId = s.AcademicSessionId
         }).ToList();
 
+        int recordsTotal = rows.Count;
 
-        int totalFound = ViewBag.totalFound = students.Count();
-
-        List<IsActiveVM> isActiveVMs = new List<IsActiveVM>();
-        IsActiveVM status1 = new IsActiveVM();
-        status1.Id = 0;
-        status1.sName = "Inactive";
-        isActiveVMs.Add(status1);
-
-        IsActiveVM status2 = new IsActiveVM();
-        status2.Id = 1;
-        status2.sName = "Active";
-        isActiveVMs.Add(status2);
-
-        IsActiveVM status3 = new IsActiveVM();
-        status3.Id = 2;
-        status3.sName = "All";
-        isActiveVMs.Add(status3);
-
-        switch (sortOrder)
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            case "roll_desc":
-                students = students.OrderByDescending(s => s.ClassRoll).ToList();
-                break;
-            case "academicClass":
-                students = students.OrderBy(s => s.ClassSerial).ToList();
-                break;
-            case "class_desc":
-                students = students.OrderByDescending(s => s.ClassSerial).ToList();
-                break;
-            default:
-                students = students.OrderBy(s => s.ClassRoll).ToList();
-                break;
+            var term = search.Trim().ToLowerInvariant();
+            rows = rows.Where(r =>
+                (r.StudentName?.ToLowerInvariant().Contains(term) ?? false)
+                || (r.NameBangla?.Contains(search) ?? false)
+                || r.ClassRoll.ToString().Contains(term)
+                || (r.UniqueId?.ToLowerInvariant().Contains(term) ?? false)
+                || (r.PhoneNo?.Contains(term) ?? false)
+                || (r.GuardianPhone?.Contains(term) ?? false)).ToList();
         }
 
-        ViewBag.academicSessionId = new SelectList(await _academicSessionManager.GetAllAsync(), "Id", "Name", academicSessionId);
-        var classes = await _academicClassManager.GetAllAsync();
-        ViewBag.academicClassId = new SelectList(classes.Where(s => s.Status == true), "Id", "Name", academicClassId).ToList();
+        int recordsFiltered = rows.Count;
 
-        ViewBag.aStatus = new SelectList(isActiveVMs.ToList(), "Id", "sName", aStatus);
-        if (pageSize == null)
+        bool desc = string.Equals(orderDir, "desc", StringComparison.OrdinalIgnoreCase);
+        IEnumerable<SMS.Entities.AdditionalModels.StudentListVM> sorted = orderCol switch
         {
-            pageSize = 20;
-        }
-        ViewBag.rowsCount = new List<SelectListItem>()
-        {
-        new SelectListItem { Value = "20", Text = "20", Selected=pageSize==20 },
-        new SelectListItem { Value = "50", Text = "50", Selected=pageSize==50  },
-        new SelectListItem { Value = "100", Text = "100", Selected=pageSize==100  },
-        new SelectListItem { Value = "0", Text = "All", Selected=pageSize==0  }
+            "uniqueId" => desc ? rows.OrderByDescending(r => r.UniqueId) : rows.OrderBy(r => r.UniqueId),
+            "classRoll" => desc ? rows.OrderByDescending(r => r.ClassRoll) : rows.OrderBy(r => r.ClassRoll),
+            "studentName" => desc ? rows.OrderByDescending(r => r.StudentName) : rows.OrderBy(r => r.StudentName),
+            "className" => desc ? rows.OrderByDescending(r => r.ClassSerial) : rows.OrderBy(r => r.ClassSerial),
+            "sectionName" => desc ? rows.OrderByDescending(r => r.SectionName) : rows.OrderBy(r => r.SectionName),
+            "phoneNo" => desc ? rows.OrderByDescending(r => r.PhoneNo) : rows.OrderBy(r => r.PhoneNo),
+            "guardianPhone" => desc ? rows.OrderByDescending(r => r.GuardianPhone) : rows.OrderBy(r => r.GuardianPhone),
+            "sessionName" => desc ? rows.OrderByDescending(r => r.SessionName) : rows.OrderBy(r => r.SessionName),
+            "gender" => desc ? rows.OrderByDescending(r => r.Gender) : rows.OrderBy(r => r.Gender),
+            "status" => desc ? rows.OrderByDescending(r => r.Status) : rows.OrderBy(r => r.Status),
+            // Default: current session first, then by class order and roll (the historical order).
+            _ => rows.OrderByDescending(r => r.AcademicSessionId).ThenBy(r => r.ClassSerial).ThenBy(r => r.ClassRoll)
         };
-        var studentCategory = new List<SelectListItem>
+
+        var paged = (length > 0 ? sorted.Skip(start).Take(length) : sorted).ToList();
+
+        var textInfo = new CultureInfo("en-US", false).TextInfo;
+        var data = paged.Select(r => new
         {
-            new SelectListItem { Text = "all", Value = "all" },
-            new SelectListItem { Text = "residential", Value = "residential" },
-            new SelectListItem { Text = "nonResidential", Value = "nonResidential" }
-        };
-        ViewBag.aCategory = new SelectList(studentCategory.ToList(), "Value", "Text", aCategory);
+            id = r.Id,
+            photoUrl = ResolveStudentPhotoUrl(r.Photo),
+            uniqueId = r.UniqueId,
+            classRoll = r.ClassRoll,
+            studentName = textInfo.ToTitleCase(r.StudentName ?? string.Empty),
+            nameBangla = r.NameBangla,
+            className = r.ClassName,
+            sectionName = r.SectionName ?? "N/A",
+            phoneNo = r.PhoneNo?.PadLeft(11, '0') ?? "",
+            guardianPhone = r.GuardianPhone?.PadLeft(11, '0') ?? "",
+            sessionName = r.SessionName,
+            gender = r.Gender,
+            status = r.Status,
+            isResidential = r.IsResidential
+        });
 
-        int pSize = 30;
-        if (pageSize != null)
-        {
-            if (pageSize > 0)
-            {
-                pSize = (int)pageSize;
-            }
-            else if (pageSize == 0)
-            {
-                pSize = students.Count();
-            }
-            else
-            {
-                pSize = totalFound;
-            }
-        }
+        return Json(new { draw, recordsTotal, recordsFiltered, data });
+    }
 
-        ViewData["pageSize"] = pageSize;
+    /// <summary>Resolves a student's avatar URL, cache-busting replaced photos by last-write time.</summary>
+    private string ResolveStudentPhotoUrl(string photo)
+    {
+        if (string.IsNullOrEmpty(photo)) return "/Images/noProfileImage.png";
+        var path = System.IO.Path.Combine(_host.WebRootPath, "Images/Student/", photo);
+        if (!System.IO.File.Exists(path)) return "/Images/noProfileImage.png";
+        return $"/Images/Student/{photo}?v={System.IO.File.GetLastWriteTimeUtc(path).Ticks}";
+    }
 
-        var ordered = students.OrderByDescending(s => s.AcademicSessionId).ThenBy(s => s.ClassSerial).ThenBy(s => s.ClassRoll).ToList();
-
-        // Clamp a stale page number so that returning to the list after an update that
-        // shrank the result set lands on the last available page, not an empty one.
-        int requestedPage = pageNumber ?? 1;
-        if (pSize > 0)
-        {
-            int totalPages = (int)Math.Ceiling(ordered.Count / (double)pSize);
-            if (totalPages < 1) totalPages = 1;
-            if (requestedPage > totalPages) requestedPage = totalPages;
-        }
-        if (requestedPage < 1) requestedPage = 1;
-
-        return View(PaginatedList<SMS.Entities.AdditionalModels.StudentListVM>.Create(ordered, requestedPage, (int)pSize));
+    /// <summary>Builds the Index query string that reproduces a given filter state.</summary>
+    private static string BuildStudentListQueryString(int? academicSessionId, int? academicClassId,
+        int? academicSectionId, string aStatus, string aCategory, string searchString)
+    {
+        var parts = new List<string>();
+        if (academicSessionId != null) parts.Add($"academicSessionId={academicSessionId}");
+        if (academicClassId != null) parts.Add($"academicClassId={academicClassId}");
+        if (academicSectionId != null) parts.Add($"academicSectionId={academicSectionId}");
+        if (!string.IsNullOrEmpty(aStatus)) parts.Add($"aStatus={Uri.EscapeDataString(aStatus)}");
+        if (!string.IsNullOrEmpty(aCategory)) parts.Add($"aCategory={Uri.EscapeDataString(aCategory)}");
+        if (!string.IsNullOrEmpty(searchString)) parts.Add($"searchString={Uri.EscapeDataString(searchString)}");
+        return parts.Count > 0 ? "?" + string.Join("&", parts) : string.Empty;
     }
 
     #endregion Index
