@@ -1,6 +1,7 @@
 ﻿@using Microsoft.AspNetCore.Identity;
 @using System.IO;
 @using SMS_App.Utilities.Pagination;
+@using SMS_App.Utilities.Export;
 @using Microsoft.AspNetCore.Hosting;
 @using System.Globalization;
 
@@ -333,14 +334,10 @@
                                     asp-items="ViewBag.rowsCount">
                                 </select>
                             </div>
-                            <a asp-action="ExportToCsv" asp-route-academicClassId="@(ViewData["selectedAcademicClassId"])"
-                                asp-route-academicSectionId="@(ViewData["selectedAcademicSectionId"])"
-                                asp-route-academicSessionId="@(ViewData["selectedAcademicSessionId"])"
-                                asp-route-aCategory="@(ViewData["categoryId"])" asp-route-aStatus="@(ViewData["statusId"])"
-                                asp-route-searchString="@ViewData["searchString"]"
-                                class="btn btn-warning col-md-4 text-dark">
-                                <i class="fa fa-file-excel"></i> Export as CSV
-                            </a>
+                            <button type="button" class="btn btn-warning col-md-4 text-dark" id="openExportBtn"
+                                    title="Choose columns and format, then download the filtered list">
+                                <i class="fa fa-file-excel"></i> Export
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -349,6 +346,60 @@
 
     </form>
 </div>
+
+<!-- Export column-picker modal -->
+<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-navy-blue text-light">
+                <h5 class="modal-title" id="exportModalLabel"><i class="fa fa-file-excel"></i> Export Students</h5>
+                <button type="button" class="close text-light" style="background:none;border:0;font-size:1.5rem;line-height:1;"
+                        data-bs-dismiss="modal" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-2">
+                    The export respects the filters currently applied to the list. Tick the columns you want, choose a
+                    format, and download.
+                </p>
+                <div class="d-flex align-items-center mb-2">
+                    <div class="btn-group btn-group-sm mr-3">
+                        <button type="button" class="btn btn-outline-primary" id="exportSelectAll">Select all</button>
+                        <button type="button" class="btn btn-outline-secondary" id="exportClear">Clear</button>
+                    </div>
+                    <div class="ml-auto">
+                        <label class="mr-2 mb-0"><strong>Format:</strong></label>
+                        <label class="mr-2 mb-0"><input type="radio" name="exportFormat" value="csv" checked> CSV</label>
+                        <label class="mb-0"><input type="radio" name="exportFormat" value="xlsx"> Excel (.xlsx)</label>
+                    </div>
+                </div>
+                <div class="row">
+                    @foreach (var group in StudentExportColumns.Grouped())
+                    {
+                        <div class="col-md-4 col-sm-6 mb-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="fw-bold text-primary mb-1" style="font-weight:600;">@group.Key</div>
+                                @foreach (var col in group)
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input export-col" type="checkbox" value="@col.Key"
+                                               id="exp_@col.Key" @(col.Default ? "checked" : "")>
+                                        <label class="form-check-label" for="exp_@col.Key">@col.Header</label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span class="mr-auto text-muted small"><span id="exportSelectedCount">0</span> column(s) selected</span>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="doExportBtn"><i class="fa fa-download"></i> Download</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Full-screen overlay (hidden by default) -->
 <div id="loadingOverlay"
     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 9998;">
@@ -516,6 +567,61 @@
             document.getElementById('loadingSpinner').style.display = 'none';
         });
 
+        // ---------------------------------------------------------------------------
+        // Export column-picker. Works under Bootstrap 5 (admin layout) and Bootstrap 4
+        // (teacher layout) by feature-detecting the modal API.
+        // ---------------------------------------------------------------------------
+        (function () {
+            var exportUrl = '@Url.Action("Export", "Students")';
+
+            function showModal(id) {
+                var el = document.getElementById(id);
+                if (window.bootstrap && bootstrap.Modal) { bootstrap.Modal.getOrCreateInstance(el).show(); }
+                else { $(el).modal('show'); }
+            }
+            function hideModal(id) {
+                var el = document.getElementById(id);
+                if (window.bootstrap && bootstrap.Modal) { bootstrap.Modal.getOrCreateInstance(el).hide(); }
+                else { $(el).modal('hide'); }
+            }
+
+            function refreshCount() {
+                $('#exportSelectedCount').text($('.export-col:checked').length);
+            }
+
+            $('#openExportBtn').on('click', function () { refreshCount(); showModal('exportModal'); });
+            $('#exportSelectAll').on('click', function () { $('.export-col').prop('checked', true); refreshCount(); });
+            $('#exportClear').on('click', function () { $('.export-col').prop('checked', false); refreshCount(); });
+            $('.export-col').on('change', refreshCount);
+            // BS4 teacher layout lacks .btn-close styling; make the cancel/close dismiss work via JS too.
+            $('#exportModal [data-dismiss="modal"], #exportModal [data-bs-dismiss="modal"]').on('click', function () { hideModal('exportModal'); });
+
+            $('#doExportBtn').on('click', function () {
+                var cols = $('.export-col:checked').map(function () { return this.value; }).get();
+                if (cols.length === 0) {
+                    if (window.alertify) { alertify.error('Please select at least one column.'); }
+                    else { alert('Please select at least one column.'); }
+                    return;
+                }
+
+                var p = new URLSearchParams();
+                // Carry the list's current filters so the export matches what's on screen.
+                var map = {
+                    academicSessionId: $('#aAcademicSessionId').val(),
+                    academicClassId: $('#aAcademicClassId').val(),
+                    academicSectionId: $('#aAcademicSectionId').val(),
+                    aCategory: $('#aCategoryId').val(),
+                    aStatus: $('#aStatusType').val(),
+                    searchString: $('#nameRoll').val()
+                };
+                Object.keys(map).forEach(function (k) { if (map[k]) p.set(k, map[k]); });
+                p.set('format', $('input[name="exportFormat"]:checked').val() || 'csv');
+                cols.forEach(function (c) { p.append('columns', c); });
+
+                hideModal('exportModal');
+                window.location.href = exportUrl + '?' + p.toString();
+            });
+        })();
 
     </script>
 

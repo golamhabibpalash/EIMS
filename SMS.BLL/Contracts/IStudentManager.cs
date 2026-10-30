@@ -16,6 +16,7 @@ public interface IStudentManager : IManager<Student>
     Task<Student> GetStudentByClassRollAsync(int id, int classRoll);
     Task<List<Student>> GetStudentsByClassIdAndSessionIdAsync(int sessionId, int classId);
     Task<List<Student>> GetStudentsByClassSessionSectionAsync(int sessionId, int classId,int sectionId);
+    Task<List<Student>> GetStudentsForExportAsync(int sessionId, int classId, int sectionId);
     Task<List<StudentListVM>> GetCurrentStudentListAsync(int? AcademicClassId, int? AcademicSectionId);
     Task<string> GetUniqueIdByStudentId(int stuId);
     Task<List<StudentListVM>> GetStudentsBySearch(string search);
