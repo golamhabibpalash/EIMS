@@ -22,8 +22,10 @@ using SMS.Entities.AdditionalModels.StudentImport;
 using SMS.Entities.AdditionalModels.StudentVM;
 using SMS.Entities.Enums;
 using SMS.Entities.Utilities;
+using QuestPDF.Fluent;
 using SMS_App.Utilities.Export;
 using SMS_App.Utilities.LoggerService;
+using SMS_App.Utilities.Reports;
 using SMS_App.Utilities.MACIPServices;
 using SMS_App.Utilities.Pagination;
 using SMS_App.Utilities.ShortMessageService;
@@ -1598,6 +1600,18 @@ public class StudentsController : Controller
 
         var cols = StudentExportColumns.Resolve(columns);
         var stamp = DateTime.Today.ToString("yyMMdd");
+
+        if (string.Equals(format, "pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            var institute = await _instituteManager.GetFirstOrDefaultAsync();
+            var headers = cols.Select(c => c.Header).ToList();
+            var rows = students
+                .Select(s => (IReadOnlyList<string>)cols.Select(c => c.Value(s) ?? string.Empty).ToList())
+                .ToList();
+            var subtitle = $"Student List ({students.Count}) — {DateTime.Now:dd MMM yyyy}";
+            var pdf = new TabularPdfBuilder(institute?.Name ?? "Student List", subtitle, headers, rows).GeneratePdf();
+            return File(pdf, "application/pdf", $"{stamp}_Student_Export.pdf");
+        }
 
         if (string.Equals(format, "xlsx", StringComparison.OrdinalIgnoreCase))
         {
