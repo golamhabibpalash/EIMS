@@ -17,61 +17,78 @@
     // Role flags drive which per-row action buttons are rendered client-side.
     var canEdit = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
     var canDelete = User.IsInRole("SuperAdmin");
+
+    // Keep the filter panel open only when the user arrived with explicit filters, so the
+    // default view gives the grid as much vertical room as possible.
+    var hasExplicitFilters = !string.IsNullOrEmpty(selClass) || !string.IsNullOrEmpty(selSection)
+        || !string.IsNullOrEmpty(selCategory) || !string.IsNullOrEmpty(selStatus)
+        || !string.IsNullOrEmpty(selSearch);
 }
 
 <div class="card shadow-sm mb-3">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
         <h5 class="mb-0"><i class="fa fa-users mr-2"></i> Students</h5>
-        <div class="btn-group btn-group-sm">
-            <a asp-action="Create" class="btn btn-primary"><i class="fa fa-plus"></i> Add Student</a>
-            <a asp-action="BulkUpload" class="btn btn-outline-secondary"
-               title="Import many students from a CSV or Excel file"><i class="fa fa-upload"></i> Bulk Upload</a>
-            <button type="button" id="openExportBtn" class="btn btn-success"
-                    title="Choose columns and format, then download the filtered list"><i class="fa fa-file-excel"></i> Export</button>
+        <div class="d-flex align-items-center flex-wrap">
+            <button type="button" id="toggleFilters" class="btn btn-outline-primary btn-sm mr-2"
+                    data-bs-toggle="collapse" data-toggle="collapse"
+                    data-bs-target="#studentFilters" data-target="#studentFilters"
+                    aria-expanded="@(hasExplicitFilters ? "true" : "false")" aria-controls="studentFilters">
+                <i class="fa fa-filter"></i> Filters
+                <span class="badge bg-primary" id="activeFilterCount" style="margin-left:4px;display:none;"></span>
+            </button>
+            <div class="btn-group btn-group-sm">
+                <a asp-action="Create" class="btn btn-primary"><i class="fa fa-plus"></i> Add Student</a>
+                <a asp-action="BulkUpload" class="btn btn-outline-secondary"
+                   title="Import many students from a CSV or Excel file"><i class="fa fa-upload"></i> Bulk Upload</a>
+                <button type="button" id="openExportBtn" class="btn btn-success"
+                        title="Choose columns and format, then download the filtered list"><i class="fa fa-file-excel"></i> Export</button>
+            </div>
         </div>
     </div>
 
-    <div class="card-body pb-2">
-        <div class="row g-2">
-            <div class="col-md-3 col-sm-6 mb-2">
-                <label for="aAcademicSessionId" class="form-label mb-1 small text-muted">Academic Session</label>
-                <select class="form-control filter-select" name="AcademicSessionId" id="aAcademicSessionId"
-                        asp-items="@ViewBag.academicSessionId"></select>
-            </div>
-            <div class="col-md-3 col-sm-6 mb-2">
-                <label for="aAcademicClassId" class="form-label mb-1 small text-muted">Academic Class</label>
-                <select class="form-control filter-select" name="AcademicClassId" id="aAcademicClassId"
-                        asp-items="@ViewBag.academicClassId">
-                    <option value="">All Classes</option>
-                </select>
-            </div>
-            <div class="col-md-3 col-sm-6 mb-2">
-                <label for="aAcademicSectionId" class="form-label mb-1 small text-muted">Academic Section</label>
-                <select class="form-control filter-select" id="aAcademicSectionId" name="AcademicSectionId"
-                        asp-items="ViewBag.SectionList">
-                    <option value="">All Sections</option>
-                </select>
-            </div>
-            <div class="col-md-3 col-sm-6 mb-2">
-                <label for="aCategoryId" class="form-label mb-1 small text-muted">Student Category</label>
-                <select class="form-control filter-select" id="aCategoryId" name="aCategory" asp-items="ViewBag.aCategory">
-                    <option value="">All Categories</option>
-                </select>
-            </div>
-            <div class="col-md-3 col-sm-6 mb-2">
-                <label for="aStatusType" class="form-label mb-1 small text-muted">Status</label>
-                <select class="form-control filter-select" name="aStatus" id="aStatusType" asp-items="ViewBag.aStatus">
-                    <option value="">Active &amp; Inactive</option>
-                </select>
-            </div>
-            <div class="col-md-5 col-sm-8 mb-2">
-                <label for="nameRoll" class="form-label mb-1 small text-muted">Keyword Search</label>
-                <input type="text" class="form-control" id="nameRoll"
-                       placeholder="Name / Roll / Unique ID / Phone" value="@selSearch">
-            </div>
-            <div class="col-md-4 col-sm-4 mb-2 d-flex align-items-end">
-                <button type="button" class="btn btn-primary mr-2" id="findButton"><i class="fa fa-search"></i> Find</button>
-                <a class="btn btn-outline-warning" asp-action="Index" asp-route-reset="true"><i class="fa fa-undo"></i> Reset</a>
+    <div class="collapse @(hasExplicitFilters ? "show" : "")" id="studentFilters">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label for="aAcademicSessionId" class="form-label mb-0 small text-muted">Session</label>
+                    <select class="form-control form-control-sm filter-select" name="AcademicSessionId" id="aAcademicSessionId"
+                            asp-items="@ViewBag.academicSessionId"></select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label for="aAcademicClassId" class="form-label mb-0 small text-muted">Class</label>
+                    <select class="form-control form-control-sm filter-select" name="AcademicClassId" id="aAcademicClassId"
+                            asp-items="@ViewBag.academicClassId">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label for="aAcademicSectionId" class="form-label mb-0 small text-muted">Section</label>
+                    <select class="form-control form-control-sm filter-select" id="aAcademicSectionId" name="AcademicSectionId"
+                            asp-items="ViewBag.SectionList">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label for="aCategoryId" class="form-label mb-0 small text-muted">Category</label>
+                    <select class="form-control form-control-sm filter-select" id="aCategoryId" name="aCategory" asp-items="ViewBag.aCategory">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label for="aStatusType" class="form-label mb-0 small text-muted">Status</label>
+                    <select class="form-control form-control-sm filter-select" name="aStatus" id="aStatusType" asp-items="ViewBag.aStatus">
+                        <option value="">Active &amp; Inactive</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-12 mb-2">
+                    <label for="nameRoll" class="form-label mb-0 small text-muted">Keyword</label>
+                    <input type="text" class="form-control form-control-sm" id="nameRoll"
+                           placeholder="Name / Roll / ID / Phone" value="@selSearch">
+                </div>
+                <div class="col-12 col-lg-auto mb-2 d-flex align-items-center">
+                    <button type="button" class="btn btn-primary btn-sm mr-2" id="findButton"><i class="fa fa-search"></i> Find</button>
+                    <a class="btn btn-outline-warning btn-sm" asp-action="Index" asp-route-reset="true"><i class="fa fa-undo"></i> Reset</a>
+                </div>
             </div>
         </div>
     </div>
@@ -284,9 +301,27 @@
 
             // "Find" and Enter in the keyword box push the keyword into DataTables' own search
             // (which triggers a server-side reload); the dropdowns are part of every AJAX call.
-            function applyFilters() { table.search($('#nameRoll').val()).draw(); }
+            function applyFilters() { updateActiveFilterCount(); table.search($('#nameRoll').val()).draw(); }
             $('#findButton').on('click', applyFilters);
             $('#nameRoll').on('keypress', function (e) { if (e.which === 13) { e.preventDefault(); applyFilters(); } });
+            $('#nameRoll').on('input', updateActiveFilterCount);
+
+            // Badge on the "Filters" toggle: how many filters narrow the list (session is
+            // excluded because it always defaults to the current session).
+            function updateActiveFilterCount() {
+                let n = 0;
+                if ($('#aAcademicClassId').val()) n++;
+                if ($('#aAcademicSectionId').val()) n++;
+                if ($('#aCategoryId').val()) n++;
+                if ($('#aStatusType').val()) n++;
+                if ($('#nameRoll').val()) n++;
+                $('#activeFilterCount').text(n).toggle(n > 0);
+            }
+            updateActiveFilterCount();
+            $('#aAcademicClassId, #aAcademicSectionId, #aCategoryId, #aStatusType').on('change', updateActiveFilterCount);
+
+            // Recalculate column widths when the filter panel expands/collapses.
+            $('#studentFilters').on('shown.bs.collapse hidden.bs.collapse', function () { table.columns.adjust(); });
 
             // Category and status are plain filters: changing them just reloads the grid.
             $('#aCategoryId, #aStatusType').on('change', function () { table.draw(); });
@@ -294,7 +329,7 @@
             // Session and class both affect which sections are valid, so they reset the
             // section dropdown, reload its options, and only then redraw the grid.
             $('#aAcademicSessionId, #aAcademicClassId').on('change', function () {
-                reloadSections(function () { table.draw(); });
+                reloadSections(function () { updateActiveFilterCount(); table.draw(); });
             });
 
             // Rebuilds the section dropdown for the current class+session, resetting it to
