@@ -96,7 +96,10 @@ public class SeatPlanPdfBuilder : IDocument
                 {
                     table.Cell()
                         .Height(CardHeightInches, Unit.Inch)
-                        .Border(1)
+                        // Specify the border colour explicitly: some QuestPDF versions default the
+                        // border to a non-black/transparent colour, which renders the card grid
+                        // invisible ("data shows but the boxes are gone") even though Border(1) is set.
+                        .Border(1).BorderColor(Colors.Black)
                         .Element(c => ComposeCard(c, student));
                 }
             });
@@ -117,7 +120,7 @@ public class SeatPlanPdfBuilder : IDocument
 
             card.Item().AlignCenter().Text("SEAT PLAN").Bold().FontSize(TitleFont);
 
-            card.Item().PaddingVertical(2).LineHorizontal(0.75f);
+            card.Item().PaddingVertical(2).LineHorizontal(0.75f).LineColor(Colors.Black);
 
             void InfoLine(string label, string value) =>
                 card.Item().Text(t =>
