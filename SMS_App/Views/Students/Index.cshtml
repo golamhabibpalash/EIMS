@@ -247,7 +247,7 @@
                 search: { search: $('#nameRoll').val() },
                 ajax: {
                     url: listUrl,
-                    type: 'GET',
+                    type: 'POST', // POST so the (large) DataTables state is sent in the body, not the URL
                     data: function (d) { return $.extend({}, d, filterState()); }
                 },
                 language: {

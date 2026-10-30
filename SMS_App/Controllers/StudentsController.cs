@@ -202,14 +202,18 @@ public class StudentsController : Controller
     public async Task<IActionResult> List(int? academicSessionId, int? academicClassId, int? academicSectionId,
         string aStatus, string aCategory)
     {
-        // DataTables request parameters (nested names like search[value] / order[0][dir]).
-        int draw = int.TryParse(Request.Query["draw"], out var d) ? d : 0;
-        int start = int.TryParse(Request.Query["start"], out var s0) ? s0 : 0;
-        int length = int.TryParse(Request.Query["length"], out var len) ? len : 20;
-        string search = Request.Query["search[value]"];
-        int orderColIdx = int.TryParse(Request.Query["order[0][column]"], out var oc) ? oc : -1;
-        string orderDir = Request.Query["order[0][dir]"];
-        string orderCol = orderColIdx >= 0 ? Request.Query[$"columns[{orderColIdx}][data]"].ToString() : null;
+        // DataTables posts its state (draw/start/length/search/order + the per-column entries)
+        // in the request BODY so the request isn't rejected by IIS's default query-string length
+        // limit (~2 KB) once there are many columns. Read from the form on POST, else the query.
+        string Param(string key) => Request.HasFormContentType ? Request.Form[key].ToString() : Request.Query[key].ToString();
+
+        int draw = int.TryParse(Param("draw"), out var d) ? d : 0;
+        int start = int.TryParse(Param("start"), out var s0) ? s0 : 0;
+        int length = int.TryParse(Param("length"), out var len) ? len : 20;
+        string search = Param("search[value]");
+        int orderColIdx = int.TryParse(Param("order[0][column]"), out var oc) ? oc : -1;
+        string orderDir = Param("order[0][dir]");
+        string orderCol = orderColIdx >= 0 ? Param($"columns[{orderColIdx}][data]") : null;
 
         // Persist the live filter state so a bare /Students (menu, Back) restores it.
         var restoreQs = BuildStudentListQueryString(academicSessionId, academicClassId, academicSectionId, aStatus, aCategory, search);
@@ -218,9 +222,9 @@ public class StudentsController : Controller
         var allStudent = await _studentManager.GetAllAsync();
         var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
 
-        allStudent = (academicSessionId != null
-            ? allStudent?.Where(s => s.AcademicSessionId == academicSessionId)
-            : allStudent?.Where(s => s.AcademicSessionId == currentSession.Id)).ToList();
+        int? effectiveSessionId = academicSessionId ?? currentSession?.Id;
+        allStudent = (allStudent ?? Enumerable.Empty<Student>())
+            .Where(s => s.AcademicSessionId == effectiveSessionId).ToList();
 
         if (academicClassId != null)
             allStudent = allStudent.Where(s => s.AcademicClassId == academicClassId.Value).ToList();
