@@ -1305,6 +1305,12 @@ public class ReportsController : Controller
             ? $"attachment; filename=\"{fileName}.pdf\""
             : $"inline; filename=\"{fileName}.pdf\"";
 
+        // Never let the browser/iframe serve a stale seat plan: after a redeploy or a data
+        // change, re-requesting the same URL must re-render, not show the cached PDF.
+        Response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+        Response.Headers["Pragma"] = "no-cache";
+        Response.Headers["Expires"] = "0";
+
         return File(result, "application/pdf");
     }
 

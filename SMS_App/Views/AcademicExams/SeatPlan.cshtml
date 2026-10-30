@@ -216,7 +216,9 @@
                         '&roll=' + encodeURIComponent(roll) +
                         '&sheet=' + sheetSize;
 
-                    $('#myIframe').attr('src', lastPreviewUrl);
+                    // Cache-buster so a re-generated plan (or a fresh deploy) never shows a
+                    // previously cached PDF in the iframe.
+                    $('#myIframe').attr('src', lastPreviewUrl + '&_t=' + Date.now());
 
                     var iframe = document.getElementById('myIframe');
                     $('#loading').show();
