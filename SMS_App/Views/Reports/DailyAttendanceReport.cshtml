@@ -77,7 +77,9 @@
                             </div>
                         </div>
                         <div class="text-end">
-                            <span id="loadReportBtn" class="btn btn-sm btn-info">Load Report</span>
+                            <span id="loadReportBtn" class="btn btn-sm btn-info"><i class="fa fa-file-pdf"></i> Load Report</span>
+                            <span id="exportExcelBtn" class="btn btn-sm btn-success" title="Download as Excel (.xlsx)"><i class="fa fa-file-excel"></i> Excel</span>
+                            <span id="exportCsvBtn" class="btn btn-sm btn-secondary" title="Download as CSV"><i class="fa fa-file-csv"></i> CSV</span>
                         </div>
                     </fieldset>
                 </form>
@@ -107,47 +109,74 @@
 @section Scripts{
     <script>
         $(document).ready(function () {
-            $('#loadReportBtn').click(function () {
 
-                $('#myIframe').attr('src', '');
-                let fileName = '';
-                let reportType = 'pdf';
-                let aSection = '0';
-                let academicClassId = '0';
-                let fromDate = '';
-                let attendanceType = 'all';
-                let attendanceFor = '';
-                let attendanceCategory = 'in';
-                let sms = '';
-
-                fromDate = $('#sFromDate').val();
-                academicClassId = $('#AcademicClassId option:selected').val();
-                aSection = $('#AcademicSectionId option:selected').val();
-                attendanceType = $('#AttendanceType option:selected').val();
-                attendanceFor = $('#AttendanceFor option:selected').val();
-                attendanceCategory = $('#AttendanceCategory option:selected').val();
-                sms = $('#sms option:selected').val();
-
-                if (fromDate == '' || attendanceFor == '') {
+            // Reads and validates the filter form. Returns the shared parameter set, or null
+            // (and surfaces the "required field" message) when the date or audience is missing.
+            function collectReportParams() {
+                const fromDate = $('#sFromDate').val();
+                const attendanceFor = $('#AttendanceFor option:selected').val();
+                if (!fromDate || !attendanceFor) {
                     $('#InvalidForm').show();
                     $('#AcademicClassId').focus();
                     $('#iframe-container').hide();
                     $('#loading').hide();
+                    return null;
                 }
-                else {
-                    $('#myIframe').attr('src', '/Reports/DailyAttendaceReportExport?reportType=' + reportType + '&&fromDate=' + fromDate + '&&academicClassId=' + academicClassId + '&&academicSectionId=' + aSection + "&&attendanceType=" + attendanceType + "&&fileName=" + fileName + "&&attendanceFor=" + attendanceFor + "&&attendanceCategory=" + attendanceCategory+"&&sms="+sms);
+                $('#InvalidForm').hide();
+                return {
+                    reportType: 'pdf',
+                    fromDate: fromDate,
+                    academicClassId: $('#AcademicClassId option:selected').val() || '0',
+                    academicSectionId: $('#AcademicSectionId option:selected').val() || '0',
+                    attendanceType: $('#AttendanceType option:selected').val() || 'all',
+                    attendanceFor: attendanceFor,
+                    attendanceCategory: $('#AttendanceCategory option:selected').val() || 'In',
+                    sms: $('#sms option:selected').val() || '',
+                    fileName: ''
+                };
+            }
 
-                    var iframe = document.getElementById('myIframe');
-                    $('#loading').show();
-                    $('#iframe-container').hide();
-                    $('#InvalidForm').hide();
-                    iframe.onload = function () {
-                        console.log('Iframe loaded');
-                        $('#loading').hide();
-                        $('#iframe-container').show();
-                    };
+            // Builds the export endpoint URL for a given output format (pdf | xlsx | csv).
+            function buildReportUrl(p, format) {
+                const q = new URLSearchParams({
+                    reportType: p.reportType,
+                    fromDate: p.fromDate,
+                    academicClassId: p.academicClassId,
+                    academicSectionId: p.academicSectionId,
+                    attendanceType: p.attendanceType,
+                    fileName: p.fileName,
+                    attendanceFor: p.attendanceFor,
+                    attendanceCategory: p.attendanceCategory,
+                    sms: p.sms,
+                    format: format
+                });
+                return '/Reports/DailyAttendaceReportExport?' + q.toString();
+            }
 
-                }
+            $('#loadReportBtn').click(function () {
+                $('#myIframe').attr('src', '');
+                const p = collectReportParams();
+                if (!p) return;
+
+                $('#myIframe').attr('src', buildReportUrl(p, 'pdf'));
+                var iframe = document.getElementById('myIframe');
+                $('#loading').show();
+                $('#iframe-container').hide();
+                iframe.onload = function () {
+                    $('#loading').hide();
+                    $('#iframe-container').show();
+                };
+            });
+
+            // Excel / CSV download: same parameters, just a different format. The file comes back
+            // with an attachment disposition, so the browser downloads it without leaving the page.
+            $('#exportExcelBtn').click(function () {
+                const p = collectReportParams();
+                if (p) window.location.href = buildReportUrl(p, 'xlsx');
+            });
+            $('#exportCsvBtn').click(function () {
+                const p = collectReportParams();
+                if (p) window.location.href = buildReportUrl(p, 'csv');
             });
 
             $('#AcademicClassId').change(function () {

@@ -14,6 +14,7 @@ using SMS.Entities;
 using SMS.Entities.RptModels.AttendanceVM;
 using SMS.Entities.RptModels.StudentPayment;
 using SMS.Entities.Utilities;
+using SMS_App.Utilities.Export;
 using SMS_App.Utilities.LoggerService;
 using SMS_App.Utilities.Others;
 using SMS_App.ViewModels.AttendanceVM;
@@ -385,7 +386,7 @@ public class ReportsController : Controller
     }
 
     [Authorize(Policy = "DailyAttendanceReportsPolicy")]
-    public async Task<IActionResult> DailyAttendaceReportExport(string reportType, string fromDate, string academicClassId, string academicSectionId, string attendanceType, string fileName, string attendanceFor, string attendanceCategory, string sms)
+    public async Task<IActionResult> DailyAttendaceReportExport(string reportType, string fromDate, string academicClassId, string academicSectionId, string attendanceType, string fileName, string attendanceFor, string attendanceCategory, string sms, string format = "pdf")
     {
 
         Institute institute = await _instituteManager.GetFirstOrDefaultAsync();
@@ -460,6 +461,23 @@ public class ReportsController : Controller
         }
 
         bool isEmp = attendanceFor == "employee";
+
+        // Spreadsheet export (same data as the PDF, just a different container).
+        bool wantsXlsx = string.Equals(format, "xlsx", StringComparison.OrdinalIgnoreCase);
+        bool wantsCsv = string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase);
+        if (wantsXlsx || wantsCsv)
+        {
+            var baseName = (string.IsNullOrEmpty(fileName) ? "attendance" : fileName) + "_" + DateTime.Now.ToString("yyyyMMdd");
+            var (headers, rows) = BuildDailyAttendanceRows(reportData, isEmp);
+            if (wantsXlsx)
+            {
+                var xlsx = ExportWriter.ToXlsx("Attendance", headers, rows);
+                return File(xlsx, ExportWriter.XlsxContentType, baseName + ".xlsx");
+            }
+            var csv = ExportWriter.ToCsv(headers, rows);
+            return File(csv, ExportWriter.CsvContentType, baseName + ".csv");
+        }
+
         var dailyDoc = new DailyAttendancePdfBuilder(
             institute, StripDataUriPrefix(imageParam), reportData, reportName, fromDate, isEmp);
         var pdf = dailyDoc.GeneratePdf();
@@ -467,6 +485,28 @@ public class ReportsController : Controller
         Response.Headers["Content-Disposition"] = $"inline; filename=\"{fileName}.pdf\"";
         return File(pdf, MediaTypeNames.Application.Pdf);
 
+    }
+
+    /// <summary>
+    /// Flattens the daily-attendance report rows into header + string-row form for CSV/XLSX export,
+    /// mirroring the columns the PDF shows (employees have no roll/class/guardian columns).
+    /// </summary>
+    private static (List<string> Headers, List<IReadOnlyList<string>> Rows) BuildDailyAttendanceRows(
+        List<RptDailyAttendaceVM> data, bool isEmployee)
+    {
+        var headers = isEmployee
+            ? new List<string> { "SL", "Name", "Designation", "Phone", "Punch Time", "SMS Sent" }
+            : new List<string> { "SL", "Roll", "Name", "Class", "Phone", "Guardian Phone", "Punch Time", "SMS Sent" };
+
+        var rows = new List<IReadOnlyList<string>>();
+        int sl = 1;
+        foreach (var d in data)
+        {
+            rows.Add(isEmployee
+                ? new List<string> { (sl++).ToString(), d.Name ?? "", d.Class_Designation ?? "", d.Phone ?? "", d.PunchTime ?? "", d.SMSSent ?? "" }
+                : new List<string> { (sl++).ToString(), d.ClassRoll ?? "", d.Name ?? "", d.Class_Designation ?? "", d.Phone ?? "", d.GuardianPhone ?? "", d.PunchTime ?? "", d.SMSSent ?? "" });
+        }
+        return (headers, rows);
     }
 
     //Monthly Attendance Report
