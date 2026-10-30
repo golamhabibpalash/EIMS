@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AutoMapper;
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -21,6 +22,7 @@ using SMS.Entities.AdditionalModels.StudentImport;
 using SMS.Entities.AdditionalModels.StudentVM;
 using SMS.Entities.Enums;
 using SMS.Entities.Utilities;
+using SMS_App.Utilities.Export;
 using SMS_App.Utilities.LoggerService;
 using SMS_App.Utilities.MACIPServices;
 using SMS_App.Utilities.Pagination;
@@ -1549,67 +1551,95 @@ public class StudentsController : Controller
         return null;
     }
 
+    // GET: Students/Export - robust, column-selectable export of the (filtered) student list.
+    // The caller passes the same filters shown on the list plus the chosen columns and format;
+    // the selectable columns and the produced file both come from StudentExportColumns so they
+    // can never drift apart.
     [HttpGet]
-    public async Task<IActionResult> ExportToCsv(int? academicSessionId, int? academicClassId, int? academicSectionId, string aStatus, string searchString, string aCategory)
+    [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
+    [Authorize(Policy = "IndexStudentsPolicy")]
+    public async Task<IActionResult> Export(int? academicSessionId, int? academicClassId, int? academicSectionId,
+        string aStatus, string aCategory, string searchString, string[] columns, string format = "csv")
     {
-        var students = await _studentManager.GetAllAsync();
-        if (academicSessionId != null)
+        // Match the list view's default: no session chosen means the current session.
+        if (academicSessionId == null)
         {
-            students = students.Where(s => s.AcademicSessionId == academicSessionId).ToList();
+            var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
+            academicSessionId = currentSession?.Id;
         }
-        if (academicClassId != null)
-        {
-            students = students.Where(s => s.AcademicClassId == academicClassId).ToList();
-        }
-        if (academicSectionId != null)
-        {
-            students = students.Where(s => s.AcademicSectionId == academicSectionId).ToList();
-        }
+
+        var students = await _studentManager.GetStudentsForExportAsync(
+            academicSessionId ?? 0, academicClassId ?? 0, academicSectionId ?? 0);
+
+        // Category and status are not part of the query filter, so apply them here (as the list does).
+        if (aCategory == "residential")
+            students = students.Where(s => s.IsResidential).ToList();
+        else if (aCategory == "nonResidential")
+            students = students.Where(s => !s.IsResidential).ToList();
 
         if (aStatus == "0" || aStatus == "1")
         {
-            bool isActive = aStatus == "1" ? true : false;
+            bool isActive = aStatus == "1";
             students = students.Where(s => s.Status == isActive).ToList();
         }
-        if (!string.IsNullOrEmpty(aCategory))
+
+        if (!string.IsNullOrWhiteSpace(searchString))
         {
-            if (aCategory == "residential")
+            var term = searchString.Trim();
+            var lower = term.ToLowerInvariant();
+            students = students.Where(s =>
+                (s.Name?.ToLowerInvariant().Contains(lower) ?? false)
+                || (s.NameBangla?.Contains(term) ?? false)
+                || s.ClassRoll.ToString().Contains(term)
+                || (s.UniqueId?.Contains(term) ?? false)
+                || (s.PhoneNo?.Contains(term) ?? false)
+                || (s.GuardianPhone?.Contains(term) ?? false)).ToList();
+        }
+
+        var cols = StudentExportColumns.Resolve(columns);
+        var stamp = DateTime.Today.ToString("yyMMdd");
+
+        if (string.Equals(format, "xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add("Students");
+            for (int c = 0; c < cols.Count; c++)
+                ws.Cell(1, c + 1).Value = cols[c].Header;
+            ws.Row(1).Style.Font.Bold = true;
+
+            int r = 2;
+            foreach (var s in students)
             {
-                students = students.Where(s => s.IsResidential).ToList();
+                for (int c = 0; c < cols.Count; c++)
+                    ws.Cell(r, c + 1).Value = cols[c].Value(s) ?? string.Empty;
+                r++;
             }
-            else if (aCategory == "nonResidential")
-            {
-                students = students.Where(s => s.IsResidential == false).ToList();
-            }
-        }
-        if (!String.IsNullOrEmpty(searchString))
-        {
-            students = students.Where(s => s.Name.Contains(searchString)
-            || s.ClassRoll.ToString().Contains(searchString)
-            || s.UniqueId.ToString().Contains(searchString)
-            || (s.PhoneNo?.Contains(searchString) ?? false)
-            || (s.GuardianPhone?.Contains(searchString) ?? false))
-                .ToList();
+            ws.Columns().AdjustToContents();
+
+            using var ms = new MemoryStream();
+            wb.SaveAs(ms);
+            return File(ms.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"{stamp}_Student_Export.xlsx");
         }
 
-        var builder = new StringBuilder();
-        builder.AppendLine("Unique Id, ClassRoll, Student Name,  Class,  Phone No,Guardian Phone, Gender, Status, Section , IsResidential");
+        // CSV (default): RFC-4180 quoting + UTF-8 BOM so Excel reads Bangla text correctly.
+        var sb = new StringBuilder();
+        sb.AppendLine(string.Join(",", cols.Select(c => CsvField(c.Header))));
+        foreach (var s in students)
+            sb.AppendLine(string.Join(",", cols.Select(c => CsvField(c.Value(s)))));
 
-        foreach (var student in students)
-        {
-            builder.AppendLine($"{student.UniqueId}," +
-                    $"{student.ClassRoll},{student.Name}," +
-                    $"{student.AcademicClass?.Name ?? "N/A"}," +
-                    $"{student.PhoneNo.PadLeft(11, '0')}," +
-                    $"{student.GuardianPhone?.PadLeft(11, '0') ?? "N/A"}," +
-                    $"{student.Gender.Name}," +
-                    $"{(student.Status ? "Active" : "Inactive")}," +
-                    $"{student.AcademicSection?.Name ?? "N/A"}," +
-                    $"{(student.IsResidential ? "Residential" : "Non Residential")},");
-        }
+        var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        return File(bytes, "text/csv", $"{stamp}_Student_Export.csv");
+    }
 
-        DateTime today = DateTime.Today;
-        return File(Encoding.UTF8.GetBytes(builder.ToString()), "text/csv", today.ToString("yyMMdd") + "Student List_.csv");
+    /// <summary>Quotes a CSV field per RFC 4180 (wrap in quotes, double any embedded quote).</summary>
+    private static string CsvField(string value)
+    {
+        value ??= string.Empty;
+        if (value.Contains('"') || value.Contains(',') || value.Contains('\n') || value.Contains('\r'))
+            return "\"" + value.Replace("\"", "\"\"") + "\"";
+        return value;
     }
 
     /// <summary>

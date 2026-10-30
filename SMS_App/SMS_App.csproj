@@ -82,6 +82,7 @@
 		<PackageReference Include="AesEncryptionLibrary" Version="8.0.0" />
 		<PackageReference Include="AspNetCore.Reporting" Version="2.1.0" />
 		<PackageReference Include="AutoMapper" Version="15.1.1" />
+		<PackageReference Include="ClosedXML" Version="0.104.2" />
 		<PackageReference Include="Hangfire" Version="1.8.7" />
 		<PackageReference Include="Hangfire.PostgreSql" Version="1.20.10" />
 		<PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="7.0.11" />
