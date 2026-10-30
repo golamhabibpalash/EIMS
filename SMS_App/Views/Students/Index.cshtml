@@ -195,9 +195,16 @@
             if (flash.failed) alertify.error(flash.failed);
 
             // Enhance the filter dropdowns with Select2 when it is available (admin layout);
-            // falls back to plain selects otherwise (teacher layout).
-            if ($.fn.select2) {
-                $('.filter-select').select2({ theme: 'bootstrap-5', width: '100%' });
+            // falls back to plain selects otherwise (teacher layout). Initialisation is deferred
+            // until the panel is visible: Select2 measures its container while building, so doing
+            // it inside a collapsed (display:none) panel makes it render blank.
+            function initFilterSelects() {
+                if (!$.fn.select2) return;
+                $('.filter-select').each(function () {
+                    if (!$(this).data('select2')) {
+                        $(this).select2({ theme: 'bootstrap-5', width: '100%' });
+                    }
+                });
             }
 
             // Read the live filter state. Used both as the grid's AJAX payload and to build
@@ -321,8 +328,15 @@
             updateActiveFilterCount();
             $('#aAcademicClassId, #aAcademicSectionId, #aCategoryId, #aStatusType').on('change', updateActiveFilterCount);
 
-            // Recalculate column widths when the filter panel expands/collapses.
-            $('#studentFilters').on('shown.bs.collapse hidden.bs.collapse', function () { table.columns.adjust(); });
+            // Initialise Select2 now only if the panel starts visible; otherwise wait for the
+            // expand event. Either way, recalculate the grid's column widths afterwards.
+            const $filterPanel = $('#studentFilters');
+            if ($filterPanel.hasClass('show')) initFilterSelects();
+            $filterPanel.on('shown.bs.collapse', function () {
+                initFilterSelects();
+                table.columns.adjust();
+            });
+            $filterPanel.on('hidden.bs.collapse', function () { table.columns.adjust(); });
 
             // Category and status are plain filters: changing them just reloads the grid.
             $('#aCategoryId, #aStatusType').on('change', function () { table.draw(); });
