@@ -123,11 +123,13 @@
                     return null;
                 }
                 $('#InvalidForm').hide();
+                // Empty class/section means "all" — the report filters only when these parse to
+                // an int, so sending '0' would wrongly match class/section id 0 (i.e. nobody).
                 return {
                     reportType: 'pdf',
                     fromDate: fromDate,
-                    academicClassId: $('#AcademicClassId option:selected').val() || '0',
-                    academicSectionId: $('#AcademicSectionId option:selected').val() || '0',
+                    academicClassId: $('#AcademicClassId option:selected').val() || '',
+                    academicSectionId: $('#AcademicSectionId option:selected').val() || '',
                     attendanceType: $('#AttendanceType option:selected').val() || 'all',
                     attendanceFor: attendanceFor,
                     attendanceCategory: $('#AttendanceCategory option:selected').val() || 'In',
