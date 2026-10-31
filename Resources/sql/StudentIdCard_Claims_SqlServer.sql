@@ -15,6 +15,9 @@
 -- After running, the user must LOG OUT and back in for the new claim to take effect.
 -- ============================================================================
 
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+
 -- ---- Part 1: module + submodule ----
 IF NOT EXISTS (SELECT 1 FROM [ProjectModules] WHERE [ModuleName] = N'StudentManagement')
     INSERT INTO [ProjectModules] ([ModuleName], [Status], [Remarks], [CreatedBy], [CreatedAt], [EditedBy], [EditedAt], [MACAddress])
