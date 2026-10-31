@@ -1213,7 +1213,7 @@ public class StudentsController : Controller
 
     [HttpGet]
     [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
-    [Authorize(Policy = "IndexStudentsPolicy")]
+    [Authorize(Policy = "IdCardStudentsPolicy")]
     public async Task<IActionResult> IdCards(int? academicSessionId, int? academicClassId,
         int? academicSectionId, string searchString, int? studentId)
     {
@@ -1238,7 +1238,7 @@ public class StudentsController : Controller
 
     [HttpGet]
     [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
-    [Authorize(Policy = "IndexStudentsPolicy")]
+    [Authorize(Policy = "IdCardStudentsPolicy")]
     public async Task<IActionResult> IdCardsPdf(int? academicSessionId, int? academicClassId,
         int? academicSectionId, string searchString, int? studentId, bool download = false)
     {

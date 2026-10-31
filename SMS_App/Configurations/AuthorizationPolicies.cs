@@ -328,6 +328,7 @@ public class AuthorizationPolicies
         options.AddPolicy("EditStudentsPolicy", policy => policy.RequireClaim("Edit Student"));
         options.AddPolicy("DeleteStudentsPolicy", policy => policy.RequireClaim("Delete Student"));
         options.AddPolicy("ProfileStudentsPolicy", policy => policy.RequireClaim("View Student Profile"));
+        options.AddPolicy("IdCardStudentsPolicy", policy => policy.RequireClaim("View Student ID Card"));
 
         //Student Enrollment
         options.AddPolicy("SubjectEnrollSubjectEnrollmentPolicy", policy => policy.RequireClaim("View Enrollment List"));
