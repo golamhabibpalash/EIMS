@@ -25,10 +25,13 @@ public class StudentIdCardPdfBuilder : IDocument
     private const float CardWidthInches = 2.45f;
     private const float CardHeightInches = 3.85f;
 
-    // Blue palette echoing the demo card.
+    // Clean palette: a single accent on an otherwise white (common) card.
     private const string PrimaryBlue = "#1565C0";
     private const string AccentBlue = "#2A9FD6";
     private const string LightBlue = "#E8F3FB";
+    private const string Ink = "#1F2A37";
+    private const string Muted = "#5B6B7B";
+    private const string CardBorder = "#D0D7DE";
 
     private readonly Institute _institute;
     private readonly byte[] _logo;
@@ -80,22 +83,18 @@ public class StudentIdCardPdfBuilder : IDocument
 
     private void ComposeFront(IContainer container, StudentIdCardVM card)
     {
-        container.Border(0.75f).BorderColor(AccentBlue).Background(Colors.White).Column(col =>
+        // Clean white (common) card - the front CONTENT is what identifies the student.
+        container.Border(0.75f).BorderColor(CardBorder).Background(Colors.White).Column(col =>
         {
-            // Header band: institute identity.
+            // Common header strip: institute identity (same on every card).
             col.Item().Background(PrimaryBlue).Padding(5).Row(r =>
             {
                 if (_logo != null)
                 {
-                    try { r.ConstantItem(26).Image(_logo).FitArea(); } catch { }
+                    try { r.ConstantItem(24).Image(_logo).FitArea(); } catch { }
                     r.ConstantItem(4);
                 }
-                r.RelativeItem().AlignMiddle().Column(c =>
-                {
-                    c.Item().Text(_institute?.Name ?? "").FontColor(Colors.White).Bold().FontSize(8.5f);
-                    if (!string.IsNullOrWhiteSpace(_institute?.Address))
-                        c.Item().Text(_institute.Address).FontColor(Colors.White).FontSize(6);
-                });
+                r.RelativeItem().AlignMiddle().Text(_institute?.Name ?? "").FontColor(Colors.White).Bold().FontSize(8.5f);
             });
 
             // Photo.
@@ -111,9 +110,9 @@ public class StudentIdCardPdfBuilder : IDocument
                 });
 
             // Name + class.
-            col.Item().PaddingTop(6).AlignCenter().Text(ToTitle(card.Name)).Bold().FontSize(11).FontColor(PrimaryBlue);
+            col.Item().PaddingTop(6).AlignCenter().Text(ToTitle(card.Name)).Bold().FontSize(11).FontColor(Ink);
             col.Item().AlignCenter().Text($"{card.ClassName}{(string.IsNullOrEmpty(card.SectionName) ? "" : " - " + card.SectionName)}")
-                .FontSize(8).FontColor(AccentBlue);
+                .FontSize(8).FontColor(Muted);
 
             // Detail rows.
             col.Item().PaddingTop(6).PaddingHorizontal(8).Column(info =>
@@ -139,37 +138,48 @@ public class StudentIdCardPdfBuilder : IDocument
 
     private void ComposeBack(IContainer container, StudentIdCardVM card)
     {
-        container.Border(0.75f).BorderColor(AccentBlue).Background(PrimaryBlue).Padding(8).Column(col =>
+        // Common white back - identical for every card (no student-specific identity).
+        container.Border(0.75f).BorderColor(CardBorder).Background(Colors.White).Column(col =>
         {
-            col.Item().AlignCenter().Text("Terms & Conditions").FontColor(Colors.White).Bold().FontSize(9);
-            col.Item().PaddingTop(4).Column(c =>
+            col.Item().Background(PrimaryBlue).Padding(5).Row(r =>
+            {
+                if (_logo != null)
+                {
+                    try { r.ConstantItem(24).Image(_logo).FitArea(); } catch { }
+                    r.ConstantItem(4);
+                }
+                r.RelativeItem().AlignMiddle().Text(_institute?.Name ?? "").FontColor(Colors.White).Bold().FontSize(8.5f);
+            });
+
+            col.Item().PaddingTop(8).AlignCenter().Text("Terms & Conditions").FontColor(PrimaryBlue).Bold().FontSize(9);
+            col.Item().PaddingHorizontal(8).PaddingTop(4).Column(c =>
             {
                 c.Spacing(3);
                 foreach (var line in BackInstructions)
-                    c.Item().Text("• " + line).FontColor(Colors.White).FontSize(6.5f);
+                    c.Item().Text("• " + line).FontColor(Ink).FontSize(6.5f);
             });
 
-            col.Item().PaddingTop(8).Column(c =>
+            col.Item().PaddingHorizontal(8).PaddingTop(8).Column(c =>
             {
                 c.Spacing(1);
                 if (!string.IsNullOrWhiteSpace(_institute?.Phone1))
-                    c.Item().Text($"Phone: {_institute.Phone1}").FontColor(Colors.White).FontSize(7);
+                    c.Item().Text($"Phone: {_institute.Phone1}").FontColor(Ink).FontSize(7);
                 if (!string.IsNullOrWhiteSpace(_institute?.Email))
-                    c.Item().Text($"E-mail: {_institute.Email}").FontColor(Colors.White).FontSize(7);
+                    c.Item().Text($"E-mail: {_institute.Email}").FontColor(Ink).FontSize(7);
+                if (!string.IsNullOrWhiteSpace(_institute?.Address))
+                    c.Item().Text($"Address: {_institute.Address}").FontColor(Ink).FontSize(7);
             });
 
-            // Signature + institute footer hug the bottom.
-            col.Item().Extend().AlignBottom().Column(c =>
+            // Signature + slogan hug the bottom.
+            col.Item().Extend().AlignBottom().PaddingBottom(8).Column(c =>
             {
                 if (_signature != null)
                 {
-                    try { c.Item().AlignCenter().Height(26).Image(_signature).FitArea(); } catch { }
+                    try { c.Item().AlignCenter().Height(24).Image(_signature).FitArea(); } catch { }
                 }
-                c.Item().PaddingTop(2).AlignCenter().Text("Authorised Signature").FontColor(Colors.White).FontSize(6.5f);
-                c.Item().LineHorizontal(0.5f).LineColor(Colors.White);
-                c.Item().PaddingTop(3).AlignCenter().Text(_institute?.Name ?? "").FontColor(Colors.White).Bold().FontSize(8);
+                c.Item().PaddingTop(2).AlignCenter().Text("Authorised Signature").FontColor(Muted).FontSize(6.5f);
                 if (!string.IsNullOrWhiteSpace(_institute?.Slogan))
-                    c.Item().AlignCenter().Text(_institute.Slogan).FontColor(Colors.White).FontSize(6.5f);
+                    c.Item().PaddingTop(3).AlignCenter().Text(_institute.Slogan).FontColor(PrimaryBlue).FontSize(6.5f);
             });
         });
     }
@@ -179,8 +189,8 @@ public class StudentIdCardPdfBuilder : IDocument
         col.Item().Row(r =>
         {
             r.ConstantItem(46).Text(label).SemiBold().FontSize(7.5f).FontColor(PrimaryBlue);
-            r.AutoItem().Text(":").FontSize(7.5f);
-            r.RelativeItem().PaddingLeft(3).Text(string.IsNullOrWhiteSpace(value) ? "-" : value).FontSize(7.5f);
+            r.AutoItem().Text(":").FontSize(7.5f).FontColor(Ink);
+            r.RelativeItem().PaddingLeft(3).Text(string.IsNullOrWhiteSpace(value) ? "-" : value).FontSize(7.5f).FontColor(Ink);
         });
     }
 
