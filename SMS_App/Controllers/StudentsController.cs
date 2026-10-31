@@ -23,6 +23,7 @@ using SMS.Entities.AdditionalModels.StudentVM;
 using SMS.Entities.Enums;
 using SMS.Entities.Utilities;
 using QuestPDF.Fluent;
+using SMS_App.Utilities;
 using SMS_App.Utilities.Export;
 using SMS_App.Utilities.LoggerService;
 using SMS_App.Utilities.Reports;
@@ -1203,6 +1204,199 @@ public class StudentsController : Controller
 
     }
     #endregion
+
+    #region ID Cards
+    // Printable, dynamic student ID cards. The HTML view (IdCards) is the pixel-faithful,
+    // "print any time" face used on screen; IdCardsPdf produces a downloadable PDF of the
+    // same cards (a simpler layout - see StudentIdCardPdfBuilder). Both pull their data from
+    // the shared BuildIdCardPageAsync so the two renderers never drift apart.
+
+    [HttpGet]
+    [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
+    [Authorize(Policy = "IndexStudentsPolicy")]
+    public async Task<IActionResult> IdCards(int? academicSessionId, int? academicClassId,
+        int? academicSectionId, string searchString, int? studentId)
+    {
+        var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
+        // A single-student print is self-contained; otherwise default to the current session.
+        if (academicSessionId == null && studentId == null)
+            academicSessionId = currentSession?.Id;
+
+        ViewBag.academicSessionId = new SelectList(await _academicSessionManager.GetAllAsync(), "Id", "Name", academicSessionId);
+        var classes = await _academicClassManager.GetAllAsync();
+        ViewBag.academicClassId = new SelectList(classes.Where(c => c.Status == true), "Id", "Name", academicClassId);
+        if (academicClassId != null)
+        {
+            var sections = await _academicSectionManager.GetAllByClassWithSessionId(
+                academicClassId.Value, academicSessionId ?? currentSession?.Id ?? 0);
+            ViewBag.SectionList = new SelectList(sections, "Id", "Name", academicSectionId);
+        }
+
+        var vm = await BuildIdCardPageAsync(academicSessionId, academicClassId, academicSectionId, searchString, studentId);
+        return View(vm);
+    }
+
+    [HttpGet]
+    [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
+    [Authorize(Policy = "IndexStudentsPolicy")]
+    public async Task<IActionResult> IdCardsPdf(int? academicSessionId, int? academicClassId,
+        int? academicSectionId, string searchString, int? studentId, bool download = false)
+    {
+        if (academicSessionId == null && studentId == null)
+            academicSessionId = (await _academicSessionManager.GetCurrentAcademicSessionAsync())?.Id;
+
+        var vm = await BuildIdCardPageAsync(academicSessionId, academicClassId, academicSectionId, searchString, studentId);
+        if (vm.Cards.Count == 0)
+            return new JsonResult("No students match the selected filters.");
+
+        var logo = ReadInstituteImage(string.IsNullOrWhiteSpace(vm.Institute?.Logo) ? "smslogo.png" : vm.Institute.Logo)
+                   ?? ReadInstituteImage("smslogo.png");
+        var signature = ReadInstituteImage("signature.jpg");
+
+        var doc = new StudentIdCardPdfBuilder(vm.Institute, logo, signature, vm.Cards);
+        var pdf = doc.GeneratePdf();
+
+        string fileName = $"id_cards_{DateTime.Now:yyyyMMdd-HHmm}.pdf";
+        Response.Headers["Content-Disposition"] = download
+            ? $"attachment; filename=\"{fileName}\""
+            : $"inline; filename=\"{fileName}\"";
+        return File(pdf, "application/pdf");
+    }
+
+    /// <summary>
+    /// Builds the card set for the given filters. A single <paramref name="studentId"/> is honoured
+    /// on its own (so an inactive student's card can still be printed from the list); otherwise the
+    /// session/class/section/keyword filters narrow the ACTIVE students, ordered class then roll.
+    /// Blood group and address lookups are pre-loaded into dictionaries to avoid per-student queries.
+    /// </summary>
+    private async Task<StudentIdCardPageVM> BuildIdCardPageAsync(int? academicSessionId,
+        int? academicClassId, int? academicSectionId, string searchString, int? studentId)
+    {
+        var institute = await _instituteManager.GetByIdAsync(1);
+        var vm = new StudentIdCardPageVM
+        {
+            Institute = institute,
+            InstituteLogoDataUri = BuildInstituteLogoDataUri(institute?.Logo),
+            AcademicSessionId = academicSessionId,
+            AcademicClassId = academicClassId,
+            AcademicSectionId = academicSectionId,
+            SearchString = searchString,
+            StudentId = studentId,
+        };
+
+        var all = (await _studentManager.GetAllAsync()) ?? Enumerable.Empty<Student>();
+        IEnumerable<Student> query;
+
+        if (studentId is > 0)
+        {
+            query = all.Where(s => s.Id == studentId.Value);
+            vm.HasQueried = true;
+        }
+        else
+        {
+            // Avoid accidentally rendering an entire session: a class, keyword or section is required.
+            vm.HasQueried = academicClassId != null || academicSectionId != null
+                || !string.IsNullOrWhiteSpace(searchString);
+            if (!vm.HasQueried)
+                return vm;
+
+            query = all.Where(s => s.Status && s.AcademicSessionId == academicSessionId);
+            if (academicClassId != null) query = query.Where(s => s.AcademicClassId == academicClassId.Value);
+            if (academicSectionId != null) query = query.Where(s => s.AcademicSectionId == academicSectionId.Value);
+            if (!string.IsNullOrWhiteSpace(searchString))
+            {
+                var term = searchString.Trim().ToLowerInvariant();
+                query = query.Where(s =>
+                    (s.Name?.ToLowerInvariant().Contains(term) ?? false)
+                    || (s.NameBangla?.Contains(searchString) ?? false)
+                    || s.ClassRoll.ToString().Contains(term)
+                    || (s.UniqueId?.ToLowerInvariant().Contains(term) ?? false)
+                    || (s.PhoneNo?.Contains(term) ?? false));
+            }
+        }
+
+        var students = query
+            .OrderBy(s => s.AcademicClass?.ClassSerial)
+            .ThenBy(s => s.ClassRoll)
+            .ToList();
+
+        if (students.Count == 0)
+            return vm;
+
+        var bloods = (await _bloodGroupManager.GetAllAsync()).ToDictionary(b => b.Id, b => b.Name);
+        var districts = (await _districtManager.GetAllAsync()).ToDictionary(d => d.Id, d => d.Name);
+        var upazilas = (await _upazilaManager.GetAllAsync()).ToDictionary(u => u.Id, u => u.Name);
+
+        foreach (var s in students)
+        {
+            var qrPayload = $"ID:{s.UniqueId}\nName:{s.Name}\nClass:{s.AcademicClass?.Name}" +
+                            $"{(string.IsNullOrEmpty(s.AcademicSection?.Name) ? "" : "-" + s.AcademicSection.Name)}\nRoll:{s.ClassRoll}";
+            var qrPng = QrCodeHelper.GeneratePng(qrPayload, 8);
+
+            vm.Cards.Add(new StudentIdCardVM
+            {
+                Id = s.Id,
+                Name = s.Name,
+                NameBangla = s.NameBangla,
+                FatherName = s.FatherName,
+                ClassName = s.AcademicClass?.Name,
+                SectionName = s.AcademicSection?.Name,
+                ClassRoll = s.ClassRoll,
+                UniqueId = s.UniqueId,
+                BloodGroup = s.BloodGroupId != null && bloods.TryGetValue(s.BloodGroupId.Value, out var bg) ? bg : null,
+                PhoneNo = s.PhoneNo,
+                GuardianPhone = s.GuardianPhone,
+                SessionName = s.AcademicSession?.Name,
+                Address = ComposeAddress(s, districts, upazilas),
+                PhotoUrl = ResolveStudentPhotoUrl(s.Photo),
+                PhotoPath = ResolveStudentPhotoPath(s.Photo),
+                QrPng = qrPng,
+                QrDataUri = qrPng == null ? string.Empty : "data:image/png;base64," + Convert.ToBase64String(qrPng),
+            });
+        }
+
+        return vm;
+    }
+
+    /// <summary>Joins the present-address parts (area, PO, upazila, district) that are set.</summary>
+    private static string ComposeAddress(Student s, IReadOnlyDictionary<int, string> districts,
+        IReadOnlyDictionary<int, string> upazilas)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(s.PresentAddressArea)) parts.Add(s.PresentAddressArea.Trim());
+        if (!string.IsNullOrWhiteSpace(s.PresentAddressPO)) parts.Add(s.PresentAddressPO.Trim());
+        if (upazilas.TryGetValue(s.PresentUpazilaId, out var up) && !string.IsNullOrWhiteSpace(up)) parts.Add(up);
+        if (districts.TryGetValue(s.PresentDistrictId, out var dist) && !string.IsNullOrWhiteSpace(dist)) parts.Add(dist);
+        return string.Join(", ", parts);
+    }
+
+    /// <summary>Absolute path to a student's photo on disk, or null when there is none.</summary>
+    private string ResolveStudentPhotoPath(string photo)
+    {
+        if (string.IsNullOrEmpty(photo)) return null;
+        var path = Path.Combine(_host.WebRootPath, "Images", "Student", photo);
+        return System.IO.File.Exists(path) ? path : null;
+    }
+
+    /// <summary>Reads an institute image (logo/signature) as bytes, or null when missing.</summary>
+    private byte[] ReadInstituteImage(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName)) return null;
+        var path = Path.Combine(_host.WebRootPath, "Images", "Institute", fileName);
+        return System.IO.File.Exists(path) ? System.IO.File.ReadAllBytes(path) : null;
+    }
+
+    /// <summary>Institute logo as a data URI for the HTML card; falls back to the bundled default.</summary>
+    private string BuildInstituteLogoDataUri(string logo)
+    {
+        var bytes = ReadInstituteImage(string.IsNullOrWhiteSpace(logo) ? "smslogo.png" : logo)
+                    ?? ReadInstituteImage("smslogo.png");
+        if (bytes == null) return string.Empty;
+        var ext = Path.GetExtension(string.IsNullOrWhiteSpace(logo) ? "smslogo.png" : logo).ToLowerInvariant();
+        var mime = ext is ".jpg" or ".jpeg" ? "image/jpeg" : "image/png";
+        return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+    }
+    #endregion ID Cards
 
     #region Profile
     [Authorize, AllowAnonymous]

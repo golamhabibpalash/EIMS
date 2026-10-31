@@ -42,6 +42,8 @@
                    title="Import many students from a CSV or Excel file"><i class="fa fa-upload"></i> Bulk Upload</a>
                 <button type="button" id="openExportBtn" class="btn btn-success"
                         title="Choose columns and format, then download the filtered list"><i class="fa fa-file-excel"></i> Export</button>
+                <a id="openIdCardsBtn" class="btn btn-info" target="_blank"
+                   title="Generate printable ID cards for the filtered students"><i class="fa fa-id-card"></i> ID Cards</a>
             </div>
         </div>
     </div>
@@ -184,6 +186,7 @@
             const editBase = '@Url.Action("Edit", "Students")';
             const detailsBase = '@Url.Action("Details", "Students")';
             const deleteBase = '@Url.Action("Delete", "Students")';
+            const idCardBase = '@Url.Action("IdCards", "Students")';
             const canEdit = @canEdit.ToString().ToLower();
             const canDelete = @canDelete.ToString().ToLower();
 
@@ -297,6 +300,7 @@
                                 html += '<a class="btn btn-sm" title="Edit" href="' + editBase + '/' + row.id + '?returnUrl=' + ret + '"><i class="fas fa-edit text-dark"></i></a>';
                             }
                             html += '<a class="btn btn-sm" title="Details" href="' + detailsBase + '/' + row.id + '?returnUrl=' + ret + '"><i class="fas fa-info-circle text-info"></i></a>';
+                            html += '<a class="btn btn-sm" title="ID Card" target="_blank" href="' + idCardBase + '?studentId=' + row.id + '"><i class="fas fa-id-card text-primary"></i></a>';
                             if (canDelete) {
                                 html += '<a class="btn btn-sm" title="Delete" href="' + deleteBase + '/' + row.id + '?returnUrl=' + ret + '"><i class="fa fa-trash text-danger"></i></a>';
                             }
@@ -393,6 +397,19 @@
             }
 
             $('#openExportBtn').on('click', function () { refreshCount(); showModal('exportModal'); });
+
+            // ID Cards: open the card screen pre-filtered to exactly what the list is showing.
+            $('#openIdCardsBtn').on('click', function (e) {
+                e.preventDefault();
+                const f = filterState();
+                const p = new URLSearchParams();
+                if (f.academicSessionId) p.set('academicSessionId', f.academicSessionId);
+                if (f.academicClassId) p.set('academicClassId', f.academicClassId);
+                if (f.academicSectionId) p.set('academicSectionId', f.academicSectionId);
+                const kw = table.search();
+                if (kw) p.set('searchString', kw);
+                window.open(idCardBase + '?' + p.toString(), '_blank');
+            });
             $('#exportSelectAll').on('click', function () { $('.export-col').prop('checked', true); refreshCount(); });
             $('#exportClear').on('click', function () { $('.export-col').prop('checked', false); refreshCount(); });
             $('.export-col').on('change', refreshCount);

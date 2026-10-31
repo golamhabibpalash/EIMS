@@ -1,0 +1,277 @@
+@using SMS_App.ViewModels.Students
+@model StudentIdCardPageVM
+@{
+    ViewData["Title"] = "Student ID Cards";
+    GlobalUI.PageTitle = "Student ID Cards";
+
+    string Title(string s) => string.IsNullOrWhiteSpace(s)
+        ? "" : System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(s.ToLowerInvariant());
+
+    // Query string that reproduces the current card set, reused by the "Download PDF" links.
+    var pdfQuery = new List<string>();
+    if (Model.AcademicSessionId != null) pdfQuery.Add($"academicSessionId={Model.AcademicSessionId}");
+    if (Model.AcademicClassId != null) pdfQuery.Add($"academicClassId={Model.AcademicClassId}");
+    if (Model.AcademicSectionId != null) pdfQuery.Add($"academicSectionId={Model.AcademicSectionId}");
+    if (!string.IsNullOrWhiteSpace(Model.SearchString)) pdfQuery.Add($"searchString={Uri.EscapeDataString(Model.SearchString)}");
+    if (Model.StudentId != null) pdfQuery.Add($"studentId={Model.StudentId}");
+    var pdfQs = string.Join("&", pdfQuery);
+}
+
+<div class="card shadow-sm mb-3 no-print">
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
+        <h5 class="mb-0"><i class="fa fa-id-card mr-2"></i> Student ID Cards</h5>
+        <div class="btn-group btn-group-sm">
+            <button type="button" id="printCardsBtn" class="btn btn-primary" @(Model.Cards.Count == 0 ? "disabled" : "")>
+                <i class="fa fa-print"></i> Print
+            </button>
+            <a id="downloadPdfBtn" class="btn btn-outline-danger @(Model.Cards.Count == 0 ? "disabled" : "")"
+               href="@Url.Action("IdCardsPdf", "Students")?@pdfQs&download=true" target="_blank">
+                <i class="fa fa-file-pdf"></i> Download PDF
+            </a>
+        </div>
+    </div>
+    <div class="card-body py-2">
+        <form method="get" asp-action="IdCards" asp-controller="Students" id="idCardFilter">
+            <div class="row g-2 align-items-end">
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Session</label>
+                    <select class="form-control form-control-sm" name="academicSessionId" id="fSession"
+                            asp-items="@ViewBag.academicSessionId"></select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Class</label>
+                    <select class="form-control form-control-sm" name="academicClassId" id="fClass"
+                            asp-items="@ViewBag.academicClassId">
+                        <option value="">Select class</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Section</label>
+                    <select class="form-control form-control-sm" name="academicSectionId" id="fSection"
+                            asp-items="@(ViewBag.SectionList as Microsoft.AspNetCore.Mvc.Rendering.SelectList)">
+                        <option value="">All sections</option>
+                    </select>
+                </div>
+                <div class="col-xl-3 col-lg-3 col-md-6 col-12 mb-2">
+                    <label class="form-label mb-0 small text-muted">Keyword</label>
+                    <input type="text" class="form-control form-control-sm" name="searchString"
+                           placeholder="Name / Roll / ID / Phone" value="@Model.SearchString">
+                </div>
+                <div class="col-12 col-lg-auto mb-2 d-flex align-items-center">
+                    <button type="submit" class="btn btn-primary btn-sm mr-2"><i class="fa fa-id-card"></i> Generate Cards</button>
+                    <a class="btn btn-outline-warning btn-sm" asp-action="IdCards"><i class="fa fa-undo"></i> Reset</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (!Model.HasQueried)
+{
+    <div class="alert alert-info no-print">
+        <i class="fa fa-info-circle"></i> Choose a <strong>class</strong> (and optionally a section) or type a keyword, then
+        click <strong>Generate Cards</strong> to produce printable ID cards.
+    </div>
+}
+else if (Model.Cards.Count == 0)
+{
+    <div class="alert alert-warning no-print">
+        <i class="fa fa-exclamation-triangle"></i> No students match the selected filters.
+    </div>
+}
+else
+{
+    <div class="no-print mb-2 text-muted small">
+        <i class="fa fa-layer-group"></i> @Model.Cards.Count card(s). Use <strong>Print</strong> for exact-size output,
+        or <strong>Download PDF</strong> for a file.
+    </div>
+
+    <div id="cardGallery" class="idc-gallery">
+        @foreach (var c in Model.Cards)
+        {
+            <div class="idc-pair">
+                @* ---------- FRONT ---------- *@
+                <div class="idc idc-front">
+                    <svg class="idc-bg" viewBox="0 0 240 380" preserveAspectRatio="none" aria-hidden="true">
+                        <path fill="#ffffff" d="M0,0 H240 V96 C182,150 150,96 96,140 C52,176 34,120 0,168 Z" />
+                        <circle cx="206" cy="350" r="70" fill="rgba(255,255,255,0.08)" />
+                        <circle cx="24" cy="250" r="46" fill="rgba(255,255,255,0.06)" />
+                    </svg>
+
+                    <div class="idc-head">
+                        @if (!string.IsNullOrEmpty(Model.InstituteLogoDataUri))
+                        {
+                            <img src="@Model.InstituteLogoDataUri" class="idc-head-logo" alt="logo" />
+                        }
+                        <span class="idc-head-name">@Model.Institute?.Name</span>
+                    </div>
+
+                    <div class="idc-photo">
+                        <img src="@c.PhotoUrl" alt="photo" />
+                    </div>
+
+                    <div class="idc-name">@Title(c.Name)</div>
+                    <div class="idc-role">@c.ClassName@(string.IsNullOrEmpty(c.SectionName) ? "" : " - " + c.SectionName)</div>
+
+                    <div class="idc-info">
+                        <div class="idc-row"><span class="idc-lbl">ID NO</span><span class="idc-sep">:</span><span class="idc-val">@c.UniqueId</span></div>
+                        <div class="idc-row"><span class="idc-lbl">Roll</span><span class="idc-sep">:</span><span class="idc-val">@c.ClassRoll</span></div>
+                        <div class="idc-row"><span class="idc-lbl">Blood</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.BloodGroup) ? "-" : c.BloodGroup)</span></div>
+                        <div class="idc-row"><span class="idc-lbl">Phone</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.PhoneNo) ? "-" : c.PhoneNo)</span></div>
+                        <div class="idc-row"><span class="idc-lbl">Address</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.Address) ? "-" : c.Address)</span></div>
+                    </div>
+
+                    <div class="idc-qr">
+                        @if (!string.IsNullOrEmpty(c.QrDataUri))
+                        {
+                            <img src="@c.QrDataUri" alt="qr" />
+                        }
+                    </div>
+                </div>
+
+                @* ---------- BACK ---------- *@
+                <div class="idc idc-back">
+                    <svg class="idc-bg" viewBox="0 0 240 380" preserveAspectRatio="none" aria-hidden="true">
+                        <path fill="#ffffff" d="M0,380 H240 V270 C190,236 150,300 96,268 C44,238 40,320 0,286 Z" />
+                        <circle cx="30" cy="40" r="56" fill="rgba(255,255,255,0.07)" />
+                    </svg>
+
+                    <div class="idc-back-title">Terms &amp; Conditions</div>
+                    <ul class="idc-terms">
+                        <li>This card is the property of the institute and is non-transferable.</li>
+                        <li>The holder must carry this card at all times within the campus.</li>
+                        <li>If found, please return this card to the institute office.</li>
+                        <li>Loss of this card must be reported to the office immediately.</li>
+                    </ul>
+
+                    <div class="idc-back-contact">
+                        @if (!string.IsNullOrWhiteSpace(Model.Institute?.Phone1))
+                        {
+                            <div><span class="idc-lbl">Phone</span><span class="idc-sep">:</span> @Model.Institute.Phone1</div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.Institute?.Email))
+                        {
+                            <div><span class="idc-lbl">E-mail</span><span class="idc-sep">:</span> @Model.Institute.Email</div>
+                        }
+                    </div>
+
+                    <div class="idc-sign">
+                        <div class="idc-sign-line"></div>
+                        <div class="idc-sign-label">Authorised Signature</div>
+                    </div>
+
+                    <div class="idc-back-footer">
+                        <div class="idc-company">@Model.Institute?.Name</div>
+                        @if (!string.IsNullOrWhiteSpace(Model.Institute?.Slogan))
+                        {
+                            <div class="idc-slogan">@Model.Institute.Slogan</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@section Styles {
+    <style>
+        /* ---- ID card: ~2.4in x 3.8in portrait lanyard card ---- */
+        .idc-gallery { display: flex; flex-wrap: wrap; gap: 14px; }
+        .idc-pair { display: flex; gap: 8px; page-break-inside: avoid; break-inside: avoid; }
+
+        .idc {
+            position: relative;
+            width: 2.4in;
+            height: 3.8in;
+            border-radius: 14px;
+            overflow: hidden;
+            background: linear-gradient(140deg, #1565C0 0%, #2A9FD6 100%);
+            color: #fff;
+            font-family: "Segoe UI", Arial, sans-serif;
+            box-shadow: 0 2px 10px rgba(0,0,0,.18);
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .idc-bg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+        .idc > :not(.idc-bg) { position: relative; z-index: 1; }
+
+        /* ---- Front ---- */
+        .idc-head { position: absolute; top: 8px; left: 0; right: 0; text-align: center; padding: 0 10px; }
+        .idc-head-logo { height: 20px; vertical-align: middle; margin-right: 4px; }
+        .idc-head-name { color: #0d47a1; font-weight: 700; font-size: 8.5px; vertical-align: middle; }
+
+        .idc-photo { margin: 46px auto 0; width: 1.15in; height: 1.15in; }
+        .idc-photo img {
+            width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+            border: 4px solid #fff; background: #e8f3fb;
+            box-shadow: 0 0 0 3px rgba(42,159,214,.5);
+        }
+
+        .idc-name { text-align: center; font-weight: 700; font-size: 15px; margin-top: 10px; letter-spacing: .5px; }
+        .idc-role { text-align: center; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: #d7ecfb; margin-top: 1px; }
+
+        .idc-info { margin: 10px 14px 0; }
+        .idc-row { display: flex; font-size: 9px; line-height: 1.5; align-items: baseline; }
+        .idc-lbl { width: 54px; flex: 0 0 54px; font-weight: 600; color: #eaf4fc; }
+        .idc-sep { width: 8px; flex: 0 0 8px; }
+        .idc-val { flex: 1; word-break: break-word; }
+
+        .idc-qr { position: absolute; bottom: 10px; right: 12px; background: #fff; padding: 3px; border-radius: 4px; line-height: 0; }
+        .idc-qr img { width: 52px; height: 52px; display: block; }
+
+        /* ---- Back ---- */
+        .idc-back-title { text-align: center; font-weight: 700; font-size: 12px; margin-top: 16px; letter-spacing: .5px; }
+        .idc-terms { margin: 8px 12px 0; padding-left: 14px; }
+        .idc-terms li { font-size: 7.5px; line-height: 1.45; margin-bottom: 4px; color: #eaf4fc; }
+        .idc-back-contact { margin: 10px 14px 0; font-size: 8.5px; }
+        .idc-back-contact .idc-lbl { display: inline-block; width: 42px; color: #d7ecfb; }
+
+        .idc-sign { position: absolute; bottom: 92px; left: 0; right: 0; text-align: center; }
+        .idc-sign-line { width: 60%; margin: 0 auto 2px; border-top: 1px solid rgba(255,255,255,.8); }
+        .idc-sign-label { font-size: 8px; color: #eaf4fc; }
+
+        .idc-back-footer { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; }
+        .idc-company { color: #0d47a1; font-weight: 700; font-size: 12px; }
+        .idc-slogan { color: #1565C0; font-size: 8px; letter-spacing: 1px; }
+
+        /* ---- Print: only the cards, at true size ---- */
+        @@media print {
+            body * { visibility: hidden; }
+            #cardGallery, #cardGallery * { visibility: visible; }
+            #cardGallery { position: absolute; left: 0; top: 0; }
+            .no-print { display: none !important; }
+            .idc { box-shadow: none; }
+            .idc-pair { margin: 0 0 0.2in 0; }
+            @@page { margin: 0.4in; }
+        }
+    </style>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            // Print just the cards.
+            document.getElementById('printCardsBtn')?.addEventListener('click', function () { window.print(); });
+
+            // Rebuild the section dropdown when class/session changes (same endpoint the list uses).
+            const $class = $('#fClass'), $session = $('#fSession'), $section = $('#fSection');
+            function reloadSections() {
+                const classId = $class.val(), sessionId = $session.val();
+                $section.empty().append('<option value="">All sections</option>');
+                if (!classId) return;
+                $.ajax({
+                    url: "/api/academicsections/getbyclasswithsessionId?classId=" + classId + "&sessionId=" + sessionId,
+                    dataType: "JSON", type: "POST", cache: false,
+                    success: function (data) {
+                        $.each(data || [], function (i, obj) {
+                            $section.append('<option value="' + obj.id + '">' + obj.name + '</option>');
+                        });
+                    }
+                });
+            }
+            $class.on('change', reloadSections);
+            $session.on('change', reloadSections);
+        })();
+    </script>
+}
