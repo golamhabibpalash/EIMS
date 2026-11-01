@@ -7,6 +7,8 @@
     string Title(string s) => string.IsNullOrWhiteSpace(s)
         ? "" : System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(s.ToLowerInvariant());
 
+    var designId = (int)Model.Design;
+
     // Query string that reproduces the current card set, reused by the "Download PDF" links.
     var pdfQuery = new List<string>();
     if (Model.AcademicSessionId != null) pdfQuery.Add($"academicSessionId={Model.AcademicSessionId}");
@@ -14,6 +16,7 @@
     if (Model.AcademicSectionId != null) pdfQuery.Add($"academicSectionId={Model.AcademicSectionId}");
     if (!string.IsNullOrWhiteSpace(Model.SearchString)) pdfQuery.Add($"searchString={Uri.EscapeDataString(Model.SearchString)}");
     if (Model.StudentId != null) pdfQuery.Add($"studentId={Model.StudentId}");
+    pdfQuery.Add($"design={designId}");
     var pdfQs = string.Join("&", pdfQuery);
 }
 
@@ -52,7 +55,15 @@
                         <option value="">All sections</option>
                     </select>
                 </div>
-                <div class="col-xl-3 col-lg-3 col-md-6 col-12 mb-2">
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Design</label>
+                    <select class="form-control form-control-sm" name="design" id="fDesign">
+                        <option value="1" selected="@(designId == 1)">Design 1 &ndash; Blue</option>
+                        <option value="2" selected="@(designId == 2)">Design 2 &ndash; Green</option>
+                        <option value="3" selected="@(designId == 3)">Design 3 &ndash; Maroon</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-6 col-12 mb-2">
                     <label class="form-label mb-0 small text-muted">Keyword</label>
                     <input type="text" class="form-control form-control-sm" name="searchString"
                            placeholder="Name / Roll / ID / Phone" value="@Model.SearchString">
@@ -69,8 +80,8 @@
 @if (!Model.HasQueried)
 {
     <div class="alert alert-info no-print">
-        <i class="fa fa-info-circle"></i> Choose a <strong>class</strong> (and optionally a section) or type a keyword, then
-        click <strong>Generate Cards</strong> to produce printable ID cards.
+        <i class="fa fa-info-circle"></i> Choose a <strong>design</strong> and a <strong>class</strong> (and optionally a section),
+        or type a keyword, then click <strong>Generate Cards</strong>.
     </div>
 }
 else if (Model.Cards.Count == 0)
@@ -82,106 +93,104 @@ else if (Model.Cards.Count == 0)
 else
 {
     <div class="no-print mb-2 text-muted small">
-        <i class="fa fa-layer-group"></i> @Model.Cards.Count card(s). Use <strong>Print</strong> for exact-size output,
-        or <strong>Download PDF</strong> for a file.
+        <i class="fa fa-layer-group"></i> @Model.Cards.Count front card(s) + 1 common back. Use <strong>Print</strong> for exact-size
+        output, or <strong>Download PDF</strong> for a file.
     </div>
 
-    <div id="cardGallery" class="idc-gallery">
+    <div id="cardGallery" class="idc-gallery idc-theme-@designId">
+        @* ---------- One FRONT per student (carries the identity) ---------- *@
         @foreach (var c in Model.Cards)
         {
-            <div class="idc-pair">
-                @* ---------- FRONT (carries the student identity) ---------- *@
-                <div class="idc idc-front">
-                    <div class="idc-head">
-                        @if (!string.IsNullOrEmpty(Model.InstituteLogoDataUri))
-                        {
-                            <img src="@Model.InstituteLogoDataUri" class="idc-head-logo" alt="logo" />
-                        }
-                        <span class="idc-head-name">@Model.Institute?.Name</span>
-                    </div>
-
-                    <div class="idc-photo">
-                        <img src="@c.PhotoUrl" alt="photo" />
-                    </div>
-
-                    <div class="idc-name">@Title(c.Name)</div>
-                    <div class="idc-role">@c.ClassName@(string.IsNullOrEmpty(c.SectionName) ? "" : " - " + c.SectionName)</div>
-
-                    <div class="idc-info">
-                        <div class="idc-row"><span class="idc-lbl">ID NO</span><span class="idc-sep">:</span><span class="idc-val">@c.UniqueId</span></div>
-                        <div class="idc-row"><span class="idc-lbl">Roll</span><span class="idc-sep">:</span><span class="idc-val">@c.ClassRoll</span></div>
-                        <div class="idc-row"><span class="idc-lbl">Blood</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.BloodGroup) ? "-" : c.BloodGroup)</span></div>
-                        <div class="idc-row"><span class="idc-lbl">Phone</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.PhoneNo) ? "-" : c.PhoneNo)</span></div>
-                        <div class="idc-row"><span class="idc-lbl">Address</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.Address) ? "-" : c.Address)</span></div>
-                    </div>
-
-                    <div class="idc-qr">
-                        @if (!string.IsNullOrEmpty(c.QrDataUri))
-                        {
-                            <img src="@c.QrDataUri" alt="qr" />
-                        }
-                    </div>
-                    <div class="idc-foot-bar"></div>
+            <div class="idc idc-front">
+                <div class="idc-head">
+                    @if (!string.IsNullOrEmpty(Model.InstituteLogoDataUri))
+                    {
+                        <img src="@Model.InstituteLogoDataUri" class="idc-head-logo" alt="logo" />
+                    }
+                    <span class="idc-head-name">@Model.Institute?.Name</span>
                 </div>
 
-                @* ---------- BACK (common to every card) ---------- *@
-                <div class="idc idc-back">
-                    <div class="idc-head">
-                        @if (!string.IsNullOrEmpty(Model.InstituteLogoDataUri))
-                        {
-                            <img src="@Model.InstituteLogoDataUri" class="idc-head-logo" alt="logo" />
-                        }
-                        <span class="idc-head-name">@Model.Institute?.Name</span>
-                    </div>
+                <div class="idc-photo">
+                    <img src="@c.PhotoUrl" alt="photo" />
+                </div>
 
-                    <div class="idc-back-title">Terms &amp; Conditions</div>
-                    <ul class="idc-terms">
-                        <li>This card is the property of the institute and is non-transferable.</li>
-                        <li>The holder must carry this card at all times within the campus.</li>
-                        <li>If found, please return this card to the institute office.</li>
-                        <li>Loss of this card must be reported to the office immediately.</li>
-                    </ul>
+                <div class="idc-name">@Title(c.Name)</div>
+                <div class="idc-role">@c.ClassName@(string.IsNullOrEmpty(c.SectionName) ? "" : " - " + c.SectionName)</div>
 
-                    <div class="idc-back-contact">
-                        @if (!string.IsNullOrWhiteSpace(Model.Institute?.Phone1))
-                        {
-                            <div><span class="idc-lbl">Phone</span><span class="idc-sep">:</span> @Model.Institute.Phone1</div>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(Model.Institute?.Email))
-                        {
-                            <div><span class="idc-lbl">E-mail</span><span class="idc-sep">:</span> @Model.Institute.Email</div>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(Model.Institute?.Address))
-                        {
-                            <div><span class="idc-lbl">Address</span><span class="idc-sep">:</span> @Model.Institute.Address</div>
-                        }
-                    </div>
+                <div class="idc-info">
+                    <div class="idc-row"><span class="idc-lbl">ID NO</span><span class="idc-sep">:</span><span class="idc-val">@c.UniqueId</span></div>
+                    <div class="idc-row"><span class="idc-lbl">Roll</span><span class="idc-sep">:</span><span class="idc-val">@c.ClassRoll</span></div>
+                    <div class="idc-row"><span class="idc-lbl">Blood</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.BloodGroup) ? "-" : c.BloodGroup)</span></div>
+                    <div class="idc-row"><span class="idc-lbl">Phone</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.PhoneNo) ? "-" : c.PhoneNo)</span></div>
+                    <div class="idc-row"><span class="idc-lbl">Address</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.Address) ? "-" : c.Address)</span></div>
+                </div>
 
-                    <div class="idc-sign">
-                        <div class="idc-sign-line"></div>
-                        <div class="idc-sign-label">Authorised Signature</div>
-                    </div>
-
-                    @if (!string.IsNullOrWhiteSpace(Model.Institute?.Slogan))
+                <div class="idc-qr">
+                    @if (!string.IsNullOrEmpty(c.QrDataUri))
                     {
-                        <div class="idc-slogan">@Model.Institute.Slogan</div>
+                        <img src="@c.QrDataUri" alt="qr" />
                     }
-                    <div class="idc-foot-bar"></div>
                 </div>
             </div>
         }
+
+        @* ---------- Single common BACK (printed once) ---------- *@
+        <div class="idc idc-back">
+            <div class="idc-head">
+                @if (!string.IsNullOrEmpty(Model.InstituteLogoDataUri))
+                {
+                    <img src="@Model.InstituteLogoDataUri" class="idc-head-logo" alt="logo" />
+                }
+                <span class="idc-head-name">@Model.Institute?.Name</span>
+            </div>
+
+            <div class="idc-back-title">Terms &amp; Conditions</div>
+            <ul class="idc-terms">
+                <li>This card is the property of the institute and is non-transferable.</li>
+                <li>The holder must carry this card at all times within the campus.</li>
+                <li>If found, please return this card to the institute office.</li>
+                <li>Loss of this card must be reported to the office immediately.</li>
+            </ul>
+
+            <div class="idc-back-contact">
+                @if (!string.IsNullOrWhiteSpace(Model.Institute?.Phone1))
+                {
+                    <div><span class="idc-lbl">Phone</span><span class="idc-sep">:</span> @Model.Institute.Phone1</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.Institute?.Email))
+                {
+                    <div><span class="idc-lbl">E-mail</span><span class="idc-sep">:</span> @Model.Institute.Email</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.Institute?.Address))
+                {
+                    <div><span class="idc-lbl">Address</span><span class="idc-sep">:</span> @Model.Institute.Address</div>
+                }
+            </div>
+
+            <div class="idc-sign">
+                <div class="idc-sign-line"></div>
+                <div class="idc-sign-label">Authorised Signature</div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(Model.Institute?.Slogan))
+            {
+                <div class="idc-slogan">@Model.Institute.Slogan</div>
+            }
+        </div>
     </div>
 }
 
 @section Styles {
     <style>
         /* ---- Student ID card: clean white (common) design, ~2.4in x 3.8in portrait ----
-           The background is plain; the FRONT content (photo + details) is what identifies
-           the student. The single accent colour is shared by every card. */
-        :root { --idc-accent: #1565C0; --idc-ink: #1f2a37; --idc-muted: #5b6b7b; }
+           The background is plain; the FRONT content (photo + details) identifies the student.
+           The three themes differ only by accent colour + photo shape (set via CSS variables). */
+        .idc-gallery { display: flex; flex-wrap: wrap; gap: 14px; --idc-ink: #1f2a37; --idc-muted: #5b6b7b; }
 
-        .idc-gallery { display: flex; flex-wrap: wrap; gap: 14px; }
-        .idc-pair { display: flex; gap: 8px; page-break-inside: avoid; break-inside: avoid; }
+        /* 3 fixed themes */
+        .idc-theme-1 { --idc-accent: #1565C0; --idc-photo-radius: 50%; }
+        .idc-theme-2 { --idc-accent: #0E9F6E; --idc-photo-radius: 14px; }
+        .idc-theme-3 { --idc-accent: #9D174D; --idc-photo-radius: 50%; }
 
         .idc {
             position: relative;
@@ -194,6 +203,7 @@ else
             color: var(--idc-ink);
             font-family: "Segoe UI", Arial, sans-serif;
             box-shadow: 0 1px 6px rgba(0,0,0,.12);
+            page-break-inside: avoid; break-inside: avoid;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
@@ -206,13 +216,10 @@ else
         .idc-head-logo { height: 20px; vertical-align: middle; margin-right: 5px; }
         .idc-head-name { font-weight: 700; font-size: 9px; vertical-align: middle; }
 
-        /* Thin accent bar at the very bottom to frame the card */
-        .idc-foot-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: var(--idc-accent); }
-
         /* ---- Front ---- */
         .idc-photo { margin: 14px auto 0; width: 1.15in; height: 1.15in; }
         .idc-photo img {
-            width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+            width: 100%; height: 100%; object-fit: cover; border-radius: var(--idc-photo-radius, 50%);
             border: 3px solid var(--idc-accent); background: #eef4fb;
         }
 
@@ -248,7 +255,6 @@ else
             #cardGallery { position: absolute; left: 0; top: 0; }
             .no-print { display: none !important; }
             .idc { box-shadow: none; }
-            .idc-pair { margin: 0 0 0.2in 0; }
             @@page { margin: 0.4in; }
         }
     </style>

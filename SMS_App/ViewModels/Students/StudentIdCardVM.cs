@@ -3,6 +3,14 @@ using SMS.Entities;
 
 namespace SMS_App.ViewModels.Students;
 
+/// <summary>The three fixed ID-card designs the user can pick from the dropdown.</summary>
+public enum IdCardDesign
+{
+    Blue = 1,
+    Green = 2,
+    Maroon = 3,
+}
+
 /// <summary>
 /// One student's data as it appears on the printable ID card. Built once in the controller
 /// and consumed by both the HTML view (<c>PhotoUrl</c> / <c>QrDataUri</c>) and the QuestPDF
@@ -56,6 +64,9 @@ public class StudentIdCardPageVM
     public int? AcademicSectionId { get; set; }
     public string SearchString { get; set; }
     public int? StudentId { get; set; }
+
+    /// <summary>Chosen card design (1-3); defaults to Blue.</summary>
+    public IdCardDesign Design { get; set; } = IdCardDesign.Blue;
 
     /// <summary>True when the user has actually run a filter/selection that produced the card set.</summary>
     public bool HasQueried { get; set; }

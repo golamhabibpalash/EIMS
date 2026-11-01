@@ -1215,7 +1215,7 @@ public class StudentsController : Controller
     [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
     [Authorize(Policy = "IdCardStudentsPolicy")]
     public async Task<IActionResult> IdCards(int? academicSessionId, int? academicClassId,
-        int? academicSectionId, string searchString, int? studentId)
+        int? academicSectionId, string searchString, int? studentId, int design = 1)
     {
         var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
         // A single-student print is self-contained; otherwise default to the current session.
@@ -1233,6 +1233,7 @@ public class StudentsController : Controller
         }
 
         var vm = await BuildIdCardPageAsync(academicSessionId, academicClassId, academicSectionId, searchString, studentId);
+        vm.Design = ClampDesign(design);
         return View(vm);
     }
 
@@ -1240,7 +1241,7 @@ public class StudentsController : Controller
     [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
     [Authorize(Policy = "IdCardStudentsPolicy")]
     public async Task<IActionResult> IdCardsPdf(int? academicSessionId, int? academicClassId,
-        int? academicSectionId, string searchString, int? studentId, bool download = false)
+        int? academicSectionId, string searchString, int? studentId, int design = 1, bool download = false)
     {
         if (academicSessionId == null && studentId == null)
             academicSessionId = (await _academicSessionManager.GetCurrentAcademicSessionAsync())?.Id;
@@ -1253,7 +1254,7 @@ public class StudentsController : Controller
                    ?? ReadInstituteImage("smslogo.png");
         var signature = ReadInstituteImage("signature.jpg");
 
-        var doc = new StudentIdCardPdfBuilder(vm.Institute, logo, signature, vm.Cards);
+        var doc = new StudentIdCardPdfBuilder(vm.Institute, logo, signature, vm.Cards, ClampDesign(design));
         var pdf = doc.GeneratePdf();
 
         string fileName = $"id_cards_{DateTime.Now:yyyyMMdd-HHmm}.pdf";
@@ -1357,6 +1358,10 @@ public class StudentsController : Controller
 
         return vm;
     }
+
+    /// <summary>Maps the raw design query value to the fixed 1-3 range, defaulting to Blue.</summary>
+    private static IdCardDesign ClampDesign(int design) =>
+        design is >= 1 and <= 3 ? (IdCardDesign)design : IdCardDesign.Blue;
 
     /// <summary>Joins the present-address parts (area, PO, upazila, district) that are set.</summary>
     private static string ComposeAddress(Student s, IReadOnlyDictionary<int, string> districts,
