@@ -1215,7 +1215,7 @@ public class StudentsController : Controller
     [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
     [Authorize(Policy = "IdCardStudentsPolicy")]
     public async Task<IActionResult> IdCards(int? academicSessionId, int? academicClassId,
-        int? academicSectionId, string searchString, int? studentId, int design = 1)
+        int? academicSectionId, string searchString, int? studentId, int design = 1, string color = null)
     {
         var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
         // A single-student print is self-contained; otherwise default to the current session.
@@ -1234,6 +1234,7 @@ public class StudentsController : Controller
 
         var vm = await BuildIdCardPageAsync(academicSessionId, academicClassId, academicSectionId, searchString, studentId);
         vm.Design = ClampDesign(design);
+        vm.AccentColor = NormalizeColor(color);
         return View(vm);
     }
 
@@ -1241,7 +1242,7 @@ public class StudentsController : Controller
     [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
     [Authorize(Policy = "IdCardStudentsPolicy")]
     public async Task<IActionResult> IdCardsPdf(int? academicSessionId, int? academicClassId,
-        int? academicSectionId, string searchString, int? studentId, int design = 1, bool download = false)
+        int? academicSectionId, string searchString, int? studentId, int design = 1, string color = null, bool download = false)
     {
         if (academicSessionId == null && studentId == null)
             academicSessionId = (await _academicSessionManager.GetCurrentAcademicSessionAsync())?.Id;
@@ -1254,7 +1255,7 @@ public class StudentsController : Controller
                    ?? ReadInstituteImage("smslogo.png");
         var signature = ReadInstituteImage("signature.jpg");
 
-        var doc = new StudentIdCardPdfBuilder(vm.Institute, logo, signature, vm.Cards, ClampDesign(design));
+        var doc = new StudentIdCardPdfBuilder(vm.Institute, logo, signature, vm.Cards, ClampDesign(design), NormalizeColor(color));
         var pdf = doc.GeneratePdf();
 
         string fileName = $"id_cards_{DateTime.Now:yyyyMMdd-HHmm}.pdf";
@@ -1359,9 +1360,19 @@ public class StudentsController : Controller
         return vm;
     }
 
-    /// <summary>Maps the raw design query value to the fixed 1-3 range, defaulting to Blue.</summary>
+    /// <summary>Maps the raw design query value to the fixed 1-3 range, defaulting to Classic.</summary>
     private static IdCardDesign ClampDesign(int design) =>
-        design is >= 1 and <= 3 ? (IdCardDesign)design : IdCardDesign.Blue;
+        design is >= 1 and <= 3 ? (IdCardDesign)design : IdCardDesign.Classic;
+
+    /// <summary>Validates a colour-picker value to a safe #RRGGBB hex, defaulting to blue.</summary>
+    private static string NormalizeColor(string color)
+    {
+        const string fallback = "#1565C0";
+        if (string.IsNullOrWhiteSpace(color)) return fallback;
+        var c = color.Trim();
+        if (!c.StartsWith("#")) c = "#" + c;
+        return System.Text.RegularExpressions.Regex.IsMatch(c, "^#[0-9A-Fa-f]{6}$") ? c.ToUpperInvariant() : fallback;
+    }
 
     /// <summary>Joins the present-address parts (area, PO, upazila, district) that are set.</summary>
     private static string ComposeAddress(Student s, IReadOnlyDictionary<int, string> districts,

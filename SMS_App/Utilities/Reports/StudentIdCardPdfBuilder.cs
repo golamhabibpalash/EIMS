@@ -15,52 +15,48 @@ namespace SMS_App.Utilities.Reports;
 /// Renders printable student ID cards as a PDF. One FRONT card is produced for every student,
 /// tiled in a grid; the common BACK is printed only ONCE, on its own page at the end.
 ///
-/// IMPORTANT: no element inside a card may use <c>Extend()</c>/<c>ExtendVertical()</c>. A fixed
-/// height is applied to each card slot, and Extend inside a fixed-height slot makes QuestPDF
-/// expand it to the full page - which previously pushed the QR onto a new page and left a ghost
-/// blank card. Content is laid out top-to-bottom and is sized to fit the slot instead.
+/// Layout is chosen via <see cref="IdCardDesign"/> (Classic / Wave / SidePanel) and the accent
+/// colour is supplied separately, so any layout can be rendered in any colour - matching the
+/// HTML cards on Views/Students/IdCards.cshtml.
 ///
-/// Three fixed designs are selectable; they differ only by colour palette (same layout), so the
-/// output stays predictable and matches the HTML cards on Views/Students/IdCards.cshtml.
+/// IMPORTANT: no element inside a card may use <c>Extend()</c>/<c>ExtendVertical()</c>. Each card
+/// sits in a fixed-height slot, and Extend inside a fixed-height slot makes QuestPDF expand it to
+/// the full page - which previously pushed the QR onto a new page and left a ghost blank card.
+/// Content is laid out top-to-bottom and sized to fit the slot instead.
 /// </summary>
 public class StudentIdCardPdfBuilder : IDocument
 {
     private const float CardWidthInches = 2.4f;
-    // 3.8in slot leaves comfortable headroom over the front content (~2.5in tall) so nothing
-    // spills onto a new page. Two rows of cards fit an A4 column; the rest flow to the next page.
+    // 3.8in slot leaves comfortable headroom over the front content so nothing spills onto a new
+    // page. Two rows of cards fit an A4 column; the rest flow to the next page.
     private const float CardHeightInches = 3.8f;
     private const int ColumnsPerRow = 3;
 
     private const string Ink = "#1F2A37";
     private const string Muted = "#5B6B7B";
     private const string CardBorder = "#D0D7DE";
+    private const string PhotoBg = "#EEF2F7";
 
     private readonly Institute _institute;
     private readonly byte[] _logo;
     private readonly byte[] _signature;
     private readonly List<StudentIdCardVM> _cards;
-    private readonly string _primary;
+    private readonly IdCardDesign _design;
     private readonly string _accent;
-    private readonly string _light;
 
     private static string ToTitle(string s) =>
         string.IsNullOrWhiteSpace(s) ? ""
             : CultureInfo.CurrentCulture.TextInfo.ToTitleCase(s.ToLowerInvariant());
 
     public StudentIdCardPdfBuilder(Institute institute, byte[] logo, byte[] signature,
-        List<StudentIdCardVM> cards, IdCardDesign design = IdCardDesign.Blue)
+        List<StudentIdCardVM> cards, IdCardDesign design = IdCardDesign.Classic, string accentColor = "#1565C0")
     {
         _institute = institute;
         _logo = logo;
         _signature = signature;
         _cards = cards ?? new List<StudentIdCardVM>();
-
-        (_primary, _accent, _light) = design switch
-        {
-            IdCardDesign.Green => ("#0E9F6E", "#34D399", "#E7F7F0"),
-            IdCardDesign.Maroon => ("#9D174D", "#DB2777", "#FCE7F0"),
-            _ => ("#1565C0", "#2A9FD6", "#E8F3FB"),
-        };
+        _design = design;
+        _accent = string.IsNullOrWhiteSpace(accentColor) ? "#1565C0" : accentColor;
     }
 
     public DocumentMetadata GetMetadata() => DocumentMetadata.Default;
@@ -77,8 +73,7 @@ public class StudentIdCardPdfBuilder : IDocument
             {
                 col.Spacing(10);
 
-                // All fronts, tiled ColumnsPerRow across. A row with fewer than ColumnsPerRow
-                // cards is padded with empty slots so widths stay aligned.
+                // All fronts, tiled ColumnsPerRow across. Short rows are padded with empty slots.
                 foreach (var chunk in _cards.Chunk(ColumnsPerRow))
                 {
                     col.Item().Row(row =>
@@ -115,57 +110,85 @@ public class StudentIdCardPdfBuilder : IDocument
 
     private void ComposeFront(IContainer container, StudentIdCardVM card)
     {
-        // Clean white (common) card - the front CONTENT identifies the student.
-        container.Border(0.75f).BorderColor(CardBorder).Background(Colors.White).Column(col =>
+        var framed = container.Border(0.75f).BorderColor(CardBorder).Background(Colors.White);
+        switch (_design)
         {
-            ComposeHeader(col);
+            case IdCardDesign.Wave: ComposeFrontWave(framed, card); break;
+            case IdCardDesign.SidePanel: ComposeFrontSidePanel(framed, card); break;
+            default: ComposeFrontClassic(framed, card); break;
+        }
+    }
 
-            // Photo.
-            col.Item().PaddingTop(8).AlignCenter().Width(1.0f, Unit.Inch).Height(1.1f, Unit.Inch)
-                .Border(2).BorderColor(_accent).Background(_light)
-                .Element(c =>
-                {
-                    if (!string.IsNullOrEmpty(card.PhotoPath) && File.Exists(card.PhotoPath))
-                    {
-                        try { c.Image(card.PhotoPath).FitArea(); return; } catch { }
-                    }
-                    c.AlignCenter().AlignMiddle().Text("No Photo").FontColor(Colors.Grey.Medium).FontSize(7);
-                });
+    // ---- Design 1: Classic - thin accent header, round-ish photo, details below ----
+    private void ComposeFrontClassic(IContainer container, StudentIdCardVM card)
+    {
+        container.Column(col =>
+        {
+            HeaderStrip(col);
+            col.Item().PaddingTop(8).AlignCenter().Element(c => Photo(c, card, 1.0f, 1.1f));
+            NameBlock(col, card);
+            DetailRows(col, card);
+            col.Item().PaddingTop(5).AlignCenter().Element(c => Qr(c, card, 46));
+        });
+    }
 
-            // Name + class.
-            col.Item().PaddingTop(5).AlignCenter().Text(ToTitle(card.Name)).Bold().FontSize(10.5f).FontColor(Ink);
-            col.Item().AlignCenter().Text($"{card.ClassName}{(string.IsNullOrEmpty(card.SectionName) ? "" : " - " + card.SectionName)}")
-                .FontSize(8).FontColor(Muted);
-
-            // Detail rows.
-            col.Item().PaddingTop(5).PaddingHorizontal(8).Column(info =>
+    // ---- Design 2: Wave - large accent top panel carrying logo/photo, details on white ----
+    private void ComposeFrontWave(IContainer container, StudentIdCardVM card)
+    {
+        container.Column(col =>
+        {
+            // Accent top panel with the institute name and the photo sitting inside it.
+            col.Item().Background(_accent).PaddingVertical(8).PaddingHorizontal(6).Column(top =>
             {
-                info.Spacing(1.5f);
-                InfoRow(info, "ID NO", card.UniqueId);
-                InfoRow(info, "Roll", card.ClassRoll.ToString());
-                InfoRow(info, "Blood", card.BloodGroup);
-                InfoRow(info, "Phone", card.PhoneNo);
+                top.Item().AlignCenter().Text(_institute?.Name ?? "").FontColor(Colors.White).Bold().FontSize(8);
+                top.Item().PaddingTop(6).AlignCenter().Element(c => Photo(c, card, 1.0f, 1.1f, white: true));
             });
 
-            // QR follows the detail rows (NOT bottom-pinned - see class remarks).
-            col.Item().PaddingTop(5).AlignCenter().Column(c =>
+            NameBlock(col, card);
+            DetailRows(col, card);
+            col.Item().PaddingTop(5).AlignCenter().Element(c => Qr(c, card, 44));
+        });
+    }
+
+    // ---- Design 3: SidePanel - accent column (photo + QR) on the left, details on the right ----
+    private void ComposeFrontSidePanel(IContainer container, StudentIdCardVM card)
+    {
+        container.Row(row =>
+        {
+            // Left accent panel.
+            row.ConstantItem(0.95f, Unit.Inch).Background(_accent).Padding(6).Column(side =>
             {
-                if (card.QrPng != null)
+                side.Item().AlignCenter().Element(c => Photo(c, card, 0.78f, 0.9f, white: true));
+                side.Item().PaddingTop(8).AlignCenter().Text(card.UniqueId ?? "").FontColor(Colors.White).Bold().FontSize(7);
+                side.Item().PaddingTop(6).AlignCenter().Background(Colors.White).Padding(2).Element(c => Qr(c, card, 40));
+            });
+
+            // Right details panel.
+            row.RelativeItem().Padding(8).Column(right =>
+            {
+                right.Item().Text(_institute?.Name ?? "").FontColor(_accent).Bold().FontSize(8);
+                right.Item().PaddingTop(6).Text(ToTitle(card.Name)).Bold().FontSize(10).FontColor(Ink);
+                right.Item().Text($"{card.ClassName}{(string.IsNullOrEmpty(card.SectionName) ? "" : " - " + card.SectionName)}")
+                    .FontSize(8).FontColor(Muted);
+                right.Item().PaddingTop(6).Column(info =>
                 {
-                    try { c.Item().AlignCenter().Width(46).Height(46).Image(card.QrPng).FitArea(); } catch { }
-                }
+                    info.Spacing(2);
+                    InfoRow(info, "Roll", card.ClassRoll.ToString());
+                    InfoRow(info, "Blood", card.BloodGroup);
+                    InfoRow(info, "Phone", card.PhoneNo);
+                    InfoRow(info, "Session", card.SessionName);
+                });
             });
         });
     }
 
     private void ComposeBack(IContainer container)
     {
-        // Common white back - identical for every card (no student-specific identity).
         container.Border(0.75f).BorderColor(CardBorder).Background(Colors.White).Column(col =>
         {
-            ComposeHeader(col);
+            HeaderStrip(col);
 
-            col.Item().PaddingTop(6).AlignCenter().Text("Terms & Conditions").FontColor(_primary).Bold().FontSize(9);
+            col.Item().PaddingTop(6).AlignCenter().Text("Terms & Conditions").FontColor(_accent).Bold().FontSize(9);
             col.Item().PaddingHorizontal(8).PaddingTop(4).Column(c =>
             {
                 c.Spacing(3);
@@ -192,15 +215,17 @@ public class StudentIdCardPdfBuilder : IDocument
                 }
                 c.Item().PaddingTop(2).AlignCenter().Text("Authorised Signature").FontColor(Muted).FontSize(6.5f);
                 if (!string.IsNullOrWhiteSpace(_institute?.Slogan))
-                    c.Item().PaddingTop(3).AlignCenter().Text(_institute.Slogan).FontColor(_primary).FontSize(6.5f);
+                    c.Item().PaddingTop(3).AlignCenter().Text(_institute.Slogan).FontColor(_accent).FontSize(6.5f);
             });
         });
     }
 
-    /// <summary>Common institute header strip shared by both faces.</summary>
-    private void ComposeHeader(ColumnDescriptor col)
+    // ----------------------------------------------------------------------- shared pieces
+
+    /// <summary>Common institute header strip (logo + name on an accent band).</summary>
+    private void HeaderStrip(ColumnDescriptor col)
     {
-        col.Item().Background(_primary).Padding(5).Row(r =>
+        col.Item().Background(_accent).Padding(5).Row(r =>
         {
             if (_logo != null)
             {
@@ -211,11 +236,51 @@ public class StudentIdCardPdfBuilder : IDocument
         });
     }
 
+    private void Photo(IContainer container, StudentIdCardVM card, float wInch, float hInch, bool white = false)
+    {
+        container.Width(wInch, Unit.Inch).Height(hInch, Unit.Inch)
+            .Border(2).BorderColor(white ? "#FFFFFF" : _accent).Background(PhotoBg)
+            .Element(c =>
+            {
+                if (!string.IsNullOrEmpty(card.PhotoPath) && File.Exists(card.PhotoPath))
+                {
+                    try { c.Image(card.PhotoPath).FitArea(); return; } catch { }
+                }
+                c.AlignCenter().AlignMiddle().Text("No Photo").FontColor(Colors.Grey.Medium).FontSize(7);
+            });
+    }
+
+    private void NameBlock(ColumnDescriptor col, StudentIdCardVM card)
+    {
+        col.Item().PaddingTop(5).AlignCenter().Text(ToTitle(card.Name)).Bold().FontSize(10.5f).FontColor(Ink);
+        col.Item().AlignCenter().Text($"{card.ClassName}{(string.IsNullOrEmpty(card.SectionName) ? "" : " - " + card.SectionName)}")
+            .FontSize(8).FontColor(Muted);
+    }
+
+    private void DetailRows(ColumnDescriptor col, StudentIdCardVM card)
+    {
+        col.Item().PaddingTop(5).PaddingHorizontal(8).Column(info =>
+        {
+            info.Spacing(1.5f);
+            InfoRow(info, "ID NO", card.UniqueId);
+            InfoRow(info, "Roll", card.ClassRoll.ToString());
+            InfoRow(info, "Blood", card.BloodGroup);
+            InfoRow(info, "Phone", card.PhoneNo);
+        });
+    }
+
+    private void Qr(IContainer container, StudentIdCardVM card, float size)
+    {
+        if (card.QrPng == null) { container.Width(size).Height(size); return; }
+        try { container.Width(size).Height(size).Image(card.QrPng).FitArea(); }
+        catch { container.Width(size).Height(size); }
+    }
+
     private void InfoRow(ColumnDescriptor col, string label, string value)
     {
         col.Item().Row(r =>
         {
-            r.ConstantItem(44).Text(label).SemiBold().FontSize(7.5f).FontColor(_primary);
+            r.ConstantItem(44).Text(label).SemiBold().FontSize(7.5f).FontColor(_accent);
             r.AutoItem().Text(":").FontSize(7.5f).FontColor(Ink);
             r.RelativeItem().PaddingLeft(3).Text(string.IsNullOrWhiteSpace(value) ? "-" : value).FontSize(7.5f).FontColor(Ink);
         });

@@ -3,12 +3,20 @@ using SMS.Entities;
 
 namespace SMS_App.ViewModels.Students;
 
-/// <summary>The three fixed ID-card designs the user can pick from the dropdown.</summary>
+/// <summary>
+/// The three fixed ID-card LAYOUTS the user can pick from the dropdown. The accent colour is
+/// chosen separately via the colour picker, so any layout can be rendered in any colour.
+/// </summary>
 public enum IdCardDesign
 {
-    Blue = 1,
-    Green = 2,
-    Maroon = 3,
+    /// <summary>Minimal: solid accent header bar, round photo, left-aligned details.</summary>
+    Classic = 1,
+
+    /// <summary>Modern: large accent top panel with a curved/wave edge and an overlapping photo.</summary>
+    Wave = 2,
+
+    /// <summary>Corporate: an accent side panel carrying the photo + QR, details on the right.</summary>
+    SidePanel = 3,
 }
 
 /// <summary>
@@ -65,8 +73,11 @@ public class StudentIdCardPageVM
     public string SearchString { get; set; }
     public int? StudentId { get; set; }
 
-    /// <summary>Chosen card design (1-3); defaults to Blue.</summary>
-    public IdCardDesign Design { get; set; } = IdCardDesign.Blue;
+    /// <summary>Chosen card layout (1-3); defaults to Classic.</summary>
+    public IdCardDesign Design { get; set; } = IdCardDesign.Classic;
+
+    /// <summary>Accent colour (hex, e.g. "#1565C0") chosen from the colour picker.</summary>
+    public string AccentColor { get; set; } = "#1565C0";
 
     /// <summary>True when the user has actually run a filter/selection that produced the card set.</summary>
     public bool HasQueried { get; set; }
