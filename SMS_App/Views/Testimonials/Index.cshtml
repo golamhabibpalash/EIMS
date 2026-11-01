@@ -1,0 +1,111 @@
+@model IEnumerable<SMS.Entities.Testimonial>
+@{
+    ViewData["Title"] = "Testimonials";
+    GlobalUI.PageTitle = "Testimonials";
+    var canManage = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+
+    string PhotoUrl(SMS.Entities.Testimonial t)
+    {
+        if (!string.IsNullOrEmpty(t.Photo)) return Url.Content($"~/Images/Testimonial/{t.Photo}");
+        if (t.Student != null && !string.IsNullOrEmpty(t.Student.Photo)) return Url.Content($"~/Images/Student/{t.Student.Photo}");
+        return Url.Content("~/Images/noProfileImage.png");
+    }
+}
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
+        <h5 class="mb-0"><i class="fa fa-quote-right mr-2"></i> Testimonials</h5>
+        <div class="btn-group btn-group-sm">
+            <a asp-action="Published" class="btn btn-outline-secondary"><i class="fa fa-eye"></i> Published</a>
+            @if (canManage)
+            {
+                <a asp-action="Create" class="btn btn-primary"><i class="fa fa-plus"></i> Add Testimonial</a>
+            }
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped table-bordered align-middle w-100" id="testimonialsTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>Photo</th>
+                        <th>Name</th>
+                        <th>Designation</th>
+                        <th>Testimonial</th>
+                        <th>Order</th>
+                        <th>Status</th>
+                        <th>Published</th>
+                        <th class="text-nowrap">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ var sl = 1; }
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td>@(sl++)</td>
+                            <td><img src="@PhotoUrl(item)" class="rounded-circle" style="width:34px;height:34px;object-fit:cover;" /></td>
+                            <td>@item.StudentName</td>
+                            <td>@item.Designation</td>
+                            <td>@(string.IsNullOrEmpty(item.Content) ? "" : (item.Content.Length > 80 ? item.Content.Substring(0, 80) + "…" : item.Content))</td>
+                            <td>@item.DisplayOrder</td>
+                            <td>
+                                @if (item.Status)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </td>
+                            <td>
+                                @if (item.IsPublished)
+                                {
+                                    <span class="badge bg-primary">Published</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">Draft</span>
+                                }
+                            </td>
+                            <td class="text-nowrap">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a class="btn btn-sm" title="Details" asp-action="Details" asp-route-id="@item.Id"><i class="fas fa-info-circle text-info"></i></a>
+                                    @if (canManage)
+                                    {
+                                        <a class="btn btn-sm" title="Edit" asp-action="Edit" asp-route-id="@item.Id"><i class="fas fa-edit text-dark"></i></a>
+                                        <form asp-action="TogglePublish" asp-route-id="@item.Id" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm" title="@(item.IsPublished ? "Unpublish" : "Publish")">
+                                                <i class="fas @(item.IsPublished ? "fa-eye-slash text-warning" : "fa-check text-success")"></i>
+                                            </button>
+                                        </form>
+                                        <a class="btn btn-sm" title="Delete" asp-action="Delete" asp-route-id="@item.Id"><i class="fa fa-trash text-danger"></i></a>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
+    <script>
+        (function () {
+            if ($.fn.DataTable) { $('#testimonialsTable').DataTable({ order: [], pageLength: 25 }); }
+            const flash = { saved: '@TempData["saved"]', edited: '@TempData["edited"]', deleted: '@TempData["deleted"]', failed: '@TempData["failed"]' };
+            if (window.alertify) {
+                if (flash.saved) alertify.success(flash.saved);
+                if (flash.edited) alertify.message(flash.edited);
+                if (flash.deleted) alertify.error(flash.deleted);
+                if (flash.failed) alertify.error(flash.failed);
+            }
+        })();
+    </script>
+}

@@ -32,6 +32,10 @@
     string fileName = Model.Student.ClassRoll + "_Payment_Report_" + DateTime.Now.ToString("dd-MM-yyyy");
     //int attSl = 0;
     string studentStatus = string.Empty;
+
+    // Testimonials/Transfer-Certificate tabs are staff-only (students viewing their own profile
+    // have no permission on those endpoints, so the AJAX would 403).
+    var isStaffView = User.IsInRole("Admin") || User.IsInRole("SuperAdmin") || User.IsInRole("Teacher");
 }
 @section Styles{
     <style>
@@ -155,6 +159,15 @@
                     <li class="nav-item bg-navy-blue border">
                         <a class="nav-link text-warning" role="tab" aria-controls="documents" aria-selected="true" href="#documents">Documents</a>
                     </li>
+                    @if (isStaffView)
+                    {
+                        <li class="nav-item bg-navy-blue border">
+                            <a class="nav-link text-warning" role="tab" aria-controls="testimonials" aria-selected="true" href="#testimonials">Testimonials</a>
+                        </li>
+                        <li class="nav-item bg-navy-blue border">
+                            <a class="nav-link text-warning" role="tab" aria-controls="transfercerts" aria-selected="true" href="#transfercerts">Transfer Certificates</a>
+                        </li>
+                    }
                     <li class="nav-item bg-navy-blue border">
                         <a class="nav-link text-warning" role="tab" aria-controls="activities" aria-selected="true" href="#activities">Activities</a>
                     </li>
@@ -498,6 +511,19 @@
                     <div id="documents" class="tab-pane">
                         <partial name="Details/_detailsDocuments" model="@Model.Documents" />
                     </div>
+                    @if (isStaffView)
+                    {
+                        <div id="testimonials" class="tab-pane text-left" role="tabpanel">
+                            <div id="testimonialsContainer" data-url="@Url.Action("ByStudent", "Testimonials", new { studentId = Model.Student.Id })">
+                                <div class="text-muted p-2">Loading…</div>
+                            </div>
+                        </div>
+                        <div id="transfercerts" class="tab-pane text-left" role="tabpanel">
+                            <div id="tcContainer" data-url="@Url.Action("ByStudent", "TransferCertificates", new { studentId = Model.Student.Id })">
+                                <div class="text-muted p-2">Loading…</div>
+                            </div>
+                        </div>
+                    }
                     <div id="activities" class="tab-pane">
                         <div class="text-center">
                             <div class="col-md-6">
@@ -555,6 +581,17 @@
                 e.preventDefault()
                 $(this).tab('show')
             });
+
+            // Lazy-load the Testimonials / Transfer Certificate tabs the first time they open.
+            function lazyLoad(containerId) {
+                var $c = $('#' + containerId);
+                if (!$c.length || $c.data('loaded')) return;
+                $.get($c.data('url'))
+                    .done(function (html) { $c.html(html); $c.data('loaded', true); })
+                    .fail(function () { $c.html('<div class="text-danger p-2">Could not load.</div>'); });
+            }
+            $('a[href="#testimonials"]').on('click', function () { lazyLoad('testimonialsContainer'); });
+            $('a[href="#transfercerts"]').on('click', function () { lazyLoad('tcContainer'); });
         });
 
         let tabName = '@ViewBag.tabName';

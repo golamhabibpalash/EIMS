@@ -1,0 +1,93 @@
+@using SMS.Entities.Enums
+@model IEnumerable<SMS.Entities.TransferCertificate>
+@{
+    ViewData["Title"] = "Transfer Certificates";
+    GlobalUI.PageTitle = "Transfer Certificates";
+    var canManage = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+    var isSuperAdmin = User.IsInRole("SuperAdmin");
+
+    string Badge(TransferCertificateStatus s) => s switch
+    {
+        TransferCertificateStatus.Issued => "<span class='badge bg-success'>Issued</span>",
+        TransferCertificateStatus.Cancelled => "<span class='badge bg-danger'>Cancelled</span>",
+        _ => "<span class='badge bg-warning text-dark'>Draft</span>"
+    };
+}
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
+        <h5 class="mb-0"><i class="fa fa-file-signature mr-2"></i> Transfer Certificates</h5>
+        @if (canManage)
+        {
+            <a asp-action="Create" class="btn btn-sm btn-primary"><i class="fa fa-plus"></i> New Certificate</a>
+        }
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped table-bordered align-middle w-100" id="tcTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th>
+                        <th>Certificate No</th>
+                        <th>Student</th>
+                        <th>Student ID</th>
+                        <th>Class</th>
+                        <th>Issue Date</th>
+                        <th>Leaving Date</th>
+                        <th>Status</th>
+                        <th class="text-nowrap">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ var sl = 1; }
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td>@(sl++)</td>
+                            <td>@item.CertificateNo</td>
+                            <td>@item.StudentNameSnapshot</td>
+                            <td>@item.UniqueIdSnapshot</td>
+                            <td>@item.ClassNameSnapshot</td>
+                            <td data-order="@item.IssueDate.ToString("yyyyMMdd")">@item.IssueDate.ToString("dd MMM yyyy")</td>
+                            <td data-order="@(item.LeavingDate?.ToString("yyyyMMdd"))">@(item.LeavingDate?.ToString("dd MMM yyyy") ?? "-")</td>
+                            <td>@Html.Raw(Badge(item.Status))</td>
+                            <td class="text-nowrap">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a class="btn btn-sm" title="Details" asp-action="Details" asp-route-id="@item.Id"><i class="fas fa-info-circle text-info"></i></a>
+                                    @if (item.Status == TransferCertificateStatus.Issued)
+                                    {
+                                        <a class="btn btn-sm" title="Certificate PDF" asp-action="Certificate" asp-route-id="@item.Id" target="_blank"><i class="fa fa-file-pdf text-danger"></i></a>
+                                    }
+                                    @if (canManage && item.Status == TransferCertificateStatus.Draft)
+                                    {
+                                        <a class="btn btn-sm" title="Edit" asp-action="Edit" asp-route-id="@item.Id"><i class="fas fa-edit text-dark"></i></a>
+                                    }
+                                    @if (isSuperAdmin && item.Status == TransferCertificateStatus.Draft)
+                                    {
+                                        <a class="btn btn-sm" title="Delete" asp-action="Delete" asp-route-id="@item.Id"><i class="fa fa-trash text-danger"></i></a>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
+    <script>
+        (function () {
+            if ($.fn.DataTable) { $('#tcTable').DataTable({ order: [], pageLength: 25 }); }
+            const flash = { saved: '@TempData["saved"]', edited: '@TempData["edited"]', deleted: '@TempData["deleted"]', failed: '@TempData["failed"]' };
+            if (window.alertify) {
+                if (flash.saved) alertify.success(flash.saved);
+                if (flash.edited) alertify.message(flash.edited);
+                if (flash.deleted) alertify.error(flash.deleted);
+                if (flash.failed) alertify.error(flash.failed);
+            }
+        })();
+    </script>
+}

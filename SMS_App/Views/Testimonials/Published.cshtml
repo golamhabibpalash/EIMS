@@ -1,0 +1,42 @@
+@model IEnumerable<SMS.Entities.Testimonial>
+@{
+    ViewData["Title"] = "Published Testimonials";
+    GlobalUI.PageTitle = "Published Testimonials";
+
+    string PhotoUrl(SMS.Entities.Testimonial t)
+    {
+        if (!string.IsNullOrEmpty(t.Photo)) return Url.Content($"~/Images/Testimonial/{t.Photo}");
+        if (t.Student != null && !string.IsNullOrEmpty(t.Student.Photo)) return Url.Content($"~/Images/Student/{t.Student.Photo}");
+        return Url.Content("~/Images/noProfileImage.png");
+    }
+}
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fa fa-eye mr-2"></i> Published Testimonials</h5>
+        <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Manage</a>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info"><i class="fa fa-info-circle"></i> No testimonials are currently published.</div>
+}
+else
+{
+    <div class="row">
+        @foreach (var t in Model)
+        {
+            <div class="col-md-4 mb-3">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body text-center">
+                        <img src="@PhotoUrl(t)" class="rounded-circle mb-2" style="width:80px;height:80px;object-fit:cover;" />
+                        <h6 class="mb-0">@t.StudentName</h6>
+                        <div class="text-muted small mb-2">@t.Designation</div>
+                        <p class="fst-italic small">“@t.Content”</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}

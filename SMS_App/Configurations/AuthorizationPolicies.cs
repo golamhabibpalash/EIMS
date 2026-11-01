@@ -330,6 +330,21 @@ public class AuthorizationPolicies
         options.AddPolicy("ProfileStudentsPolicy", policy => policy.RequireClaim("View Student Profile"));
         options.AddPolicy("IdCardStudentsPolicy", policy => policy.RequireClaim("View Student ID Card"));
 
+        //Testimonials
+        options.AddPolicy("IndexTestimonialsPolicy", policy => policy.RequireClaim("View Testimonials"));
+        options.AddPolicy("CreateTestimonialsPolicy", policy => policy.RequireClaim("Create Testimonial"));
+        options.AddPolicy("EditTestimonialsPolicy", policy => policy.RequireClaim("Edit Testimonial"));
+        options.AddPolicy("DeleteTestimonialsPolicy", policy => policy.RequireClaim("Delete Testimonial"));
+        options.AddPolicy("PublishTestimonialsPolicy", policy => policy.RequireClaim("Publish Testimonial"));
+
+        //Transfer Certificates
+        options.AddPolicy("IndexTransferCertificatesPolicy", policy => policy.RequireClaim("View Transfer Certificates"));
+        options.AddPolicy("CreateTransferCertificatesPolicy", policy => policy.RequireClaim("Create Transfer Certificate"));
+        options.AddPolicy("EditTransferCertificatesPolicy", policy => policy.RequireClaim("Edit Transfer Certificate"));
+        options.AddPolicy("DeleteTransferCertificatesPolicy", policy => policy.RequireClaim("Delete Transfer Certificate"));
+        options.AddPolicy("CancelTransferCertificatesPolicy", policy => policy.RequireClaim("Cancel Transfer Certificate"));
+        options.AddPolicy("GenerateTransferCertificatesPolicy", policy => policy.RequireClaim("Generate Transfer Certificate"));
+
         //Student Enrollment
         options.AddPolicy("SubjectEnrollSubjectEnrollmentPolicy", policy => policy.RequireClaim("View Enrollment List"));
         options.AddPolicy("SetOptionalSubjectSubjectEnrollmentPolicy", policy => policy.RequireClaim("Update Optional Subject"));

@@ -1,0 +1,68 @@
+@model SMS_App.ViewModels.TransferCertificates.TransferCertificateCreateVM
+@{
+    ViewData["Title"] = "New Transfer Certificate";
+    GlobalUI.PageTitle = "New Transfer Certificate";
+}
+
+<div class="card shadow-sm">
+    <div class="card-header bg-navy-blue text-light"><h5 class="mb-0"><i class="fa fa-file-signature mr-2"></i> New Transfer Certificate</h5></div>
+    <div class="card-body">
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label asp-for="StudentId" class="form-label"></label>
+                    <select asp-for="StudentId" asp-items="Model.StudentList" class="form-control select2">
+                        <option value="">— Select student —</option>
+                    </select>
+                    <span asp-validation-for="StudentId" class="text-danger"></span>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="CertificateNo" class="form-label"></label>
+                    <input asp-for="CertificateNo" class="form-control" />
+                    <span asp-validation-for="CertificateNo" class="text-danger"></span>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="IssueDate" class="form-label"></label>
+                    <input asp-for="IssueDate" type="date" class="form-control" />
+                    <span asp-validation-for="IssueDate" class="text-danger"></span>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="LeavingDate" class="form-label"></label>
+                    <input asp-for="LeavingDate" type="date" class="form-control" />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="Status" class="form-label"></label>
+                    <select asp-for="Status" class="form-control">
+                        <option value="Draft">Draft</option>
+                        <option value="Issued">Issued</option>
+                    </select>
+                    <small class="text-muted d-block">Once issued, the record is locked and can only be cancelled.</small>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="Reason" class="form-label"></label>
+                    <input asp-for="Reason" class="form-control" />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="Conduct" class="form-label"></label>
+                    <input asp-for="Conduct" class="form-control" placeholder="e.g. Good / Satisfactory" />
+                </div>
+                <div class="col-12 mb-3">
+                    <label asp-for="Remarks" class="form-label"></label>
+                    <textarea asp-for="Remarks" class="form-control" rows="2" maxlength="1000"></textarea>
+                </div>
+            </div>
+            <div class="mt-2">
+                <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Save</button>
+                <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () { if ($.fn.select2) $('.select2').select2({ theme: 'bootstrap-5', width: '100%' }); })();
+    </script>
+}

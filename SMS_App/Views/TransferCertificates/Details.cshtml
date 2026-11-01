@@ -1,0 +1,63 @@
+@using SMS.Entities.Enums
+@model SMS.Entities.TransferCertificate
+@{
+    ViewData["Title"] = "Transfer Certificate";
+    GlobalUI.PageTitle = "Transfer Certificate";
+    var canManage = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+    var isSuperAdmin = User.IsInRole("SuperAdmin");
+
+    string Badge(TransferCertificateStatus s) => s switch
+    {
+        TransferCertificateStatus.Issued => "<span class='badge bg-success'>Issued</span>",
+        TransferCertificateStatus.Cancelled => "<span class='badge bg-danger'>Cancelled</span>",
+        _ => "<span class='badge bg-warning text-dark'>Draft</span>"
+    };
+}
+
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fa fa-file-signature mr-2"></i> Transfer Certificate @Html.Raw(Badge(Model.Status))</h5>
+        <div class="btn-group btn-group-sm">
+            @if (Model.Status == TransferCertificateStatus.Issued)
+            {
+                <a asp-action="Certificate" asp-route-id="@Model.Id" target="_blank" class="btn btn-danger"><i class="fa fa-file-pdf"></i> View PDF</a>
+                <a asp-action="Certificate" asp-route-id="@Model.Id" asp-route-download="true" class="btn btn-outline-danger"><i class="fa fa-download"></i> Download</a>
+            }
+            @if (canManage && Model.Status == TransferCertificateStatus.Draft)
+            {
+                <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary"><i class="fa fa-edit"></i> Edit</a>
+            }
+            <a asp-action="Index" class="btn btn-outline-secondary">Back</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <dl class="row">
+            <dt class="col-sm-3">Certificate No</dt><dd class="col-sm-9">@Model.CertificateNo</dd>
+            <dt class="col-sm-3">Student Name</dt><dd class="col-sm-9">@Model.StudentNameSnapshot</dd>
+            <dt class="col-sm-3">Student ID</dt><dd class="col-sm-9">@Model.UniqueIdSnapshot</dd>
+            <dt class="col-sm-3">Class</dt><dd class="col-sm-9">@Model.ClassNameSnapshot</dd>
+            <dt class="col-sm-3">Roll</dt><dd class="col-sm-9">@Model.ClassRollSnapshot</dd>
+            <dt class="col-sm-3">Session</dt><dd class="col-sm-9">@Model.SessionNameSnapshot</dd>
+            <dt class="col-sm-3">Date of Admission</dt><dd class="col-sm-9">@(Model.AdmissionDateSnapshot?.ToString("dd MMM yyyy") ?? "-")</dd>
+            <dt class="col-sm-3">Date of Issue</dt><dd class="col-sm-9">@Model.IssueDate.ToString("dd MMM yyyy")</dd>
+            <dt class="col-sm-3">Date of Leaving</dt><dd class="col-sm-9">@(Model.LeavingDate?.ToString("dd MMM yyyy") ?? "-")</dd>
+            <dt class="col-sm-3">Reason for Leaving</dt><dd class="col-sm-9">@Model.Reason</dd>
+            <dt class="col-sm-3">Conduct / Character</dt><dd class="col-sm-9">@Model.Conduct</dd>
+            <dt class="col-sm-3">Remarks</dt><dd class="col-sm-9">@Model.Remarks</dd>
+            <dt class="col-sm-3">Created</dt><dd class="col-sm-9">@Model.CreatedAt.ToString("dd MMM yyyy") by @Model.CreatedBy</dd>
+        </dl>
+
+        @if (canManage && Model.Status == TransferCertificateStatus.Issued)
+        {
+            <form asp-action="Cancel" asp-route-id="@Model.Id" method="post" class="d-inline"
+                  onsubmit="return confirm('Cancel this issued certificate? This cannot be undone.');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm btn-warning"><i class="fa fa-ban"></i> Cancel Certificate</button>
+            </form>
+        }
+        @if (isSuperAdmin && Model.Status == TransferCertificateStatus.Draft)
+        {
+            <a asp-action="Delete" asp-route-id="@Model.Id" class="btn btn-sm btn-outline-danger"><i class="fa fa-trash"></i> Delete Draft</a>
+        }
+    </div>
+</div>
