@@ -1,0 +1,70 @@
+@using SMS_App.ViewModels.Certificates
+@model StudentCertificateFormVM
+@{
+    ViewData["Title"] = (Model.Id == 0 ? "New " : "Edit ") + Model.Title;
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+    var isEdit = Model.Id != 0;
+}
+
+<div class="card shadow-sm">
+    <div class="card-header bg-navy-blue text-light"><h5 class="mb-0"><i class="fa fa-certificate mr-2"></i> @ViewData["Title"]</h5></div>
+    <div class="card-body">
+        <form asp-controller="@Model.ControllerName" asp-action="@(isEdit ? "Edit" : "Create")" asp-route-id="@(isEdit ? Model.Id : (int?)null)" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="Id" />
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label asp-for="StudentId" class="form-label"></label>
+                    <select asp-for="StudentId" asp-items="Model.StudentList" class="form-control select2"><option value="">— Select student —</option></select>
+                    <span asp-validation-for="StudentId" class="text-danger"></span>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="IssueDate" class="form-label"></label>
+                    <input asp-for="IssueDate" type="date" class="form-control" />
+                    <span asp-validation-for="IssueDate" class="text-danger"></span>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <label asp-for="DeliveryDate" class="form-label"></label>
+                    <input asp-for="DeliveryDate" type="date" class="form-control" />
+                </div>
+
+                @if (Model.IsTransfer)
+                {
+                    <div class="col-md-3 mb-3">
+                        <label asp-for="LeavingDate" class="form-label"></label>
+                        <input asp-for="LeavingDate" type="date" class="form-control" />
+                    </div>
+                    <div class="col-md-9 mb-3">
+                        <label asp-for="Reason" class="form-label"></label>
+                        <input asp-for="Reason" class="form-control" />
+                    </div>
+                    <div class="col-12"><hr class="my-1" /><small class="text-muted">Optional last-exam line (printed only if filled):</small></div>
+                    <div class="col-md-3 mb-3"><label asp-for="ExamName" class="form-label"></label><input asp-for="ExamName" class="form-control" placeholder="e.g. Monthly Exam" /></div>
+                    <div class="col-md-2 mb-3"><label asp-for="TotalMarks" class="form-label"></label><input asp-for="TotalMarks" class="form-control" /></div>
+                    <div class="col-md-2 mb-3"><label asp-for="Gpa" class="form-label"></label><input asp-for="Gpa" class="form-control" /></div>
+                    <div class="col-md-2 mb-3"><label asp-for="Grade" class="form-label"></label><input asp-for="Grade" class="form-control" /></div>
+                    <div class="col-md-3 mb-3"><label asp-for="MeritRank" class="form-label"></label><input asp-for="MeritRank" class="form-control" /></div>
+                }
+
+                <div class="col-12"><hr class="my-1" /><small class="text-muted">Signatory (shown on the printed certificate):</small></div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="SignatoryName" class="form-label"></label>
+                    <input asp-for="SignatoryName" class="form-control" placeholder="e.g. A N M Arif Badal" />
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label asp-for="SignatoryDesignation" class="form-label"></label>
+                    <input asp-for="SignatoryDesignation" class="form-control" />
+                </div>
+            </div>
+            <div class="mt-2">
+                <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> @(isEdit ? "Update" : "Save")</button>
+                <a asp-controller="@Model.ControllerName" asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>(function () { if ($.fn.select2) $('.select2').select2({ theme: 'bootstrap-5', width: '100%' }); })();</script>
+}

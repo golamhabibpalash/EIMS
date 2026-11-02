@@ -1,0 +1,51 @@
+@model IEnumerable<SMS.Entities.StudentCertificate>
+@{
+    var studentId = (int)ViewBag.StudentId;
+    var controllerName = (string)ViewBag.ControllerName;
+    var title = (string)ViewBag.Title;
+    var canManage = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+    var returnUrl = Url.Action("Details", "Students", new { id = studentId });
+}
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h6 class="mb-0">@title</h6>
+    <div class="btn-group btn-group-sm">
+        <form asp-controller="@controllerName" asp-action="Apply" method="post" class="d-inline">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="studentId" value="@studentId" />
+            <input type="hidden" name="returnUrl" value="@returnUrl" />
+            <button type="submit" class="btn btn-sm btn-outline-primary" title="Create a request for this student"><i class="fa fa-plus"></i> Apply</button>
+        </form>
+        @if (canManage)
+        {
+            <a asp-controller="@controllerName" asp-action="Create" asp-route-studentId="@studentId" class="btn btn-sm btn-primary" target="_blank"><i class="fa fa-edit"></i> New (full)</a>
+        }
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+    <p class="text-muted small">No @title.ToLower() records yet.</p>
+}
+else
+{
+    <table class="table table-sm table-bordered">
+        <thead class="table-light"><tr><th>Issue Date</th><th>Delivery Date</th><th class="text-nowrap">Actions</th></tr></thead>
+        <tbody>
+            @foreach (var c in Model)
+            {
+                <tr>
+                    <td>@c.IssueDate.ToString("dd MMM yyyy")</td>
+                    <td>@(c.DeliveryDate?.ToString("dd MMM yyyy") ?? "-")</td>
+                    <td class="text-nowrap">
+                        <a asp-controller="@controllerName" asp-action="Print" asp-route-id="@c.Id" target="_blank" class="btn btn-sm btn-outline-danger" title="Print / View"><i class="fa fa-file-pdf"></i></a>
+                        @if (canManage)
+                        {
+                            <a asp-controller="@controllerName" asp-action="Details" asp-route-id="@c.Id" target="_blank" class="btn btn-sm btn-outline-info"><i class="fa fa-eye"></i></a>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

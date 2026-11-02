@@ -1,0 +1,93 @@
+@using SMS_App.ViewModels.Certificates
+@model StudentCertificateIndexVM
+@{
+    ViewData["Title"] = Model.Title;
+    GlobalUI.PageTitle = Model.Title;
+    var canManage = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+    var isSuperAdmin = User.IsInRole("SuperAdmin");
+}
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
+        <h5 class="mb-0"><i class="fa fa-certificate mr-2"></i> @Model.Title</h5>
+        @if (canManage)
+        {
+            <a asp-controller="@Model.ControllerName" asp-action="Create" class="btn btn-sm btn-primary"><i class="fa fa-plus"></i> Add</a>
+        }
+    </div>
+    <div class="card-body py-2">
+        <form method="get" asp-controller="@Model.ControllerName" asp-action="Index" class="row g-2 align-items-end">
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-0 small text-muted">Class</label>
+                <select class="form-control form-control-sm" name="academicClassId" asp-items="@ViewBag.academicClassId"><option value="">All</option></select>
+            </div>
+            <div class="col-md-3 col-6">
+                <label class="form-label mb-0 small text-muted">Section</label>
+                <select class="form-control form-control-sm" name="academicSectionId" asp-items="@(ViewBag.SectionList as Microsoft.AspNetCore.Mvc.Rendering.SelectList)"><option value="">All</option></select>
+            </div>
+            <div class="col-md-4 col-8">
+                <label class="form-label mb-0 small text-muted">Keyword</label>
+                <input type="text" class="form-control form-control-sm" name="searchString" placeholder="Name / Student ID / Roll" value="@Model.SearchString">
+            </div>
+            <div class="col-md-2 col-4">
+                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fa fa-search"></i> Find</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered align-middle w-100" id="certTable">
+                <thead class="table-dark">
+                    <tr><th>#</th><th>Student ID</th><th>Name</th><th>Class</th><th>Section</th><th>Roll</th><th>Issue Date</th><th>Delivery Date</th><th class="text-nowrap">Actions</th></tr>
+                </thead>
+                <tbody>
+                    @{ var sl = 1; }
+                    @foreach (var c in Model.Items)
+                    {
+                        <tr>
+                            <td>@(sl++)</td>
+                            <td>@c.UniqueIdSnapshot</td>
+                            <td>@c.StudentNameSnapshot</td>
+                            <td>@c.ClassNameSnapshot</td>
+                            <td>@(c.SectionNameSnapshot ?? "-")</td>
+                            <td>@c.ClassRollSnapshot</td>
+                            <td data-order="@c.IssueDate.ToString("yyyyMMdd")">@c.IssueDate.ToString("dd MMM yyyy")</td>
+                            <td data-order="@(c.DeliveryDate?.ToString("yyyyMMdd"))">@(c.DeliveryDate?.ToString("dd MMM yyyy") ?? "-")</td>
+                            <td class="text-nowrap">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a class="btn btn-sm" title="Details" asp-controller="@Model.ControllerName" asp-action="Details" asp-route-id="@c.Id"><i class="fas fa-info-circle text-info"></i></a>
+                                    <a class="btn btn-sm" title="Print / View" target="_blank" asp-controller="@Model.ControllerName" asp-action="Print" asp-route-id="@c.Id"><i class="fa fa-file-pdf text-danger"></i></a>
+                                    @if (canManage)
+                                    {
+                                        <a class="btn btn-sm" title="Edit" asp-controller="@Model.ControllerName" asp-action="Edit" asp-route-id="@c.Id"><i class="fas fa-edit text-dark"></i></a>
+                                    }
+                                    @if (isSuperAdmin)
+                                    {
+                                        <form asp-controller="@Model.ControllerName" asp-action="Delete" asp-route-id="@c.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this record?');">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm" title="Delete"><i class="fa fa-trash text-danger"></i></button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
+    <script>
+        (function () {
+            if ($.fn.DataTable) $('#certTable').DataTable({ order: [], pageLength: 25 });
+            const f = { saved: '@TempData["saved"]', edited: '@TempData["edited"]', deleted: '@TempData["deleted"]', failed: '@TempData["failed"]' };
+            if (window.alertify) { if (f.saved) alertify.success(f.saved); if (f.edited) alertify.message(f.edited); if (f.deleted) alertify.error(f.deleted); if (f.failed) alertify.error(f.failed); }
+        })();
+    </script>
+}
