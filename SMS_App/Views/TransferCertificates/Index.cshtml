@@ -1,93 +1,133 @@
-@using SMS.Entities.Enums
-@model IEnumerable<SMS.Entities.TransferCertificate>
+@using SMS_App.ViewModels.Certificates
+@model CertificateFilterVM
 @{
-    ViewData["Title"] = "Transfer Certificates";
-    GlobalUI.PageTitle = "Transfer Certificates";
-    var canManage = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
-    var isSuperAdmin = User.IsInRole("SuperAdmin");
-
-    string Badge(TransferCertificateStatus s) => s switch
-    {
-        TransferCertificateStatus.Issued => "<span class='badge bg-success'>Issued</span>",
-        TransferCertificateStatus.Cancelled => "<span class='badge bg-danger'>Cancelled</span>",
-        _ => "<span class='badge bg-warning text-dark'>Draft</span>"
-    };
+    ViewData["Title"] = "Transfer Certificate";
+    GlobalUI.PageTitle = "Transfer Certificate";
 }
 
 <div class="card shadow-sm mb-3">
-    <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
-        <h5 class="mb-0"><i class="fa fa-file-signature mr-2"></i> Transfer Certificates</h5>
-        @if (canManage)
-        {
-            <a asp-action="Create" class="btn btn-sm btn-primary"><i class="fa fa-plus"></i> New Certificate</a>
-        }
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover table-striped table-bordered align-middle w-100" id="tcTable">
-                <thead class="table-dark">
-                    <tr>
-                        <th>#</th>
-                        <th>Certificate No</th>
-                        <th>Student</th>
-                        <th>Student ID</th>
-                        <th>Class</th>
-                        <th>Issue Date</th>
-                        <th>Leaving Date</th>
-                        <th>Status</th>
-                        <th class="text-nowrap">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @{ var sl = 1; }
-                    @foreach (var item in Model)
-                    {
-                        <tr>
-                            <td>@(sl++)</td>
-                            <td>@item.CertificateNo</td>
-                            <td>@item.StudentNameSnapshot</td>
-                            <td>@item.UniqueIdSnapshot</td>
-                            <td>@item.ClassNameSnapshot</td>
-                            <td data-order="@item.IssueDate.ToString("yyyyMMdd")">@item.IssueDate.ToString("dd MMM yyyy")</td>
-                            <td data-order="@(item.LeavingDate?.ToString("yyyyMMdd"))">@(item.LeavingDate?.ToString("dd MMM yyyy") ?? "-")</td>
-                            <td>@Html.Raw(Badge(item.Status))</td>
-                            <td class="text-nowrap">
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <a class="btn btn-sm" title="Details" asp-action="Details" asp-route-id="@item.Id"><i class="fas fa-info-circle text-info"></i></a>
-                                    @if (item.Status == TransferCertificateStatus.Issued)
-                                    {
-                                        <a class="btn btn-sm" title="Certificate PDF" asp-action="Certificate" asp-route-id="@item.Id" target="_blank"><i class="fa fa-file-pdf text-danger"></i></a>
-                                    }
-                                    @if (canManage && item.Status == TransferCertificateStatus.Draft)
-                                    {
-                                        <a class="btn btn-sm" title="Edit" asp-action="Edit" asp-route-id="@item.Id"><i class="fas fa-edit text-dark"></i></a>
-                                    }
-                                    @if (isSuperAdmin && item.Status == TransferCertificateStatus.Draft)
-                                    {
-                                        <a class="btn btn-sm" title="Delete" asp-action="Delete" asp-route-id="@item.Id"><i class="fa fa-trash text-danger"></i></a>
-                                    }
-                                </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+    <div class="card-header"><h5 class="mb-0"><i class="fa fa-file-signature mr-2"></i> Student Transfer Certificate</h5></div>
+    <div class="card-body py-2">
+        <form method="get" asp-action="Index" id="filterForm">
+            <div class="row g-2 align-items-end">
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Session</label>
+                    <select class="form-control form-control-sm" name="academicSessionId" id="fSession" asp-items="@ViewBag.academicSessionId"></select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Class</label>
+                    <select class="form-control form-control-sm" name="academicClassId" id="fClass" asp-items="@ViewBag.academicClassId"><option value="">Select class</option></select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Section</label>
+                    <select class="form-control form-control-sm" name="academicSectionId" id="fSection" asp-items="@(ViewBag.SectionList as Microsoft.AspNetCore.Mvc.Rendering.SelectList)"><option value="">All sections</option></select>
+                </div>
+                <div class="col-xl-3 col-lg-3 col-md-6 col-12 mb-2">
+                    <label class="form-label mb-0 small text-muted">Keyword</label>
+                    <input type="text" class="form-control form-control-sm" name="searchString" placeholder="Name / Roll / ID / Phone" value="@Model.SearchString">
+                </div>
+                <div class="col-12 col-lg-auto mb-2">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fa fa-search"></i> Find Students</button>
+                </div>
+            </div>
+        </form>
+        <hr class="my-2" />
+        <div class="row g-2 align-items-end">
+            <div class="col-md-2 col-6 mb-2">
+                <label class="form-label mb-0 small text-muted">Issue Date</label>
+                <input type="date" class="form-control form-control-sm" id="optIssueDate" value="@DateTime.Today.ToString("yyyy-MM-dd")">
+            </div>
+            <div class="col-md-3 col-6 mb-2">
+                <label class="form-label mb-0 small text-muted">Signatory Name</label>
+                <input type="text" class="form-control form-control-sm" id="optSigName" placeholder="e.g. A N M Arif Badal">
+            </div>
+            <div class="col-md-2 col-6 mb-2">
+                <label class="form-label mb-0 small text-muted">Designation</label>
+                <input type="text" class="form-control form-control-sm" id="optSigDesig" value="@Model.SignatoryDesignation">
+            </div>
+        </div>
+        <div class="row g-2 align-items-end">
+            <div class="col-12"><small class="text-muted"><i class="fa fa-info-circle"></i> Optional last-exam line (leave blank to omit):</small></div>
+            <div class="col-md-3 col-6 mb-2"><label class="form-label mb-0 small text-muted">Exam Name</label><input type="text" class="form-control form-control-sm" id="optExamName" placeholder="e.g. Monthly Exam"></div>
+            <div class="col-md-2 col-6 mb-2"><label class="form-label mb-0 small text-muted">Total Marks</label><input type="text" class="form-control form-control-sm" id="optMarks"></div>
+            <div class="col-md-2 col-6 mb-2"><label class="form-label mb-0 small text-muted">GPA</label><input type="text" class="form-control form-control-sm" id="optGpa"></div>
+            <div class="col-md-2 col-6 mb-2"><label class="form-label mb-0 small text-muted">Grade</label><input type="text" class="form-control form-control-sm" id="optGrade"></div>
+            <div class="col-md-2 col-6 mb-2"><label class="form-label mb-0 small text-muted">Merit Rank</label><input type="text" class="form-control form-control-sm" id="optRank"></div>
         </div>
     </div>
 </div>
 
+@if (!Model.HasQueried)
+{
+    <div class="alert alert-info"><i class="fa fa-info-circle"></i> Choose a class (and optionally a section) or type a keyword, then <strong>Find Students</strong>.</div>
+}
+else if (Model.Students.Count == 0)
+{
+    <div class="alert alert-warning"><i class="fa fa-exclamation-triangle"></i> No students match the filter.</div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle w-100" id="studentsTable">
+                    <thead class="table-dark"><tr><th>#</th><th>Student ID</th><th>Roll</th><th>Name</th><th>Class</th><th>Section</th><th class="text-nowrap">Certificate</th></tr></thead>
+                    <tbody>
+                        @{ var sl = 1; }
+                        @foreach (var s in Model.Students)
+                        {
+                            <tr>
+                                <td>@(sl++)</td>
+                                <td>@s.UniqueId</td>
+                                <td>@s.ClassRoll</td>
+                                <td>@s.Name</td>
+                                <td>@s.ClassName</td>
+                                <td>@(s.SectionName ?? "-")</td>
+                                <td class="text-nowrap">
+                                    <button class="btn btn-sm btn-primary gen-view" data-id="@s.Id"><i class="fa fa-eye"></i> View</button>
+                                    <button class="btn btn-sm btn-outline-danger gen-dl" data-id="@s.Id"><i class="fa fa-download"></i> PDF</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
 @section Scripts {
-    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
     <script>
         (function () {
-            if ($.fn.DataTable) { $('#tcTable').DataTable({ order: [], pageLength: 25 }); }
-            const flash = { saved: '@TempData["saved"]', edited: '@TempData["edited"]', deleted: '@TempData["deleted"]', failed: '@TempData["failed"]' };
-            if (window.alertify) {
-                if (flash.saved) alertify.success(flash.saved);
-                if (flash.edited) alertify.message(flash.edited);
-                if (flash.deleted) alertify.error(flash.deleted);
-                if (flash.failed) alertify.error(flash.failed);
+            const base = '@Url.Action("Generate", "TransferCertificates")';
+            function val(id) { const e = document.getElementById(id); return e ? e.value : ''; }
+            function url(id, dl) {
+                const p = new URLSearchParams();
+                p.set('studentId', id);
+                if (val('optIssueDate')) p.set('issueDate', val('optIssueDate'));
+                if (val('optSigName')) p.set('signatoryName', val('optSigName'));
+                if (val('optSigDesig')) p.set('signatoryDesignation', val('optSigDesig'));
+                if (val('optExamName')) p.set('examName', val('optExamName'));
+                if (val('optMarks')) p.set('totalMarks', val('optMarks'));
+                if (val('optGpa')) p.set('gpa', val('optGpa'));
+                if (val('optGrade')) p.set('grade', val('optGrade'));
+                if (val('optRank')) p.set('meritRank', val('optRank'));
+                if (dl) p.set('download', 'true');
+                return base + '?' + p.toString();
             }
+            document.querySelectorAll('.gen-view').forEach(b => b.addEventListener('click', () => window.open(url(b.dataset.id, false), '_blank')));
+            document.querySelectorAll('.gen-dl').forEach(b => b.addEventListener('click', () => window.open(url(b.dataset.id, true), '_blank')));
+            if ($.fn.DataTable) $('#studentsTable').DataTable({ order: [], pageLength: 25 });
+
+            const $class = $('#fClass'), $session = $('#fSession'), $section = $('#fSection');
+            function reloadSections() {
+                const classId = $class.val(), sessionId = $session.val();
+                $section.empty().append('<option value="">All sections</option>');
+                if (!classId) return;
+                $.ajax({ url: "/api/academicsections/getbyclasswithsessionId?classId=" + classId + "&sessionId=" + sessionId, dataType: "JSON", type: "POST", cache: false,
+                    success: function (data) { $.each(data || [], function (i, o) { $section.append('<option value="' + o.id + '">' + o.name + '</option>'); }); } });
+            }
+            $class.on('change', reloadSections); $session.on('change', reloadSections);
         })();
     </script>
 }

@@ -133,8 +133,6 @@ namespace SMS.DB
         public DbSet<StudentPaymentDetails> StudentPaymentDetails { get; set; }
         public DbSet<StudentActivateHist> StudentActivateHists { get; set; }
         public DbSet<StudentFeeAllocation> StudentFeeAllocations { get; set; }
-        public DbSet<Testimonial> Testimonials { get; set; }
-        public DbSet<TransferCertificate> TransferCertificates { get; set; }
         public DbSet<SubjectEnrollment> SubjectEnrollments { get; set; }
         public DbSet<SubjectEnrollmentDetail> SubjectEnrollmentDetails { get; set; }
         #endregion
@@ -233,21 +231,6 @@ namespace SMS.DB
             builder.Entity<ParamBusConfig>()
                 .HasIndex(s => s.ConfigName)
                 .IsUnique();
-
-            // A certificate number must be unique across the institution.
-            builder.Entity<TransferCertificate>()
-                .HasIndex(t => t.CertificateNo)
-                .IsUnique();
-
-            // Official records must survive a student delete, so restrict the FK (no cascade).
-            builder.Entity<TransferCertificate>()
-                .HasOne(t => t.Student).WithMany().HasForeignKey(t => t.StudentId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // A testimonial's student link is optional; null it out rather than deleting the row.
-            builder.Entity<Testimonial>()
-                .HasOne(t => t.Student).WithMany().HasForeignKey(t => t.StudentId)
-                .OnDelete(DeleteBehavior.SetNull);
 
             builder.Entity<AttendanceVM>(entity => entity.HasNoKey());
             builder.Entity<StudentPaymentSummeryVM>(entity => entity.HasNoKey());

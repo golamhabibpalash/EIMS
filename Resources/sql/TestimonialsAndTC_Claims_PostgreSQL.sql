@@ -1,8 +1,9 @@
 -- ============================================================================
--- Testimonials + Transfer Certificates - PERMISSIONS (POSTGRESQL)
--- Same content as the SQL Server script. IDEMPOTENT. Seeds ClaimStores under
--- StudentManagement > StudentDocuments and optionally grants all permissions to
--- one account (edit target_email). Log out/in afterwards.
+-- Student Testimonial + Transfer Certificate GENERATORS - PERMISSIONS (POSTGRESQL)
+-- On-demand PDF certificates (nothing stored). Seeds the three live claims under
+-- StudentManagement > StudentDocuments. IDEMPOTENT. Part edits target_email to grant
+-- one account. Log out/in afterwards.
+-- (Ran the earlier 11-claim version? See TestimonialsAndTC_Cleanup_PostgreSQL.sql - optional.)
 -- ============================================================================
 DO $$
 DECLARE
@@ -12,20 +13,10 @@ DECLARE
     user_id text;
     claims text[][] := ARRAY[
         ['View Testimonials','IndexTestimonialsPolicy'],
-        ['Create Testimonial','CreateTestimonialsPolicy'],
-        ['Edit Testimonial','EditTestimonialsPolicy'],
-        ['Delete Testimonial','DeleteTestimonialsPolicy'],
-        ['Publish Testimonial','PublishTestimonialsPolicy'],
         ['View Transfer Certificates','IndexTransferCertificatesPolicy'],
-        ['Create Transfer Certificate','CreateTransferCertificatesPolicy'],
-        ['Edit Transfer Certificate','EditTransferCertificatesPolicy'],
-        ['Delete Transfer Certificate','DeleteTransferCertificatesPolicy'],
-        ['Cancel Transfer Certificate','CancelTransferCertificatesPolicy'],
         ['Generate Transfer Certificate','GenerateTransferCertificatesPolicy']
     ];
-    i integer;
-    ctype text;
-    cvalue text;
+    i integer; ctype text; cvalue text;
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM "ProjectModules" WHERE "ModuleName" = 'StudentManagement') THEN
         INSERT INTO "ProjectModules" ("ModuleName", "Status", "Remarks", "CreatedBy", "CreatedAt", "EditedBy", "EditedAt", "MACAddress")
@@ -40,8 +31,7 @@ BEGIN
     SELECT "Id" INTO sub_id FROM "ProjectSubModules" WHERE "SubModuleName" = 'StudentDocuments' AND "ProjectModuleId" = module_id;
 
     FOR i IN 1 .. array_length(claims, 1) LOOP
-        ctype := claims[i][1];
-        cvalue := claims[i][2];
+        ctype := claims[i][1]; cvalue := claims[i][2];
         IF NOT EXISTS (SELECT 1 FROM "ClaimStores" WHERE "ClaimValue" = cvalue AND "ClaimType" = ctype) THEN
             INSERT INTO "ClaimStores" ("ClaimType", "ClaimValue", "SubModuleId", "CreatedBy", "CreatedAt", "EditedBy", "EditedAt", "MACAddress")
             VALUES (ctype, cvalue, sub_id, 'SiteMapSeed', now() AT TIME ZONE 'utc', 'SiteMapSeed', now() AT TIME ZONE 'utc', '');
@@ -53,7 +43,7 @@ BEGIN
         INSERT INTO "AspNetUserClaims" ("UserId", "ClaimType", "ClaimValue")
         SELECT user_id, cs."ClaimType", cs."ClaimValue"
         FROM "ClaimStores" cs
-        WHERE cs."SubModuleId" = sub_id
+        WHERE cs."ClaimValue" IN ('IndexTestimonialsPolicy','IndexTransferCertificatesPolicy','GenerateTransferCertificatesPolicy')
           AND NOT EXISTS (SELECT 1 FROM "AspNetUserClaims" uc WHERE uc."UserId" = user_id AND uc."ClaimType" = cs."ClaimType");
     END IF;
 END $$;

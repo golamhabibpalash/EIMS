@@ -1,111 +1,120 @@
-@model IEnumerable<SMS.Entities.Testimonial>
+@using SMS_App.ViewModels.Certificates
+@model CertificateFilterVM
 @{
-    ViewData["Title"] = "Testimonials";
-    GlobalUI.PageTitle = "Testimonials";
-    var canManage = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
-
-    string PhotoUrl(SMS.Entities.Testimonial t)
-    {
-        if (!string.IsNullOrEmpty(t.Photo)) return Url.Content($"~/Images/Testimonial/{t.Photo}");
-        if (t.Student != null && !string.IsNullOrEmpty(t.Student.Photo)) return Url.Content($"~/Images/Student/{t.Student.Photo}");
-        return Url.Content("~/Images/noProfileImage.png");
-    }
+    ViewData["Title"] = "Student Testimonial";
+    GlobalUI.PageTitle = "Student Testimonial";
 }
 
 <div class="card shadow-sm mb-3">
-    <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
-        <h5 class="mb-0"><i class="fa fa-quote-right mr-2"></i> Testimonials</h5>
-        <div class="btn-group btn-group-sm">
-            <a asp-action="Published" class="btn btn-outline-secondary"><i class="fa fa-eye"></i> Published</a>
-            @if (canManage)
-            {
-                <a asp-action="Create" class="btn btn-primary"><i class="fa fa-plus"></i> Add Testimonial</a>
-            }
-        </div>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-hover table-striped table-bordered align-middle w-100" id="testimonialsTable">
-                <thead class="table-dark">
-                    <tr>
-                        <th>#</th>
-                        <th>Photo</th>
-                        <th>Name</th>
-                        <th>Designation</th>
-                        <th>Testimonial</th>
-                        <th>Order</th>
-                        <th>Status</th>
-                        <th>Published</th>
-                        <th class="text-nowrap">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @{ var sl = 1; }
-                    @foreach (var item in Model)
-                    {
-                        <tr>
-                            <td>@(sl++)</td>
-                            <td><img src="@PhotoUrl(item)" class="rounded-circle" style="width:34px;height:34px;object-fit:cover;" /></td>
-                            <td>@item.StudentName</td>
-                            <td>@item.Designation</td>
-                            <td>@(string.IsNullOrEmpty(item.Content) ? "" : (item.Content.Length > 80 ? item.Content.Substring(0, 80) + "…" : item.Content))</td>
-                            <td>@item.DisplayOrder</td>
-                            <td>
-                                @if (item.Status)
-                                {
-                                    <span class="badge bg-success">Active</span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-secondary">Inactive</span>
-                                }
-                            </td>
-                            <td>
-                                @if (item.IsPublished)
-                                {
-                                    <span class="badge bg-primary">Published</span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-warning text-dark">Draft</span>
-                                }
-                            </td>
-                            <td class="text-nowrap">
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <a class="btn btn-sm" title="Details" asp-action="Details" asp-route-id="@item.Id"><i class="fas fa-info-circle text-info"></i></a>
-                                    @if (canManage)
-                                    {
-                                        <a class="btn btn-sm" title="Edit" asp-action="Edit" asp-route-id="@item.Id"><i class="fas fa-edit text-dark"></i></a>
-                                        <form asp-action="TogglePublish" asp-route-id="@item.Id" method="post" class="d-inline">
-                                            @Html.AntiForgeryToken()
-                                            <button type="submit" class="btn btn-sm" title="@(item.IsPublished ? "Unpublish" : "Publish")">
-                                                <i class="fas @(item.IsPublished ? "fa-eye-slash text-warning" : "fa-check text-success")"></i>
-                                            </button>
-                                        </form>
-                                        <a class="btn btn-sm" title="Delete" asp-action="Delete" asp-route-id="@item.Id"><i class="fa fa-trash text-danger"></i></a>
-                                    }
-                                </div>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+    <div class="card-header"><h5 class="mb-0"><i class="fa fa-certificate mr-2"></i> Student Testimonial (Character Certificate)</h5></div>
+    <div class="card-body py-2">
+        <form method="get" asp-action="Index" id="filterForm">
+            <div class="row g-2 align-items-end">
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Session</label>
+                    <select class="form-control form-control-sm" name="academicSessionId" id="fSession" asp-items="@ViewBag.academicSessionId"></select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Class</label>
+                    <select class="form-control form-control-sm" name="academicClassId" id="fClass" asp-items="@ViewBag.academicClassId"><option value="">Select class</option></select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Section</label>
+                    <select class="form-control form-control-sm" name="academicSectionId" id="fSection" asp-items="@(ViewBag.SectionList as Microsoft.AspNetCore.Mvc.Rendering.SelectList)"><option value="">All sections</option></select>
+                </div>
+                <div class="col-xl-3 col-lg-3 col-md-6 col-12 mb-2">
+                    <label class="form-label mb-0 small text-muted">Keyword</label>
+                    <input type="text" class="form-control form-control-sm" name="searchString" placeholder="Name / Roll / ID / Phone" value="@Model.SearchString">
+                </div>
+                <div class="col-12 col-lg-auto mb-2">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fa fa-search"></i> Find Students</button>
+                </div>
+            </div>
+        </form>
+        <hr class="my-2" />
+        <div class="row g-2 align-items-end">
+            <div class="col-md-2 col-6 mb-2">
+                <label class="form-label mb-0 small text-muted">Issue Date</label>
+                <input type="date" class="form-control form-control-sm" id="optIssueDate" value="@DateTime.Today.ToString("yyyy-MM-dd")">
+            </div>
+            <div class="col-md-3 col-6 mb-2">
+                <label class="form-label mb-0 small text-muted">Signatory Name</label>
+                <input type="text" class="form-control form-control-sm" id="optSigName" placeholder="e.g. A N M Arif Badal">
+            </div>
+            <div class="col-md-2 col-6 mb-2">
+                <label class="form-label mb-0 small text-muted">Designation</label>
+                <input type="text" class="form-control form-control-sm" id="optSigDesig" value="@Model.SignatoryDesignation">
+            </div>
+            <div class="col-12"><small class="text-muted"><i class="fa fa-info-circle"></i> These apply to every certificate you generate below.</small></div>
         </div>
     </div>
 </div>
 
+@if (!Model.HasQueried)
+{
+    <div class="alert alert-info"><i class="fa fa-info-circle"></i> Choose a class (and optionally a section) or type a keyword, then <strong>Find Students</strong>.</div>
+}
+else if (Model.Students.Count == 0)
+{
+    <div class="alert alert-warning"><i class="fa fa-exclamation-triangle"></i> No students match the filter.</div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle w-100" id="studentsTable">
+                    <thead class="table-dark"><tr><th>#</th><th>Student ID</th><th>Roll</th><th>Name</th><th>Class</th><th>Section</th><th class="text-nowrap">Certificate</th></tr></thead>
+                    <tbody>
+                        @{ var sl = 1; }
+                        @foreach (var s in Model.Students)
+                        {
+                            <tr>
+                                <td>@(sl++)</td>
+                                <td>@s.UniqueId</td>
+                                <td>@s.ClassRoll</td>
+                                <td>@s.Name</td>
+                                <td>@s.ClassName</td>
+                                <td>@(s.SectionName ?? "-")</td>
+                                <td class="text-nowrap">
+                                    <button class="btn btn-sm btn-primary gen-view" data-id="@s.Id"><i class="fa fa-eye"></i> View</button>
+                                    <button class="btn btn-sm btn-outline-danger gen-dl" data-id="@s.Id"><i class="fa fa-download"></i> PDF</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
 @section Scripts {
-    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
     <script>
         (function () {
-            if ($.fn.DataTable) { $('#testimonialsTable').DataTable({ order: [], pageLength: 25 }); }
-            const flash = { saved: '@TempData["saved"]', edited: '@TempData["edited"]', deleted: '@TempData["deleted"]', failed: '@TempData["failed"]' };
-            if (window.alertify) {
-                if (flash.saved) alertify.success(flash.saved);
-                if (flash.edited) alertify.message(flash.edited);
-                if (flash.deleted) alertify.error(flash.deleted);
-                if (flash.failed) alertify.error(flash.failed);
+            const base = '@Url.Action("Generate", "Testimonials")';
+            function url(id, dl) {
+                const p = new URLSearchParams();
+                p.set('studentId', id);
+                const d = document.getElementById('optIssueDate'); if (d && d.value) p.set('issueDate', d.value);
+                const n = document.getElementById('optSigName'); if (n && n.value) p.set('signatoryName', n.value);
+                const g = document.getElementById('optSigDesig'); if (g && g.value) p.set('signatoryDesignation', g.value);
+                if (dl) p.set('download', 'true');
+                return base + '?' + p.toString();
             }
+            document.querySelectorAll('.gen-view').forEach(b => b.addEventListener('click', () => window.open(url(b.dataset.id, false), '_blank')));
+            document.querySelectorAll('.gen-dl').forEach(b => b.addEventListener('click', () => window.open(url(b.dataset.id, true), '_blank')));
+            if ($.fn.DataTable) $('#studentsTable').DataTable({ order: [], pageLength: 25 });
+
+            const $class = $('#fClass'), $session = $('#fSession'), $section = $('#fSection');
+            function reloadSections() {
+                const classId = $class.val(), sessionId = $session.val();
+                $section.empty().append('<option value="">All sections</option>');
+                if (!classId) return;
+                $.ajax({ url: "/api/academicsections/getbyclasswithsessionId?classId=" + classId + "&sessionId=" + sessionId, dataType: "JSON", type: "POST", cache: false,
+                    success: function (data) { $.each(data || [], function (i, o) { $section.append('<option value="' + o.id + '">' + o.name + '</option>'); }); } });
+            }
+            $class.on('change', reloadSections); $session.on('change', reloadSections);
         })();
     </script>
 }

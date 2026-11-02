@@ -7,8 +7,6 @@ using SMS_App.ViewModels.SetupVM;
 using SMS_App.ViewModels.Students;
 using SMS.Entities;
 using SMS_App.ViewModels.LogVM;
-using SMS_App.ViewModels.Testimonials;
-using SMS_App.ViewModels.TransferCertificates;
 
 namespace SMS_App.Utilities.AutoMapperConfiguration
 {
@@ -24,20 +22,6 @@ namespace SMS_App.Utilities.AutoMapperConfiguration
 
             CreateMap<StudentListVM, Student>();
             CreateMap<Student, StudentListVM>();
-
-            // Testimonials: ignore navigation/audit on the way into the entity.
-            CreateMap<TestimonialCreateVM, Testimonial>()
-                .ForMember(d => d.Student, o => o.Ignore());
-            CreateMap<TestimonialEditVM, Testimonial>()
-                .ForMember(d => d.Student, o => o.Ignore());
-            CreateMap<Testimonial, TestimonialEditVM>();
-
-            // Transfer Certificates.
-            CreateMap<TransferCertificateCreateVM, TransferCertificate>()
-                .ForMember(d => d.Student, o => o.Ignore());
-            CreateMap<TransferCertificateEditVM, TransferCertificate>()
-                .ForMember(d => d.Student, o => o.Ignore());
-            CreateMap<TransferCertificate, TransferCertificateEditVM>();
 
             CreateMap<EmployeeCreateVM, Employee>();
             CreateMap<Employee, EmployeeCreateVM>();
