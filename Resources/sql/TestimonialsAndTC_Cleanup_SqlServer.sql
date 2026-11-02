@@ -6,6 +6,9 @@
 -- Safe/idempotent. Not required for the feature.
 -- ============================================================================
 
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+
 DELETE FROM AspNetUserClaims
  WHERE ClaimValue IN (N'CreateTestimonialsPolicy',N'EditTestimonialsPolicy',N'DeleteTestimonialsPolicy',N'PublishTestimonialsPolicy',
                       N'CreateTransferCertificatesPolicy',N'EditTransferCertificatesPolicy',N'DeleteTransferCertificatesPolicy',N'CancelTransferCertificatesPolicy');
