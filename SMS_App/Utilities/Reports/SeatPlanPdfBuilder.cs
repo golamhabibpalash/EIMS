@@ -18,16 +18,18 @@ public enum SeatPlanSheet
 }
 
 /// <summary>
-/// Renders small 3in x 2in seat-plan cards tiled two-across onto a Legal or A4 sheet.
+/// Renders small 2in-tall seat-plan cards tiled three-across onto a Legal or A4 sheet.
+/// Card width is derived from the sheet so three cards fill the printable width.
 /// Every card is bordered and the cards sit flush against one another so the border
 /// lines form a continuous grid the user can cut along.
 /// </summary>
 public class SeatPlanPdfBuilder : IDocument
 {
-    // Card physical size is fixed by requirement: 3in wide x 2in tall.
-    private const float CardWidthInches = 3f;
+    // Card height is fixed at 2in; width = (sheet width - side margins) / Columns
+    // (~2.67in on Legal, ~2.59in on A4). Three 3in cards (9in) would not fit either sheet.
     private const float CardHeightInches = 2f;
-    private const int Columns = 2; // two 3in cards = 6in, fits both Legal (8.5) and A4 (8.27)
+    private const int Columns = 3;
+    private const float SideMarginInches = 0.25f;
 
     private const float LegalWidthInches = 8.5f;
     private const float LegalHeightInches = 14f;
@@ -74,8 +76,9 @@ public class SeatPlanPdfBuilder : IDocument
 
         var spec = SheetSpec;
 
-        // Centre the 6in-wide grid on the sheet; a small vertical margin.
-        float horizontalMargin = Math.Max(0f, (spec.Width - CardWidthInches * Columns) / 2f);
+        // Split the printable width evenly across the columns.
+        float horizontalMargin = SideMarginInches;
+        float cardWidthInches = (spec.Width - 2 * SideMarginInches) / Columns;
 
         container.Page(page =>
         {
@@ -89,7 +92,7 @@ public class SeatPlanPdfBuilder : IDocument
                 table.ColumnsDefinition(c =>
                 {
                     for (int i = 0; i < Columns; i++)
-                        c.ConstantColumn(CardWidthInches, Unit.Inch);
+                        c.ConstantColumn(cardWidthInches, Unit.Inch);
                 });
 
                 foreach (var student in students)
