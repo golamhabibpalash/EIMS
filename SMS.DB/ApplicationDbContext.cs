@@ -133,6 +133,7 @@ namespace SMS.DB
         public DbSet<StudentPaymentDetails> StudentPaymentDetails { get; set; }
         public DbSet<StudentActivateHist> StudentActivateHists { get; set; }
         public DbSet<StudentFeeAllocation> StudentFeeAllocations { get; set; }
+        public DbSet<StudentCertificate> StudentCertificates { get; set; }
         public DbSet<SubjectEnrollment> SubjectEnrollments { get; set; }
         public DbSet<SubjectEnrollmentDetail> SubjectEnrollmentDetails { get; set; }
         #endregion
@@ -231,6 +232,11 @@ namespace SMS.DB
             builder.Entity<ParamBusConfig>()
                 .HasIndex(s => s.ConfigName)
                 .IsUnique();
+
+            // Certificates must survive a student delete (official records), so restrict the FK.
+            builder.Entity<StudentCertificate>()
+                .HasOne(c => c.Student).WithMany().HasForeignKey(c => c.StudentId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<AttendanceVM>(entity => entity.HasNoKey());
             builder.Entity<StudentPaymentSummeryVM>(entity => entity.HasNoKey());

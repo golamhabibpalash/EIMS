@@ -207,6 +207,37 @@ namespace SMS.DAL.Repositories
             return students;
         }
 
+        public async Task<List<Student>> GetStudentsForExportAsync(int sessionId, int classId, int sectionId)
+        {
+            var query = _context.Student
+                .Include(s => s.AcademicClass)
+                .Include(s => s.AcademicSection)
+                .Include(s => s.AcademicSession)
+                .Include(s => s.Gender)
+                .Include(s => s.Religion)
+                .Include(s => s.BloodGroup)
+                .Include(s => s.Nationality)
+                .Include(s => s.PresentDivision)
+                .Include(s => s.PresentDistrict)
+                .Include(s => s.PresentUpazila)
+                .Include(s => s.PermanentDivision)
+                .Include(s => s.PermanentDistrict)
+                .Include(s => s.PermanentUpazila)
+                .AsQueryable();
+
+            if (sessionId != 0)
+                query = query.Where(s => s.AcademicSessionId == sessionId);
+            if (classId != 0)
+                query = query.Where(s => s.AcademicClassId == classId);
+            if (sectionId != 0)
+                query = query.Where(s => s.AcademicSectionId == sectionId);
+
+            return await query
+                .OrderBy(s => s.AcademicClass.ClassSerial)
+                .ThenBy(s => s.ClassRoll)
+                .ToListAsync();
+        }
+
         public async Task<List<Student>> GetStudentsWithSectionBySectionIdAsync(int academicSectionId, int? classId = null, int? sessionId = null, bool? isResidential = null)
         {
             var students = _context.Student

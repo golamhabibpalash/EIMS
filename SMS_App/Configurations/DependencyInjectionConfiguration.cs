@@ -30,6 +30,9 @@ public static class DependencyInjectionConfiguration
         services.AddScoped<IStudentManager, StudentManager>();
         services.AddScoped<IStudentBulkImportManager, StudentBulkImportManager>();
 
+        services.AddScoped<IStudentCertificateRepository, StudentCertificateRepository>();
+        services.AddScoped<IStudentCertificateManager, StudentCertificateManager>();
+
         services.AddScoped<IInstituteRepository, InstituteRepository>();
         services.AddScoped<IInstituteManager, InstituteManager>();
 

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using AutoMapper;
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -21,7 +22,11 @@ using SMS.Entities.AdditionalModels.StudentImport;
 using SMS.Entities.AdditionalModels.StudentVM;
 using SMS.Entities.Enums;
 using SMS.Entities.Utilities;
+using QuestPDF.Fluent;
+using SMS_App.Utilities;
+using SMS_App.Utilities.Export;
 using SMS_App.Utilities.LoggerService;
+using SMS_App.Utilities.Reports;
 using SMS_App.Utilities.MACIPServices;
 using SMS_App.Utilities.Pagination;
 using SMS_App.Utilities.ShortMessageService;
@@ -104,7 +109,7 @@ public class StudentsController : Controller
         // --- Remember the user's list context across navigation --------------------
         // The list is fully described by its query string. We stash that query string in
         // session so that returning to the list by ANY route (the left-nav menu, browser
-        // Back, or a redirect after an edit) restores the same filters/search/sort/page,
+        // Back, or a redirect after an edit) restores the same filters/search/page,
         // not just via the "Back to List" button. "Reset" clears it.
         const string filterSessionKey = "StudentsListFilter";
 
@@ -135,40 +140,26 @@ public class StudentsController : Controller
         }
         // ---------------------------------------------------------------------------
 
+        // The grid itself is fed asynchronously by the List action (server-side
+        // DataTables processing). Index only renders the shell and the filter controls,
+        // pre-selected from the query string so a restored/bookmarked URL shows the same
+        // filters and the grid's first AJAX call picks them up from the dropdowns.
+        var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
+        if (academicSessionId == null)
+        {
+            academicSessionId = currentSession?.Id;
+        }
+
         ViewData["searchString"] = searchString;
         ViewData["selectedAcademicClassId"] = academicClassId != null ? academicClassId.ToString() : "";
         ViewData["selectedAcademicSectionId"] = academicSectionId;
         ViewData["selectedAcademicSessionId"] = academicSessionId;
         ViewData["categoryId"] = aCategory;
         ViewData["statusId"] = aStatus;
-        ViewData["pageRowCount"] = pageSize;
+        ViewData["pageSize"] = pageSize ?? 20;
 
-
-
-        var students = new List<SMS.Entities.AdditionalModels.StudentListVM>();
-        var allStudent = await _studentManager.GetAllAsync();
-        var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
-        if (academicSessionId != null)
-        {
-            allStudent = allStudent?.Where(s => s.AcademicSessionId == academicSessionId).ToList();
-        }
-        else
-        {
-            allStudent = allStudent?.Where(s => s.AcademicSessionId == currentSession.Id).ToList();
-            academicSessionId = currentSession?.Id;
-        }
-        if (!String.IsNullOrEmpty(searchString))
-        {
-            allStudent = allStudent.Where(s => s.Name.ToLower().Contains(searchString.ToLower())
-            || s.ClassRoll.ToString().Contains(searchString)
-            || s.UniqueId.ToString().Contains(searchString)
-            || (s.PhoneNo?.Contains(searchString) ?? false)
-            || (s.GuardianPhone?.Contains(searchString) ?? false))
-                .ToList();
-        }
         if (academicClassId != null)
         {
-            allStudent = allStudent.Where(s => s.AcademicClassId == Convert.ToInt32(academicClassId)).ToList();
             var sections = await _academicSectionManager.GetAllByClassWithSessionId(Convert.ToInt32(academicClassId), currentSession.Id);
             ViewBag.SectionList = new SelectList(sections, "Id", "Name", academicSectionId);
             ViewBag.selectedClassId = academicClassId;
@@ -177,41 +168,92 @@ public class StudentsController : Controller
         {
             ViewBag.selectedClassId = "";
         }
+
+        var isActiveVMs = new List<IsActiveVM>
+        {
+            new IsActiveVM { Id = 0, sName = "Inactive" },
+            new IsActiveVM { Id = 1, sName = "Active" },
+            new IsActiveVM { Id = 2, sName = "All" },
+        };
+
+        ViewBag.academicSessionId = new SelectList(await _academicSessionManager.GetAllAsync(), "Id", "Name", academicSessionId);
+        var classes = await _academicClassManager.GetAllAsync();
+        ViewBag.academicClassId = new SelectList(classes.Where(s => s.Status == true), "Id", "Name", academicClassId).ToList();
+        ViewBag.aStatus = new SelectList(isActiveVMs, "Id", "sName", aStatus);
+
+        var studentCategory = new List<SelectListItem>
+        {
+            new SelectListItem { Text = "all", Value = "all" },
+            new SelectListItem { Text = "residential", Value = "residential" },
+            new SelectListItem { Text = "nonResidential", Value = "nonResidential" }
+        };
+        ViewBag.aCategory = new SelectList(studentCategory, "Value", "Text", aCategory);
+
+        return View();
+    }
+
+    /// <summary>
+    /// Server-side DataTables endpoint for the student grid. Applies the filter dropdowns,
+    /// the global search box, column sorting, and paging on the server so only one page of
+    /// rows is ever serialized to the browser. Returns the shape the DataTables client
+    /// expects: { draw, recordsTotal, recordsFiltered, data }.
+    /// </summary>
+    [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
+    [Authorize(Policy = "IndexStudentsPolicy")]
+    public async Task<IActionResult> List(int? academicSessionId, int? academicClassId, int? academicSectionId,
+        string aStatus, string aCategory)
+    {
+        // DataTables posts its state (draw/start/length/search/order + the per-column entries)
+        // in the request BODY so the request isn't rejected by IIS's default query-string length
+        // limit (~2 KB) once there are many columns. Read from the form on POST, else the query.
+        string Param(string key) => Request.HasFormContentType ? Request.Form[key].ToString() : Request.Query[key].ToString();
+
+        int draw = int.TryParse(Param("draw"), out var d) ? d : 0;
+        int start = int.TryParse(Param("start"), out var s0) ? s0 : 0;
+        int length = int.TryParse(Param("length"), out var len) ? len : 20;
+        string search = Param("search[value]");
+        int orderColIdx = int.TryParse(Param("order[0][column]"), out var oc) ? oc : -1;
+        string orderDir = Param("order[0][dir]");
+        string orderCol = orderColIdx >= 0 ? Param($"columns[{orderColIdx}][data]") : null;
+
+        // Persist the live filter state so a bare /Students (menu, Back) restores it.
+        var restoreQs = BuildStudentListQueryString(academicSessionId, academicClassId, academicSectionId, aStatus, aCategory, search);
+        HttpContext.Session.SetString("StudentsListFilter", restoreQs);
+
+        var allStudent = await _studentManager.GetAllAsync();
+        var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
+
+        int? effectiveSessionId = academicSessionId ?? currentSession?.Id;
+        allStudent = (allStudent ?? Enumerable.Empty<Student>())
+            .Where(s => s.AcademicSessionId == effectiveSessionId).ToList();
+
+        if (academicClassId != null)
+            allStudent = allStudent.Where(s => s.AcademicClassId == academicClassId.Value).ToList();
         if (academicSectionId != null)
-        {
-            allStudent = allStudent.Where(s => s.AcademicSectionId == Convert.ToInt32(academicSectionId)).ToList();
-        }
-        if (!string.IsNullOrEmpty(aCategory))
-        {
-            if (aCategory == "residential")
-            {
-                allStudent = allStudent.Where(s => s.IsResidential).ToList();
-            }
-            else if (aCategory == "nonResidential")
-            {
-                allStudent = allStudent.Where(s => s.IsResidential == false).ToList();
-            }
-        }
-
-
+            allStudent = allStudent.Where(s => s.AcademicSectionId == academicSectionId.Value).ToList();
+        if (aCategory == "residential")
+            allStudent = allStudent.Where(s => s.IsResidential).ToList();
+        else if (aCategory == "nonResidential")
+            allStudent = allStudent.Where(s => !s.IsResidential).ToList();
         if (aStatus == "0" || aStatus == "1")
         {
-            bool isActive = aStatus == "1" ? true : false;
+            bool isActive = aStatus == "1";
             allStudent = allStudent.Where(s => s.Status == isActive).ToList();
         }
-        students = allStudent.Select(s => new SMS.Entities.AdditionalModels.StudentListVM()
+
+        var rows = allStudent.Select(s => new SMS.Entities.AdditionalModels.StudentListVM
         {
             Id = s.Id,
             ClassRoll = s.ClassRoll,
             Photo = s.Photo,
             StudentName = s.Name,
             NameBangla = s.NameBangla,
-            ClassName = s.AcademicClass.Name,
+            ClassName = s.AcademicClass?.Name,
             SectionName = s.AcademicSection?.Name,
             PhoneNo = s.PhoneNo,
             GuardianPhone = s.GuardianPhone,
             SessionName = s.AcademicSession?.Name,
-            Gender = s.Gender.Name,
+            Gender = s.Gender?.Name,
             Status = s.Status,
             ClassSerial = s.AcademicClass?.ClassSerial,
             IsResidential = s.IsResidential,
@@ -219,98 +261,84 @@ public class StudentsController : Controller
             AcademicSessionId = s.AcademicSessionId
         }).ToList();
 
+        int recordsTotal = rows.Count;
 
-        int totalFound = ViewBag.totalFound = students.Count();
-
-        List<IsActiveVM> isActiveVMs = new List<IsActiveVM>();
-        IsActiveVM status1 = new IsActiveVM();
-        status1.Id = 0;
-        status1.sName = "Inactive";
-        isActiveVMs.Add(status1);
-
-        IsActiveVM status2 = new IsActiveVM();
-        status2.Id = 1;
-        status2.sName = "Active";
-        isActiveVMs.Add(status2);
-
-        IsActiveVM status3 = new IsActiveVM();
-        status3.Id = 2;
-        status3.sName = "All";
-        isActiveVMs.Add(status3);
-
-        switch (sortOrder)
+        if (!string.IsNullOrWhiteSpace(search))
         {
-            case "roll_desc":
-                students = students.OrderByDescending(s => s.ClassRoll).ToList();
-                break;
-            case "academicClass":
-                students = students.OrderBy(s => s.ClassSerial).ToList();
-                break;
-            case "class_desc":
-                students = students.OrderByDescending(s => s.ClassSerial).ToList();
-                break;
-            default:
-                students = students.OrderBy(s => s.ClassRoll).ToList();
-                break;
+            var term = search.Trim().ToLowerInvariant();
+            rows = rows.Where(r =>
+                (r.StudentName?.ToLowerInvariant().Contains(term) ?? false)
+                || (r.NameBangla?.Contains(search) ?? false)
+                || r.ClassRoll.ToString().Contains(term)
+                || (r.UniqueId?.ToLowerInvariant().Contains(term) ?? false)
+                || (r.PhoneNo?.Contains(term) ?? false)
+                || (r.GuardianPhone?.Contains(term) ?? false)).ToList();
         }
 
-        ViewBag.academicSessionId = new SelectList(await _academicSessionManager.GetAllAsync(), "Id", "Name", academicSessionId);
-        var classes = await _academicClassManager.GetAllAsync();
-        ViewBag.academicClassId = new SelectList(classes.Where(s => s.Status == true), "Id", "Name", academicClassId).ToList();
+        int recordsFiltered = rows.Count;
 
-        ViewBag.aStatus = new SelectList(isActiveVMs.ToList(), "Id", "sName", aStatus);
-        if (pageSize == null)
+        bool desc = string.Equals(orderDir, "desc", StringComparison.OrdinalIgnoreCase);
+        IEnumerable<SMS.Entities.AdditionalModels.StudentListVM> sorted = orderCol switch
         {
-            pageSize = 20;
-        }
-        ViewBag.rowsCount = new List<SelectListItem>()
-        {
-        new SelectListItem { Value = "20", Text = "20", Selected=pageSize==20 },
-        new SelectListItem { Value = "50", Text = "50", Selected=pageSize==50  },
-        new SelectListItem { Value = "100", Text = "100", Selected=pageSize==100  },
-        new SelectListItem { Value = "0", Text = "All", Selected=pageSize==0  }
+            "uniqueId" => desc ? rows.OrderByDescending(r => r.UniqueId) : rows.OrderBy(r => r.UniqueId),
+            "classRoll" => desc ? rows.OrderByDescending(r => r.ClassRoll) : rows.OrderBy(r => r.ClassRoll),
+            "studentName" => desc ? rows.OrderByDescending(r => r.StudentName) : rows.OrderBy(r => r.StudentName),
+            "className" => desc ? rows.OrderByDescending(r => r.ClassSerial) : rows.OrderBy(r => r.ClassSerial),
+            "sectionName" => desc ? rows.OrderByDescending(r => r.SectionName) : rows.OrderBy(r => r.SectionName),
+            "phoneNo" => desc ? rows.OrderByDescending(r => r.PhoneNo) : rows.OrderBy(r => r.PhoneNo),
+            "guardianPhone" => desc ? rows.OrderByDescending(r => r.GuardianPhone) : rows.OrderBy(r => r.GuardianPhone),
+            "sessionName" => desc ? rows.OrderByDescending(r => r.SessionName) : rows.OrderBy(r => r.SessionName),
+            "gender" => desc ? rows.OrderByDescending(r => r.Gender) : rows.OrderBy(r => r.Gender),
+            "status" => desc ? rows.OrderByDescending(r => r.Status) : rows.OrderBy(r => r.Status),
+            // Default: current session first, then by class order and roll (the historical order).
+            _ => rows.OrderByDescending(r => r.AcademicSessionId).ThenBy(r => r.ClassSerial).ThenBy(r => r.ClassRoll)
         };
-        var studentCategory = new List<SelectListItem>
+
+        var paged = (length > 0 ? sorted.Skip(start).Take(length) : sorted).ToList();
+
+        var textInfo = new CultureInfo("en-US", false).TextInfo;
+        var data = paged.Select(r => new
         {
-            new SelectListItem { Text = "all", Value = "all" },
-            new SelectListItem { Text = "residential", Value = "residential" },
-            new SelectListItem { Text = "nonResidential", Value = "nonResidential" }
-        };
-        ViewBag.aCategory = new SelectList(studentCategory.ToList(), "Value", "Text", aCategory);
+            id = r.Id,
+            photoUrl = ResolveStudentPhotoUrl(r.Photo),
+            uniqueId = r.UniqueId,
+            classRoll = r.ClassRoll,
+            studentName = textInfo.ToTitleCase(r.StudentName ?? string.Empty),
+            nameBangla = r.NameBangla,
+            className = r.ClassName,
+            sectionName = r.SectionName ?? "N/A",
+            phoneNo = r.PhoneNo?.PadLeft(11, '0') ?? "",
+            guardianPhone = r.GuardianPhone?.PadLeft(11, '0') ?? "",
+            sessionName = r.SessionName,
+            gender = r.Gender,
+            status = r.Status,
+            isResidential = r.IsResidential
+        });
 
-        int pSize = 30;
-        if (pageSize != null)
-        {
-            if (pageSize > 0)
-            {
-                pSize = (int)pageSize;
-            }
-            else if (pageSize == 0)
-            {
-                pSize = students.Count();
-            }
-            else
-            {
-                pSize = totalFound;
-            }
-        }
+        return Json(new { draw, recordsTotal, recordsFiltered, data });
+    }
 
-        ViewData["pageSize"] = pageSize;
+    /// <summary>Resolves a student's avatar URL, cache-busting replaced photos by last-write time.</summary>
+    private string ResolveStudentPhotoUrl(string photo)
+    {
+        if (string.IsNullOrEmpty(photo)) return "/Images/noProfileImage.png";
+        var path = System.IO.Path.Combine(_host.WebRootPath, "Images/Student/", photo);
+        if (!System.IO.File.Exists(path)) return "/Images/noProfileImage.png";
+        return $"/Images/Student/{photo}?v={System.IO.File.GetLastWriteTimeUtc(path).Ticks}";
+    }
 
-        var ordered = students.OrderByDescending(s => s.AcademicSessionId).ThenBy(s => s.ClassSerial).ThenBy(s => s.ClassRoll).ToList();
-
-        // Clamp a stale page number so that returning to the list after an update that
-        // shrank the result set lands on the last available page, not an empty one.
-        int requestedPage = pageNumber ?? 1;
-        if (pSize > 0)
-        {
-            int totalPages = (int)Math.Ceiling(ordered.Count / (double)pSize);
-            if (totalPages < 1) totalPages = 1;
-            if (requestedPage > totalPages) requestedPage = totalPages;
-        }
-        if (requestedPage < 1) requestedPage = 1;
-
-        return View(PaginatedList<SMS.Entities.AdditionalModels.StudentListVM>.Create(ordered, requestedPage, (int)pSize));
+    /// <summary>Builds the Index query string that reproduces a given filter state.</summary>
+    private static string BuildStudentListQueryString(int? academicSessionId, int? academicClassId,
+        int? academicSectionId, string aStatus, string aCategory, string searchString)
+    {
+        var parts = new List<string>();
+        if (academicSessionId != null) parts.Add($"academicSessionId={academicSessionId}");
+        if (academicClassId != null) parts.Add($"academicClassId={academicClassId}");
+        if (academicSectionId != null) parts.Add($"academicSectionId={academicSectionId}");
+        if (!string.IsNullOrEmpty(aStatus)) parts.Add($"aStatus={Uri.EscapeDataString(aStatus)}");
+        if (!string.IsNullOrEmpty(aCategory)) parts.Add($"aCategory={Uri.EscapeDataString(aCategory)}");
+        if (!string.IsNullOrEmpty(searchString)) parts.Add($"searchString={Uri.EscapeDataString(searchString)}");
+        return parts.Count > 0 ? "?" + string.Join("&", parts) : string.Empty;
     }
 
     #endregion Index
@@ -1177,6 +1205,215 @@ public class StudentsController : Controller
     }
     #endregion
 
+    #region ID Cards
+    // Printable, dynamic student ID cards. The HTML view (IdCards) is the pixel-faithful,
+    // "print any time" face used on screen; IdCardsPdf produces a downloadable PDF of the
+    // same cards (a simpler layout - see StudentIdCardPdfBuilder). Both pull their data from
+    // the shared BuildIdCardPageAsync so the two renderers never drift apart.
+
+    [HttpGet]
+    [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
+    [Authorize(Policy = "IdCardStudentsPolicy")]
+    public async Task<IActionResult> IdCards(int? academicSessionId, int? academicClassId,
+        int? academicSectionId, string searchString, int? studentId, int design = 1, string color = null)
+    {
+        var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
+        // A single-student print is self-contained; otherwise default to the current session.
+        if (academicSessionId == null && studentId == null)
+            academicSessionId = currentSession?.Id;
+
+        ViewBag.academicSessionId = new SelectList(await _academicSessionManager.GetAllAsync(), "Id", "Name", academicSessionId);
+        var classes = await _academicClassManager.GetAllAsync();
+        ViewBag.academicClassId = new SelectList(classes.Where(c => c.Status == true), "Id", "Name", academicClassId);
+        if (academicClassId != null)
+        {
+            var sections = await _academicSectionManager.GetAllByClassWithSessionId(
+                academicClassId.Value, academicSessionId ?? currentSession?.Id ?? 0);
+            ViewBag.SectionList = new SelectList(sections, "Id", "Name", academicSectionId);
+        }
+
+        var vm = await BuildIdCardPageAsync(academicSessionId, academicClassId, academicSectionId, searchString, studentId);
+        vm.Design = ClampDesign(design);
+        vm.AccentColor = NormalizeColor(color);
+        return View(vm);
+    }
+
+    [HttpGet]
+    [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
+    [Authorize(Policy = "IdCardStudentsPolicy")]
+    public async Task<IActionResult> IdCardsPdf(int? academicSessionId, int? academicClassId,
+        int? academicSectionId, string searchString, int? studentId, int design = 1, string color = null, bool download = false)
+    {
+        if (academicSessionId == null && studentId == null)
+            academicSessionId = (await _academicSessionManager.GetCurrentAcademicSessionAsync())?.Id;
+
+        var vm = await BuildIdCardPageAsync(academicSessionId, academicClassId, academicSectionId, searchString, studentId);
+        if (vm.Cards.Count == 0)
+            return new JsonResult("No students match the selected filters.");
+
+        var logo = ReadInstituteImage(string.IsNullOrWhiteSpace(vm.Institute?.Logo) ? "smslogo.png" : vm.Institute.Logo)
+                   ?? ReadInstituteImage("smslogo.png");
+        var signature = ReadInstituteImage("signature.jpg");
+
+        var doc = new StudentIdCardPdfBuilder(vm.Institute, logo, signature, vm.Cards, ClampDesign(design), NormalizeColor(color));
+        var pdf = doc.GeneratePdf();
+
+        string fileName = $"id_cards_{DateTime.Now:yyyyMMdd-HHmm}.pdf";
+        Response.Headers["Content-Disposition"] = download
+            ? $"attachment; filename=\"{fileName}\""
+            : $"inline; filename=\"{fileName}\"";
+        return File(pdf, "application/pdf");
+    }
+
+    /// <summary>
+    /// Builds the card set for the given filters. A single <paramref name="studentId"/> is honoured
+    /// on its own (so an inactive student's card can still be printed from the list); otherwise the
+    /// session/class/section/keyword filters narrow the ACTIVE students, ordered class then roll.
+    /// Blood group and address lookups are pre-loaded into dictionaries to avoid per-student queries.
+    /// </summary>
+    private async Task<StudentIdCardPageVM> BuildIdCardPageAsync(int? academicSessionId,
+        int? academicClassId, int? academicSectionId, string searchString, int? studentId)
+    {
+        var institute = await _instituteManager.GetByIdAsync(1);
+        var vm = new StudentIdCardPageVM
+        {
+            Institute = institute,
+            InstituteLogoDataUri = BuildInstituteLogoDataUri(institute?.Logo),
+            AcademicSessionId = academicSessionId,
+            AcademicClassId = academicClassId,
+            AcademicSectionId = academicSectionId,
+            SearchString = searchString,
+            StudentId = studentId,
+        };
+
+        var all = (await _studentManager.GetAllAsync()) ?? Enumerable.Empty<Student>();
+        IEnumerable<Student> query;
+
+        if (studentId is > 0)
+        {
+            query = all.Where(s => s.Id == studentId.Value);
+            vm.HasQueried = true;
+        }
+        else
+        {
+            // Avoid accidentally rendering an entire session: a class, keyword or section is required.
+            vm.HasQueried = academicClassId != null || academicSectionId != null
+                || !string.IsNullOrWhiteSpace(searchString);
+            if (!vm.HasQueried)
+                return vm;
+
+            query = all.Where(s => s.Status && s.AcademicSessionId == academicSessionId);
+            if (academicClassId != null) query = query.Where(s => s.AcademicClassId == academicClassId.Value);
+            if (academicSectionId != null) query = query.Where(s => s.AcademicSectionId == academicSectionId.Value);
+            if (!string.IsNullOrWhiteSpace(searchString))
+            {
+                var term = searchString.Trim().ToLowerInvariant();
+                query = query.Where(s =>
+                    (s.Name?.ToLowerInvariant().Contains(term) ?? false)
+                    || (s.NameBangla?.Contains(searchString) ?? false)
+                    || s.ClassRoll.ToString().Contains(term)
+                    || (s.UniqueId?.ToLowerInvariant().Contains(term) ?? false)
+                    || (s.PhoneNo?.Contains(term) ?? false));
+            }
+        }
+
+        var students = query
+            .OrderBy(s => s.AcademicClass?.ClassSerial)
+            .ThenBy(s => s.ClassRoll)
+            .ToList();
+
+        if (students.Count == 0)
+            return vm;
+
+        var bloods = (await _bloodGroupManager.GetAllAsync()).ToDictionary(b => b.Id, b => b.Name);
+        var districts = (await _districtManager.GetAllAsync()).ToDictionary(d => d.Id, d => d.Name);
+        var upazilas = (await _upazilaManager.GetAllAsync()).ToDictionary(u => u.Id, u => u.Name);
+
+        foreach (var s in students)
+        {
+            var qrPayload = $"ID:{s.UniqueId}\nName:{s.Name}\nClass:{s.AcademicClass?.Name}" +
+                            $"{(string.IsNullOrEmpty(s.AcademicSection?.Name) ? "" : "-" + s.AcademicSection.Name)}\nRoll:{s.ClassRoll}";
+            var qrPng = QrCodeHelper.GeneratePng(qrPayload, 8);
+
+            vm.Cards.Add(new StudentIdCardVM
+            {
+                Id = s.Id,
+                Name = s.Name,
+                NameBangla = s.NameBangla,
+                FatherName = s.FatherName,
+                ClassName = s.AcademicClass?.Name,
+                SectionName = s.AcademicSection?.Name,
+                ClassRoll = s.ClassRoll,
+                UniqueId = s.UniqueId,
+                BloodGroup = s.BloodGroupId != null && bloods.TryGetValue(s.BloodGroupId.Value, out var bg) ? bg : null,
+                PhoneNo = s.PhoneNo,
+                GuardianPhone = s.GuardianPhone,
+                SessionName = s.AcademicSession?.Name,
+                Address = ComposeAddress(s, districts, upazilas),
+                PhotoUrl = ResolveStudentPhotoUrl(s.Photo),
+                PhotoPath = ResolveStudentPhotoPath(s.Photo),
+                QrPng = qrPng,
+                QrDataUri = qrPng == null ? string.Empty : "data:image/png;base64," + Convert.ToBase64String(qrPng),
+            });
+        }
+
+        return vm;
+    }
+
+    /// <summary>Maps the raw design query value to the fixed 1-3 range, defaulting to Classic.</summary>
+    private static IdCardDesign ClampDesign(int design) =>
+        design is >= 1 and <= 3 ? (IdCardDesign)design : IdCardDesign.Classic;
+
+    /// <summary>Validates a colour-picker value to a safe #RRGGBB hex, defaulting to blue.</summary>
+    private static string NormalizeColor(string color)
+    {
+        const string fallback = "#1565C0";
+        if (string.IsNullOrWhiteSpace(color)) return fallback;
+        var c = color.Trim();
+        if (!c.StartsWith("#")) c = "#" + c;
+        return System.Text.RegularExpressions.Regex.IsMatch(c, "^#[0-9A-Fa-f]{6}$") ? c.ToUpperInvariant() : fallback;
+    }
+
+    /// <summary>Joins the present-address parts (area, PO, upazila, district) that are set.</summary>
+    private static string ComposeAddress(Student s, IReadOnlyDictionary<int, string> districts,
+        IReadOnlyDictionary<int, string> upazilas)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(s.PresentAddressArea)) parts.Add(s.PresentAddressArea.Trim());
+        if (!string.IsNullOrWhiteSpace(s.PresentAddressPO)) parts.Add(s.PresentAddressPO.Trim());
+        if (upazilas.TryGetValue(s.PresentUpazilaId, out var up) && !string.IsNullOrWhiteSpace(up)) parts.Add(up);
+        if (districts.TryGetValue(s.PresentDistrictId, out var dist) && !string.IsNullOrWhiteSpace(dist)) parts.Add(dist);
+        return string.Join(", ", parts);
+    }
+
+    /// <summary>Absolute path to a student's photo on disk, or null when there is none.</summary>
+    private string ResolveStudentPhotoPath(string photo)
+    {
+        if (string.IsNullOrEmpty(photo)) return null;
+        var path = Path.Combine(_host.WebRootPath, "Images", "Student", photo);
+        return System.IO.File.Exists(path) ? path : null;
+    }
+
+    /// <summary>Reads an institute image (logo/signature) as bytes, or null when missing.</summary>
+    private byte[] ReadInstituteImage(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName)) return null;
+        var path = Path.Combine(_host.WebRootPath, "Images", "Institute", fileName);
+        return System.IO.File.Exists(path) ? System.IO.File.ReadAllBytes(path) : null;
+    }
+
+    /// <summary>Institute logo as a data URI for the HTML card; falls back to the bundled default.</summary>
+    private string BuildInstituteLogoDataUri(string logo)
+    {
+        var bytes = ReadInstituteImage(string.IsNullOrWhiteSpace(logo) ? "smslogo.png" : logo)
+                    ?? ReadInstituteImage("smslogo.png");
+        if (bytes == null) return string.Empty;
+        var ext = Path.GetExtension(string.IsNullOrWhiteSpace(logo) ? "smslogo.png" : logo).ToLowerInvariant();
+        var mime = ext is ".jpg" or ".jpeg" ? "image/jpeg" : "image/png";
+        return $"data:{mime};base64,{Convert.ToBase64String(bytes)}";
+    }
+    #endregion ID Cards
+
     #region Profile
     [Authorize, AllowAnonymous]
     [Authorize(Policy = "ProfileStudentsPolicy")]
@@ -1530,67 +1767,107 @@ public class StudentsController : Controller
         return null;
     }
 
+    // GET: Students/Export - robust, column-selectable export of the (filtered) student list.
+    // The caller passes the same filters shown on the list plus the chosen columns and format;
+    // the selectable columns and the produced file both come from StudentExportColumns so they
+    // can never drift apart.
     [HttpGet]
-    public async Task<IActionResult> ExportToCsv(int? academicSessionId, int? academicClassId, int? academicSectionId, string aStatus, string searchString, string aCategory)
+    [Authorize(Roles = "SuperAdmin, Admin,Teacher")]
+    [Authorize(Policy = "IndexStudentsPolicy")]
+    public async Task<IActionResult> Export(int? academicSessionId, int? academicClassId, int? academicSectionId,
+        string aStatus, string aCategory, string searchString, string[] columns, string format = "csv")
     {
-        var students = await _studentManager.GetAllAsync();
-        if (academicSessionId != null)
+        // Match the list view's default: no session chosen means the current session.
+        if (academicSessionId == null)
         {
-            students = students.Where(s => s.AcademicSessionId == academicSessionId).ToList();
+            var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
+            academicSessionId = currentSession?.Id;
         }
-        if (academicClassId != null)
-        {
-            students = students.Where(s => s.AcademicClassId == academicClassId).ToList();
-        }
-        if (academicSectionId != null)
-        {
-            students = students.Where(s => s.AcademicSectionId == academicSectionId).ToList();
-        }
+
+        var students = await _studentManager.GetStudentsForExportAsync(
+            academicSessionId ?? 0, academicClassId ?? 0, academicSectionId ?? 0);
+
+        // Category and status are not part of the query filter, so apply them here (as the list does).
+        if (aCategory == "residential")
+            students = students.Where(s => s.IsResidential).ToList();
+        else if (aCategory == "nonResidential")
+            students = students.Where(s => !s.IsResidential).ToList();
 
         if (aStatus == "0" || aStatus == "1")
         {
-            bool isActive = aStatus == "1" ? true : false;
+            bool isActive = aStatus == "1";
             students = students.Where(s => s.Status == isActive).ToList();
         }
-        if (!string.IsNullOrEmpty(aCategory))
+
+        if (!string.IsNullOrWhiteSpace(searchString))
         {
-            if (aCategory == "residential")
-            {
-                students = students.Where(s => s.IsResidential).ToList();
-            }
-            else if (aCategory == "nonResidential")
-            {
-                students = students.Where(s => s.IsResidential == false).ToList();
-            }
+            var term = searchString.Trim();
+            var lower = term.ToLowerInvariant();
+            students = students.Where(s =>
+                (s.Name?.ToLowerInvariant().Contains(lower) ?? false)
+                || (s.NameBangla?.Contains(term) ?? false)
+                || s.ClassRoll.ToString().Contains(term)
+                || (s.UniqueId?.Contains(term) ?? false)
+                || (s.PhoneNo?.Contains(term) ?? false)
+                || (s.GuardianPhone?.Contains(term) ?? false)).ToList();
         }
-        if (!String.IsNullOrEmpty(searchString))
+
+        var cols = StudentExportColumns.Resolve(columns);
+        var stamp = DateTime.Today.ToString("yyMMdd");
+
+        if (string.Equals(format, "pdf", StringComparison.OrdinalIgnoreCase))
         {
-            students = students.Where(s => s.Name.Contains(searchString)
-            || s.ClassRoll.ToString().Contains(searchString)
-            || s.UniqueId.ToString().Contains(searchString)
-            || (s.PhoneNo?.Contains(searchString) ?? false)
-            || (s.GuardianPhone?.Contains(searchString) ?? false))
+            var institute = await _instituteManager.GetFirstOrDefaultAsync();
+            var headers = cols.Select(c => c.Header).ToList();
+            var rows = students
+                .Select(s => (IReadOnlyList<string>)cols.Select(c => c.Value(s) ?? string.Empty).ToList())
                 .ToList();
+            var subtitle = $"Student List ({students.Count}) — {DateTime.Now:dd MMM yyyy}";
+            var pdf = new TabularPdfBuilder(institute?.Name ?? "Student List", subtitle, headers, rows).GeneratePdf();
+            return File(pdf, "application/pdf", $"{stamp}_Student_Export.pdf");
         }
 
-        var builder = new StringBuilder();
-        builder.AppendLine("Unique Id, ClassRoll, Student Name,  Class,  Phone No,Guardian Phone, Gender, Status, Section , IsResidential");
-
-        foreach (var student in students)
+        if (string.Equals(format, "xlsx", StringComparison.OrdinalIgnoreCase))
         {
-            builder.AppendLine($"{student.UniqueId}," +
-                    $"{student.ClassRoll},{student.Name}," +
-                    $"{student.AcademicClass?.Name ?? "N/A"}," +
-                    $"{student.PhoneNo.PadLeft(11, '0')}," +
-                    $"{student.GuardianPhone?.PadLeft(11, '0') ?? "N/A"}," +
-                    $"{student.Gender.Name}," +
-                    $"{(student.Status ? "Active" : "Inactive")}," +
-                    $"{student.AcademicSection?.Name ?? "N/A"}," +
-                    $"{(student.IsResidential ? "Residential" : "Non Residential")},");
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add("Students");
+            for (int c = 0; c < cols.Count; c++)
+                ws.Cell(1, c + 1).Value = cols[c].Header;
+            ws.Row(1).Style.Font.Bold = true;
+
+            int r = 2;
+            foreach (var s in students)
+            {
+                for (int c = 0; c < cols.Count; c++)
+                    ws.Cell(r, c + 1).Value = cols[c].Value(s) ?? string.Empty;
+                r++;
+            }
+            ws.Columns().AdjustToContents();
+
+            using var ms = new MemoryStream();
+            wb.SaveAs(ms);
+            return File(ms.ToArray(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"{stamp}_Student_Export.xlsx");
         }
 
-        DateTime today = DateTime.Today;
-        return File(Encoding.UTF8.GetBytes(builder.ToString()), "text/csv", today.ToString("yyMMdd") + "Student List_.csv");
+        // CSV (default): RFC-4180 quoting + UTF-8 BOM so Excel reads Bangla text correctly.
+        var sb = new StringBuilder();
+        sb.AppendLine(string.Join(",", cols.Select(c => CsvField(c.Header))));
+        foreach (var s in students)
+            sb.AppendLine(string.Join(",", cols.Select(c => CsvField(c.Value(s)))));
+
+        var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+        return File(bytes, "text/csv", $"{stamp}_Student_Export.csv");
+    }
+
+    /// <summary>Quotes a CSV field per RFC 4180 (wrap in quotes, double any embedded quote).</summary>
+    private static string CsvField(string value)
+    {
+        value ??= string.Empty;
+        if (value.Contains('"') || value.Contains(',') || value.Contains('\n') || value.Contains('\r'))
+            return "\"" + value.Replace("\"", "\"\"") + "\"";
+        return value;
     }
 
     /// <summary>

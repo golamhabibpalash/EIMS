@@ -328,6 +328,14 @@ public class AuthorizationPolicies
         options.AddPolicy("EditStudentsPolicy", policy => policy.RequireClaim("Edit Student"));
         options.AddPolicy("DeleteStudentsPolicy", policy => policy.RequireClaim("Delete Student"));
         options.AddPolicy("ProfileStudentsPolicy", policy => policy.RequireClaim("View Student Profile"));
+        options.AddPolicy("IdCardStudentsPolicy", policy => policy.RequireClaim("View Student ID Card"));
+
+        // Student Testimonial (character) certificate - dynamic generator
+        options.AddPolicy("IndexTestimonialsPolicy", policy => policy.RequireClaim("View Testimonials"));
+
+        // Student Transfer Certificate - dynamic generator
+        options.AddPolicy("IndexTransferCertificatesPolicy", policy => policy.RequireClaim("View Transfer Certificates"));
+        options.AddPolicy("GenerateTransferCertificatesPolicy", policy => policy.RequireClaim("Generate Transfer Certificate"));
 
         //Student Enrollment
         options.AddPolicy("SubjectEnrollSubjectEnrollmentPolicy", policy => policy.RequireClaim("View Enrollment List"));

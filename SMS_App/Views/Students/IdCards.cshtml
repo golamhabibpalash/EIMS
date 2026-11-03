@@ -1,0 +1,365 @@
+@using SMS_App.ViewModels.Students
+@model StudentIdCardPageVM
+@{
+    ViewData["Title"] = "Student ID Cards";
+    GlobalUI.PageTitle = "Student ID Cards";
+
+    string Title(string s) => string.IsNullOrWhiteSpace(s)
+        ? "" : System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(s.ToLowerInvariant());
+
+    var designId = (int)Model.Design;
+
+    // Query string that reproduces the current card set, reused by the "Download PDF" links.
+    var pdfQuery = new List<string>();
+    if (Model.AcademicSessionId != null) pdfQuery.Add($"academicSessionId={Model.AcademicSessionId}");
+    if (Model.AcademicClassId != null) pdfQuery.Add($"academicClassId={Model.AcademicClassId}");
+    if (Model.AcademicSectionId != null) pdfQuery.Add($"academicSectionId={Model.AcademicSectionId}");
+    if (!string.IsNullOrWhiteSpace(Model.SearchString)) pdfQuery.Add($"searchString={Uri.EscapeDataString(Model.SearchString)}");
+    if (Model.StudentId != null) pdfQuery.Add($"studentId={Model.StudentId}");
+    pdfQuery.Add($"design={designId}");
+    pdfQuery.Add($"color={Uri.EscapeDataString(Model.AccentColor)}");
+    var pdfQs = string.Join("&", pdfQuery);
+}
+
+<div class="card shadow-sm mb-3 no-print">
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
+        <h5 class="mb-0"><i class="fa fa-id-card mr-2"></i> Student ID Cards</h5>
+        <div class="btn-group btn-group-sm">
+            <button type="button" id="printCardsBtn" class="btn btn-primary" @(Model.Cards.Count == 0 ? "disabled" : "")>
+                <i class="fa fa-print"></i> Print
+            </button>
+            <a id="downloadPdfBtn" class="btn btn-outline-danger @(Model.Cards.Count == 0 ? "disabled" : "")"
+               href="@Url.Action("IdCardsPdf", "Students")?@pdfQs&download=true" target="_blank">
+                <i class="fa fa-file-pdf"></i> Download PDF
+            </a>
+        </div>
+    </div>
+    <div class="card-body py-2">
+        <form method="get" asp-action="IdCards" asp-controller="Students" id="idCardFilter">
+            <div class="row g-2 align-items-end">
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Session</label>
+                    <select class="form-control form-control-sm" name="academicSessionId" id="fSession"
+                            asp-items="@ViewBag.academicSessionId"></select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Class</label>
+                    <select class="form-control form-control-sm" name="academicClassId" id="fClass"
+                            asp-items="@ViewBag.academicClassId">
+                        <option value="">Select class</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Section</label>
+                    <select class="form-control form-control-sm" name="academicSectionId" id="fSection"
+                            asp-items="@(ViewBag.SectionList as Microsoft.AspNetCore.Mvc.Rendering.SelectList)">
+                        <option value="">All sections</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Design</label>
+                    <select class="form-control form-control-sm" name="design" id="fDesign">
+                        <option value="1" selected="@(designId == 1)">Design 1 &ndash; Classic</option>
+                        <option value="2" selected="@(designId == 2)">Design 2 &ndash; Wave</option>
+                        <option value="3" selected="@(designId == 3)">Design 3 &ndash; Side Panel</option>
+                    </select>
+                </div>
+                <div class="col-xl-1 col-lg-2 col-md-3 col-6 mb-2">
+                    <label class="form-label mb-0 small text-muted">Color</label>
+                    <input type="color" class="form-control form-control-sm form-control-color p-1" style="height:31px;"
+                           name="color" id="fColor" value="@Model.AccentColor" title="Pick the card accent colour">
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-6 col-12 mb-2">
+                    <label class="form-label mb-0 small text-muted">Keyword</label>
+                    <input type="text" class="form-control form-control-sm" name="searchString"
+                           placeholder="Name / Roll / ID / Phone" value="@Model.SearchString">
+                </div>
+                <div class="col-12 col-lg-auto mb-2 d-flex align-items-center">
+                    <button type="submit" class="btn btn-primary btn-sm mr-2"><i class="fa fa-id-card"></i> Generate Cards</button>
+                    <a class="btn btn-outline-warning btn-sm" asp-action="IdCards"><i class="fa fa-undo"></i> Reset</a>
+                </div>
+            </div>
+            <div class="small text-muted mt-1">
+                <i class="fa fa-info-circle"></i> Pick a design and accent colour. Colour updates the preview instantly;
+                changing the design needs <strong>Generate Cards</strong>.
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (!Model.HasQueried)
+{
+    <div class="alert alert-info no-print">
+        <i class="fa fa-info-circle"></i> Choose a <strong>design</strong>, a <strong>colour</strong> and a <strong>class</strong>
+        (and optionally a section), or type a keyword, then click <strong>Generate Cards</strong>.
+    </div>
+}
+else if (Model.Cards.Count == 0)
+{
+    <div class="alert alert-warning no-print">
+        <i class="fa fa-exclamation-triangle"></i> No students match the selected filters.
+    </div>
+}
+else
+{
+    <div class="no-print mb-2 text-muted small">
+        <i class="fa fa-layer-group"></i> @Model.Cards.Count front card(s) + 1 common back.
+    </div>
+
+    <div id="cardGallery" class="idc-gallery" style="--idc-accent:@Model.AccentColor;">
+        @foreach (var c in Model.Cards)
+        {
+            @switch (Model.Design)
+            {
+                case IdCardDesign.Wave:
+                    <div class="idc idc-front idc-d2">
+                        <div class="idc-d2-top">
+                            <span class="idc-head-name">
+                                @if (!string.IsNullOrEmpty(Model.InstituteLogoDataUri))
+                                {
+                                    <img src="@Model.InstituteLogoDataUri" class="idc-head-logo" alt="logo" />
+                                }
+                                @Model.Institute?.Name
+                            </span>
+                        </div>
+                        <div class="idc-photo idc-d2-photo"><img src="@c.PhotoUrl" alt="photo" /></div>
+                        <div class="idc-d2-body">
+                            <div class="idc-name">@Title(c.Name)</div>
+                            <div class="idc-role">@c.ClassName@(string.IsNullOrEmpty(c.SectionName) ? "" : " - " + c.SectionName)</div>
+                            <div class="idc-info">
+                                <div class="idc-row"><span class="idc-lbl">ID NO</span><span class="idc-sep">:</span><span class="idc-val">@c.UniqueId</span></div>
+                                <div class="idc-row"><span class="idc-lbl">Roll</span><span class="idc-sep">:</span><span class="idc-val">@c.ClassRoll</span></div>
+                                <div class="idc-row"><span class="idc-lbl">Blood</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.BloodGroup) ? "-" : c.BloodGroup)</span></div>
+                                <div class="idc-row"><span class="idc-lbl">Phone</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.PhoneNo) ? "-" : c.PhoneNo)</span></div>
+                            </div>
+                        </div>
+                        <div class="idc-qr">@if (!string.IsNullOrEmpty(c.QrDataUri)) { <img src="@c.QrDataUri" alt="qr" /> }</div>
+                    </div>
+                    break;
+
+                case IdCardDesign.SidePanel:
+                    <div class="idc idc-front idc-d3">
+                        <div class="idc-d3-side">
+                            <div class="idc-photo"><img src="@c.PhotoUrl" alt="photo" /></div>
+                            <div class="idc-d3-id">@c.UniqueId</div>
+                            <div class="idc-qr">@if (!string.IsNullOrEmpty(c.QrDataUri)) { <img src="@c.QrDataUri" alt="qr" /> }</div>
+                        </div>
+                        <div class="idc-d3-main">
+                            <div class="idc-d3-inst">
+                                @if (!string.IsNullOrEmpty(Model.InstituteLogoDataUri))
+                                {
+                                    <img src="@Model.InstituteLogoDataUri" class="idc-head-logo" alt="logo" />
+                                }
+                                @Model.Institute?.Name
+                            </div>
+                            <div class="idc-name text-left">@Title(c.Name)</div>
+                            <div class="idc-role text-left">@c.ClassName@(string.IsNullOrEmpty(c.SectionName) ? "" : " - " + c.SectionName)</div>
+                            <div class="idc-info">
+                                <div class="idc-row"><span class="idc-lbl">Roll</span><span class="idc-sep">:</span><span class="idc-val">@c.ClassRoll</span></div>
+                                <div class="idc-row"><span class="idc-lbl">Blood</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.BloodGroup) ? "-" : c.BloodGroup)</span></div>
+                                <div class="idc-row"><span class="idc-lbl">Phone</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.PhoneNo) ? "-" : c.PhoneNo)</span></div>
+                                <div class="idc-row"><span class="idc-lbl">Session</span><span class="idc-sep">:</span><span class="idc-val">@c.SessionName</span></div>
+                                <div class="idc-row"><span class="idc-lbl">Address</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.Address) ? "-" : c.Address)</span></div>
+                            </div>
+                        </div>
+                    </div>
+                    break;
+
+                default:
+                    <div class="idc idc-front idc-d1">
+                        <div class="idc-head">
+                            @if (!string.IsNullOrEmpty(Model.InstituteLogoDataUri))
+                            {
+                                <img src="@Model.InstituteLogoDataUri" class="idc-head-logo" alt="logo" />
+                            }
+                            <span class="idc-head-name">@Model.Institute?.Name</span>
+                        </div>
+                        <div class="idc-photo"><img src="@c.PhotoUrl" alt="photo" /></div>
+                        <div class="idc-name">@Title(c.Name)</div>
+                        <div class="idc-role">@c.ClassName@(string.IsNullOrEmpty(c.SectionName) ? "" : " - " + c.SectionName)</div>
+                        <div class="idc-info">
+                            <div class="idc-row"><span class="idc-lbl">ID NO</span><span class="idc-sep">:</span><span class="idc-val">@c.UniqueId</span></div>
+                            <div class="idc-row"><span class="idc-lbl">Roll</span><span class="idc-sep">:</span><span class="idc-val">@c.ClassRoll</span></div>
+                            <div class="idc-row"><span class="idc-lbl">Blood</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.BloodGroup) ? "-" : c.BloodGroup)</span></div>
+                            <div class="idc-row"><span class="idc-lbl">Phone</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.PhoneNo) ? "-" : c.PhoneNo)</span></div>
+                            <div class="idc-row"><span class="idc-lbl">Address</span><span class="idc-sep">:</span><span class="idc-val">@(string.IsNullOrEmpty(c.Address) ? "-" : c.Address)</span></div>
+                        </div>
+                        <div class="idc-qr">@if (!string.IsNullOrEmpty(c.QrDataUri)) { <img src="@c.QrDataUri" alt="qr" /> }</div>
+                    </div>
+                    break;
+            }
+        }
+
+        @* ---------- Single common BACK (printed once) ---------- *@
+        <div class="idc idc-back">
+            <div class="idc-head">
+                @if (!string.IsNullOrEmpty(Model.InstituteLogoDataUri))
+                {
+                    <img src="@Model.InstituteLogoDataUri" class="idc-head-logo" alt="logo" />
+                }
+                <span class="idc-head-name">@Model.Institute?.Name</span>
+            </div>
+            <div class="idc-back-title">Terms &amp; Conditions</div>
+            <ul class="idc-terms">
+                <li>This card is the property of the institute and is non-transferable.</li>
+                <li>The holder must carry this card at all times within the campus.</li>
+                <li>If found, please return this card to the institute office.</li>
+                <li>Loss of this card must be reported to the office immediately.</li>
+            </ul>
+            <div class="idc-back-contact">
+                @if (!string.IsNullOrWhiteSpace(Model.Institute?.Phone1))
+                {
+                    <div><span class="idc-lbl">Phone</span><span class="idc-sep">:</span> @Model.Institute.Phone1</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.Institute?.Email))
+                {
+                    <div><span class="idc-lbl">E-mail</span><span class="idc-sep">:</span> @Model.Institute.Email</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(Model.Institute?.Address))
+                {
+                    <div><span class="idc-lbl">Address</span><span class="idc-sep">:</span> @Model.Institute.Address</div>
+                }
+            </div>
+            <div class="idc-sign">
+                <div class="idc-sign-line"></div>
+                <div class="idc-sign-label">Authorised Signature</div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(Model.Institute?.Slogan))
+            {
+                <div class="idc-slogan">@Model.Institute.Slogan</div>
+            }
+        </div>
+    </div>
+}
+
+@section Styles {
+    <style>
+        /* ================= Student ID cards ===================================
+           White (common) cards, ~2.4in x 3.8in. The FRONT content identifies the
+           student; the single accent colour is set from the colour picker via the
+           --idc-accent CSS variable, so any design renders in any colour. ====== */
+        .idc-gallery { display: flex; flex-wrap: wrap; gap: 14px; --idc-ink: #1f2a37; --idc-muted: #5b6b7b; --idc-accent: #1565C0; }
+
+        .idc {
+            position: relative;
+            width: 2.4in; height: 3.8in;
+            border: 1px solid #d0d7de; border-radius: 10px; overflow: hidden;
+            background: #fff; color: var(--idc-ink);
+            font-family: "Segoe UI", Arial, sans-serif;
+            box-shadow: 0 1px 6px rgba(0,0,0,.12);
+            page-break-inside: avoid; break-inside: avoid;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        }
+
+        .idc-head-logo { height: 18px; vertical-align: middle; margin-right: 5px; }
+        .idc-head-name { font-weight: 700; font-size: 9px; vertical-align: middle; }
+
+        .idc-name { text-align: center; font-weight: 700; font-size: 14px; letter-spacing: .3px; color: var(--idc-ink); }
+        .idc-role { text-align: center; font-size: 8.5px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--idc-muted); margin-top: 1px; }
+        .text-left { text-align: left !important; }
+
+        .idc-info { margin: 8px 12px 0; }
+        .idc-row { display: flex; font-size: 9px; line-height: 1.5; align-items: baseline; }
+        .idc-lbl { width: 50px; flex: 0 0 50px; font-weight: 600; color: var(--idc-accent); }
+        .idc-sep { width: 8px; flex: 0 0 8px; }
+        .idc-val { flex: 1; word-break: break-word; color: var(--idc-ink); }
+
+        .idc-photo img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* ---- Design 1: Classic ---- */
+        .idc-d1 .idc-head { background: var(--idc-accent); color: #fff; text-align: center; padding: 6px 8px; min-height: 30px; }
+        .idc-d1 .idc-photo { width: 1.1in; height: 1.1in; margin: 14px auto 0; }
+        .idc-d1 .idc-photo img { border-radius: 50%; border: 3px solid var(--idc-accent); background: #eef4fb; }
+        .idc-d1 .idc-name { margin-top: 10px; }
+        .idc-d1 .idc-qr { position: absolute; bottom: 14px; right: 12px; line-height: 0; }
+        .idc-d1 .idc-qr img { width: 50px; height: 50px; }
+
+        /* ---- Design 2: Wave (smart gradient top with a curved edge, overlapping photo) ---- */
+        .idc-d2 .idc-d2-top {
+            position: absolute; top: 0; left: 0; right: 0; height: 150px; text-align: center;
+            background: linear-gradient(135deg, var(--idc-accent) 0%, rgba(0,0,0,.22) 160%);
+            border-bottom-left-radius: 50% 26px; border-bottom-right-radius: 50% 26px;
+        }
+        .idc-d2 .idc-d2-top .idc-head-name { color: #fff; display: block; padding: 10px 10px 0; font-size: 9px; }
+        .idc-d2 .idc-d2-photo { position: absolute; top: 104px; left: 50%; transform: translateX(-50%); width: 1.0in; height: 1.0in; z-index: 2; }
+        .idc-d2 .idc-d2-photo img { border-radius: 50%; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+        .idc-d2 .idc-d2-body { position: absolute; top: 200px; left: 0; right: 0; }
+        .idc-d2 .idc-qr { position: absolute; bottom: 12px; right: 12px; line-height: 0; }
+        .idc-d2 .idc-qr img { width: 46px; height: 46px; }
+
+        /* ---- Design 3: Side Panel (accent column with photo + QR, details on the right) ---- */
+        .idc-d3 { display: flex; }
+        .idc-d3 .idc-d3-side {
+            width: 38%; background: var(--idc-accent); color: #fff;
+            display: flex; flex-direction: column; align-items: center; padding: 12px 6px;
+        }
+        .idc-d3 .idc-d3-side .idc-photo { width: 0.82in; height: 0.82in; }
+        .idc-d3 .idc-d3-side .idc-photo img { border-radius: 50%; border: 3px solid #fff; }
+        .idc-d3 .idc-d3-id { font-size: 8px; font-weight: 700; margin-top: 8px; text-align: center; word-break: break-all; }
+        .idc-d3 .idc-d3-side .idc-qr { margin-top: auto; background: #fff; padding: 3px; border-radius: 4px; line-height: 0; }
+        .idc-d3 .idc-d3-side .idc-qr img { width: 46px; height: 46px; display: block; }
+        .idc-d3 .idc-d3-main { flex: 1; padding: 10px; }
+        .idc-d3 .idc-d3-inst { color: var(--idc-accent); font-weight: 700; font-size: 8.5px; margin-bottom: 8px; }
+        .idc-d3 .idc-name { font-size: 12px; }
+        .idc-d3 .idc-info { margin: 8px 0 0; }
+
+        /* ---- Back (common) ---- */
+        .idc-back .idc-head { background: var(--idc-accent); color: #fff; text-align: center; padding: 6px 8px; min-height: 30px; }
+        .idc-back-title { text-align: center; font-weight: 700; font-size: 12px; margin-top: 14px; color: var(--idc-accent); }
+        .idc-terms { margin: 8px 12px 0; padding-left: 14px; }
+        .idc-terms li { font-size: 7.5px; line-height: 1.5; margin-bottom: 4px; color: var(--idc-ink); }
+        .idc-back-contact { margin: 10px 14px 0; font-size: 8.5px; color: var(--idc-ink); }
+        .idc-back-contact .idc-lbl { display: inline-block; width: 44px; }
+        .idc-sign { position: absolute; bottom: 60px; left: 0; right: 0; text-align: center; }
+        .idc-sign-line { width: 60%; margin: 0 auto 2px; border-top: 1px solid var(--idc-muted); }
+        .idc-sign-label { font-size: 8px; color: var(--idc-muted); }
+        .idc-slogan { position: absolute; bottom: 18px; left: 0; right: 0; text-align: center; color: var(--idc-accent); font-size: 8px; letter-spacing: 1px; }
+
+        /* ---- Print: only the cards, at true size ---- */
+        @@media print {
+            body * { visibility: hidden; }
+            #cardGallery, #cardGallery * { visibility: visible; }
+            #cardGallery { position: absolute; left: 0; top: 0; }
+            .no-print { display: none !important; }
+            .idc { box-shadow: none; }
+            @@page { margin: 0.4in; }
+        }
+    </style>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            document.getElementById('printCardsBtn')?.addEventListener('click', function () { window.print(); });
+
+            // Live accent-colour preview + keep the Download-PDF link's colour in sync.
+            const gallery = document.getElementById('cardGallery');
+            const colorInput = document.getElementById('fColor');
+            const dl = document.getElementById('downloadPdfBtn');
+            colorInput?.addEventListener('input', function (e) {
+                const v = e.target.value;
+                if (gallery) gallery.style.setProperty('--idc-accent', v);
+                if (dl) dl.href = dl.href.replace(/([?&]color=)[^&]*/, '$1' + encodeURIComponent(v));
+            });
+
+            // Rebuild the section dropdown when class/session changes.
+            const $class = $('#fClass'), $session = $('#fSession'), $section = $('#fSection');
+            function reloadSections() {
+                const classId = $class.val(), sessionId = $session.val();
+                $section.empty().append('<option value="">All sections</option>');
+                if (!classId) return;
+                $.ajax({
+                    url: "/api/academicsections/getbyclasswithsessionId?classId=" + classId + "&sessionId=" + sessionId,
+                    dataType: "JSON", type: "POST", cache: false,
+                    success: function (data) {
+                        $.each(data || [], function (i, obj) {
+                            $section.append('<option value="' + obj.id + '">' + obj.name + '</option>');
+                        });
+                    }
+                });
+            }
+            $class.on('change', reloadSections);
+            $session.on('change', reloadSections);
+        })();
+    </script>
+}
