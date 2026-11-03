@@ -5,8 +5,10 @@
 # the published output into the live app dir, preserving config,
 # data-protection keys and uploaded images. Then restarts & checks.
 #
-#   Usage:  sudo /usr/local/bin/eims-deploy        # deploy latest FinalDeployment
-#           sudo /usr/local/bin/eims-deploy <ref>  # deploy a specific commit/tag/branch
+#   Usage:  sudo /usr/local/bin/eims-deploy                  # deploy latest FinalDeployment
+#           sudo /usr/local/bin/eims-deploy <ref> [build#]   # a specific branch/commit/tag
+#   CI runs this file straight from the repo over SSH:
+#           ssh host "sudo -n bash -s -- <sha> <run#>" < Resources/deployment/eims-deploy.sh
 #
 # Safe to re-run. Backs up the current release before swapping.
 # ============================================================
@@ -14,7 +16,8 @@ set -euo pipefail
 
 # ---- CONFIG ----
 REPO="https://github.com/golamhabibpalash/EIMS.git"
-BRANCH="${1:-FinalDeployment}"
+REF="${1:-FinalDeployment}"
+BUILD_NUMBER="${2:-0}"
 SRC_DIR="/var/www/eims-deploy"          # dedicated checkout (NOT eims-src)
 APP_DIR="/var/www/eims"                 # live published app
 SERVICE="eims-noble.service"            # serves schoolbd.hekzor.com on :5001
@@ -41,10 +44,11 @@ if [ ! -d "$SRC_DIR/.git" ]; then
     git clone "$REPO" "$SRC_DIR"
 fi
 cd "$SRC_DIR"
-log "fetching origin and resetting to $BRANCH"
+log "fetching origin and checking out $REF"
 git fetch --prune origin
-git checkout -B "$BRANCH" "origin/$BRANCH"
-git reset --hard "origin/$BRANCH"
+# A branch name resolves to its remote tip; anything else (commit sha, tag) is used as-is.
+if git rev-parse --verify --quiet "origin/$REF" >/dev/null; then TARGET="origin/$REF"; else TARGET="$REF"; fi
+git checkout --force --detach "$TARGET"
 COMMIT="$(git rev-parse --short HEAD)"
 log "building commit $COMMIT"
 
@@ -52,6 +56,7 @@ log "building commit $COMMIT"
 PUB_DIR="$SRC_DIR/publish"
 rm -rf "$PUB_DIR"
 "$DOTNET" publish SMS_App/SMS_App.csproj -c Release -o "$PUB_DIR" --nologo \
+    -p:BuildNumber="$BUILD_NUMBER" \
     -p:GitCommit="$COMMIT" \
     -p:BuildTimestampUtc="$(date -u '+%Y-%m-%d %H:%M:%S')"
 
@@ -79,6 +84,8 @@ rsync -a --delete \
     --exclude="/Keys/" \
     --exclude="/logs/" \
     --exclude="/wwwroot/Images/" \
+    --exclude="/wwwroot/Uploads/" \
+    --exclude="/App_Data/" \
     "$PUB_DIR"/ "$APP_DIR"/
 
 chown -R "$APP_USER:$APP_GROUP" "$APP_DIR"

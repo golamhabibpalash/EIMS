@@ -1,88 +1,80 @@
-# CI/CD — one branch, one build, every instance
+# CI/CD — one branch, one commit, every instance
 
-`.github/workflows/deploy.yml` builds the app **once** and deploys the identical
-package to every instance. Instances are GitHub **Environments**; they differ only
-by their secrets/variables — never by branch or by code.
+`.github/workflows/deploy.yml` releases a single commit of `FinalDeployment` to every
+instance and then checks each one is really running it.
 
 ```
-push to FinalDeployment  ->  deploys ALL instances
-Actions -> Deploy EIMS -> Run workflow -> pick one  ->  deploys just that instance
+git push origin FinalDeployment          ->  deploys ALL instances
+Actions -> Deploy EIMS -> Run workflow   ->  pick one instance (or "all")
 ```
+
+| Environment     | Site URL                         | Host                          | How it deploys |
+|-----------------|----------------------------------|-------------------------------|----------------|
+| `DMCPS`         | https://eims.mcpsbd.com          | Windows shared hosting (Plesk) | FTP, self-contained win-x64 |
+| `Unityschoolbd` | https://eims.unityschoolbd.com   | Windows shared hosting (Plesk) | FTP, self-contained win-x64 |
+| `Curiosity`     | https://curiosity.mcpsbd.com     | Windows shared hosting (Plesk) | FTP, self-contained win-x64 |
+| `Noble`         | https://schoolbd.hekzor.com      | Linux VPS (systemd + nginx)    | SSH → `eims-deploy.sh` builds on the box |
+
+## What a run does
+
+1. **Build** the self-contained `win-x64` package once (this also proves the commit compiles
+   before any server is touched).
+2. **Windows instances** (two at a time; one failing never blocks the others):
+   - read the server's `web.config` and, if it still says `dotnet SMS_App.dll`, point
+     `processPath` at `.\SMS_App.exe` — every other setting in it is kept;
+   - upload `app_offline.htm`, mirror the package over FTP (only changed files after the
+     first run), upload the patched `web.config` if needed, remove `app_offline.htm`.
+3. **Linux instance**: SSH in and run the repo's `eims-deploy.sh` for the exact commit —
+   it backs up the live release, builds, swaps, restarts `eims-noble.service` and health-checks.
+4. **Verify**: request `<SITE_URL>/build-info` (returns `<version> <commit>`) and fail the job
+   unless the instance reports the commit just released.
+
+Self-contained Windows packages carry their own .NET runtime, so a host's installed runtime
+version can never cause `HTTP 500.31` again.
+
+## Never touched on a server
+
+`appsettings*.json`, `Keys/`, `logs/`, `App_Data/` (online-admission uploads),
+`wwwroot/Uploads/`, `wwwroot/Images/` (logos, student/employee photos). The FTP mirror
+runs without `--delete`; the Linux rsync excludes the same paths.
 
 ## One-time setup
 
-### 1. Create an Environment per instance
+### 1. Environments
+**Repo → Settings → Environments → New environment**, names exactly as in the table.
+Remove the old `Mamitonnesa` environment — it is no longer deployed.
 
-**Repo → Settings → Environments → New environment.** Names must match exactly:
+### 2. Secrets and variables per environment
 
-| Environment      | Site URL                              | Host   |
-|------------------|--------------------------------------|--------|
-| `Noble`          | https://eims.nobleschoolbd.com        | Linux  |
-| `Mamitonnesa`    | https://eims.mamitonnessaghs.edu.bd   | Linux  |
-| `DMCPS`          | https://eims.mcpsbd.com               | Linux  |
-| `Unityschoolbd`  | https://eims.unityschoolbd.com        | IIS    |
-| `Curiosity`      | https://curiosity.mcpsbd.com          | Linux  |
+| Name           | Kind     | Windows | Linux | Notes |
+|----------------|----------|:-------:|:-----:|-------|
+| `FTP_SERVER`   | secret   | ✔ |   | host only, no `ftp://` |
+| `FTP_USERNAME` | secret   | ✔ |   | |
+| `FTP_PASSWORD` | secret   | ✔ |   | |
+| `FTP_PATH`     | secret   | ✔ |   | web root, e.g. `/httpdocs` |
+| `SSH_HOST`     | secret   |   | ✔ | |
+| `SSH_USER`     | secret   |   | ✔ | needs passwordless `sudo` (`root` works) |
+| `SSH_KEY`      | secret   |   | ✔ | full private key (PEM) |
+| `SITE_URL`     | variable | ✔ | ✔ | e.g. `https://eims.mcpsbd.com` — used by the verify step |
 
-Add a new school by adding its Environment here **and** one line to the `client`
-list in `setup` + the `workflow_dispatch` `options` in `deploy.yml`.
+### 3. Runner
+Jobs run on the repo's **self-hosted** runner. It needs `bash`, `lftp`, `perl`, `curl`,
+`ssh` and network access to every FTP/SSH host. The .NET SDK is installed by the
+workflow from `global.json`.
 
-### 2. Per-environment secrets
+## Releases that change the database
 
-| Secret         | Notes                                              |
-|----------------|----------------------------------------------------|
-| `FTP_SERVER`   | host only, no `ftp://`                              |
-| `FTP_USERNAME` |                                                    |
-| `FTP_PASSWORD` |                                                    |
-| `FTP_PATH`     | web root on the server, e.g. `/httpdocs` or `/`     |
-| `SSH_HOST`     | Linux hosts only — omit entirely on IIS            |
-| `SSH_USER`     | Linux hosts only                                   |
-| `SSH_KEY`      | Linux hosts only — full private key, PEM           |
+CI never changes a schema. When a release adds tables or permissions, run its scripts
+from `Resources/sql/` (SqlServer or PostgreSQL version as appropriate) on **every**
+instance **before** pushing. List them in the commit/PR so nothing is missed.
 
-If `SSH_*` is absent the restart step is skipped; on IIS, deleting `app_offline.htm`
-recycles the app pool, which is enough.
+## Adding a school
 
-### 3. Per-environment variables
-
-| Variable       | Notes                                                       |
-|----------------|------------------------------------------------------------|
-| `SITE_URL`     | full URL for the post-deploy health check                   |
-| `SERVICE_NAME` | optional; defaults to `eims-<client-lowercase>.service`     |
-
-### 4. Migrating from the old per-client secrets
-
-The previous workflow used repo secrets like `NOBLE_FTP_SERVER`, `MAMI_FTP_PASSWORD`,
-`UNITY_FTP_PATH`, `DMCPS_SSH_KEY`, `CURIOSITY_*`. Copy each into the matching
-Environment under the new short name and delete the old repo secret:
-
-```
-NOBLE_FTP_SERVER      -> Environment "Noble"         secret FTP_SERVER
-MAMI_FTP_*            -> Environment "Mamitonnesa"   secret FTP_*
-DMCPS_*              -> Environment "DMCPS"          secret *
-UNITY_FTP_*           -> Environment "Unityschoolbd"  secret FTP_*   (no SSH_* — IIS)
-CURIOSITY_*           -> Environment "Curiosity"      secret *
-```
-
-## What the pipeline never touches on a server
-
-`appsettings*.json`, `Keys/` (data-protection), `logs/`, and uploaded images
-(`wwwroot/Images/Student/Photo`, `wwwroot/Images/Employee/photo`,
-`wwwroot/Images/Institute`). Everything else — DLLs, views, and the app's own
-`wwwroot` assets (css/js/lib/fonts) — is deployed. The FTP mirror runs **without**
-`--delete`, so excluded server files are safe; lftp only transfers files whose
-size or timestamp changed, so the first deploy is large (~200 MB of `wwwroot/lib`)
-and later ones push only what changed.
-
-## Optional hardening
-
-- **Approval gate per instance:** Environment → *Required reviewers*. That instance's
-  deploy then waits for a click; the others proceed (`fail-fast: false`).
-- **Staggered release:** run the workflow for one instance, confirm, then push to
-  the branch (or run with `all`) for the rest.
-- **Database migrations** are not run by CI. Apply EF migrations manually per
-  instance when a release includes schema changes (SqlServer instances); the
-  PostgreSQL instances are dump-provisioned.
+1. Create its Environment with the secrets/variables above.
+2. Add its name to `windows=(…)` or `linux=(…)` in the `setup` job and to the
+   `workflow_dispatch` options in `deploy.yml`.
 
 ## Rollback
 
-Re-run the workflow from an earlier green commit (Actions → that run → *Re-run*),
-or `git revert` on `FinalDeployment` and let it redeploy.
+`git revert` the bad commit on `FinalDeployment` and push — the revert deploys like any
+release. Linux also keeps the last 7 releases in `/var/www/eims-backups/`.

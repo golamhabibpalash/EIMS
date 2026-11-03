@@ -349,6 +349,12 @@ app.MapControllers();
 // Real-time notifications hub (groups keyed by the signed-in user's id)
 app.MapHub<SMS_App.Hubs.NotificationHub>("/hubs/notifications");
 
+// Plain-text build stamp ("<version> <commit>") so the deploy workflow can confirm
+// each instance is really running the build it just shipped. No data, no auth needed.
+app.MapGet("/build-info", () => Results.Text(
+        $"{SchoolManagementSystem.BuildInfo.Version} {SchoolManagementSystem.BuildInfo.Commit}"))
+    .AllowAnonymous();
+
 // AREA routing
 app.MapControllerRoute(
     name: "areas",
