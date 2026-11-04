@@ -63,6 +63,9 @@ runner `eims-vps` on the SchoolBD VPS (62.84.181.246), installed in `/opt/cicd/r
 running as user `github-runner` under systemd service
 `actions.runner.golamhabibpalash-EIMS.eims-vps.service`.
 
+The build uses the VPS's own .NET 8 SDK in `/usr/share/dotnet` (not `/usr/bin/dotnet`, which is
+a separate .NET 10 install); keep an 8.0.x SDK installed there.
+
 The VPS also hosts other production apps, so the service has a drop-in
 (`/etc/systemd/system/<service>.d/limits.conf`) that keeps builds polite: `Nice=10`,
 low IO priority, `CPUQuota=200%` (2 of 6 cores), `MemoryHigh=2500M`, `MemoryMax=3G`.

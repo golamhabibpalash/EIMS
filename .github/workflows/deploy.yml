@@ -93,9 +93,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-dotnet@v4
-        with:
-          global-json-file: global.json
+      # Use the VPS's own .NET 8 SDK. actions/setup-dotnet installs into /usr/share/dotnet,
+      # which the unprivileged runner user can't write to, and the default `dotnet` on
+      # this host (/usr/bin/dotnet) is a separate .NET 10-only install.
+      - name: Use the server's .NET 8 SDK
+        shell: bash
+        run: |
+          echo "DOTNET_ROOT=/usr/share/dotnet" >> "$GITHUB_ENV"
+          echo "DOTNET_CLI_TELEMETRY_OPTOUT=1" >> "$GITHUB_ENV"
+          echo "DOTNET_NOLOGO=1" >> "$GITHUB_ENV"
+          echo "/usr/share/dotnet" >> "$GITHUB_PATH"
+          /usr/share/dotnet/dotnet --version
 
       - name: Build metadata
         id: meta
