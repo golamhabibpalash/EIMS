@@ -13,7 +13,6 @@ SMS.Frameworks = shared utilities (no upward deps)
 
 - Interfaces in `SMS.*/Contracts/`, implementations in `SMS.*/Managers|Repositories/`.
 - All managers/repositories are registered by hand in `SMS_App/Configurations/DependencyInjectionConfiguration.cs` (`Addservices()`) — a new CRUD feature must add its `I...Repository/Repository` and `I...Manager/Manager` there.
-- `SMS_App/SMS_App.sln` is a stale stray; use the root `SchoolManagementSystem.sln`.
 
 ## Build, run, verify
 

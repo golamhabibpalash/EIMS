@@ -410,3 +410,10 @@ sql.rtf
 
 # PostgreSQL dump files (large, regenerable)
 *.dump
+
+# Never commit build outputs or database dumps (a 286 MB publish-fd/ build was once committed)
+publish-fd/
+**/publish-*/
+*.dump
+*.backup
+Resources/DB Backup/

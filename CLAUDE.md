@@ -193,7 +193,7 @@ Persisted to `SMS_App/Keys/` for shared hosting stability. App name: `"SMS_App"`
 | `Resources/deployment/` | Linux deploy assets: `deploy.sh`, `eims-instance.service` (systemd), `nginx-school.conf`, `EncryptConnString/` (connection-string encryptor) |
 | `README.md` | Partly stale: it says migrations run from `SMS_App/` and that reports are RDLC; trust this file instead |
 | `Resources/sql*`, `Resources/StudentMigrationScripts/` | Raw SQL — stored procs, views, functions, data-migration scripts run outside EF |
-| `SchoolManagementSystem.sln` | Solution file (also a stray `SMS_App/SMS_App.sln` — use the root one) |
+| `SchoolManagementSystem.sln` | Solution file (the only one) |
 
 ## Reference Documentation
 
