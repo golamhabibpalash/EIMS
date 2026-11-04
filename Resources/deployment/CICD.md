@@ -58,9 +58,19 @@ Remove the old `Mamitonnesa` environment — it is no longer deployed.
 | `SITE_URL`     | variable | ✔ | ✔ | e.g. `https://eims.mcpsbd.com` — used by the verify step |
 
 ### 3. Runner
-Jobs run on the repo's **self-hosted** runner. It needs `bash`, `lftp`, `perl`, `curl`,
-`ssh` and network access to every FTP/SSH host. The .NET SDK is installed by the
-workflow from `global.json`.
+Jobs run only on a self-hosted runner carrying the label **`eims`** (`runs-on: [self-hosted, eims]`):
+runner `eims-vps` on the SchoolBD VPS (62.84.181.246), installed in `/opt/cicd/runners/sms`,
+running as user `github-runner` under systemd service
+`actions.runner.golamhabibpalash-EIMS.eims-vps.service`.
+
+The VPS also hosts other production apps, so the service has a drop-in
+(`/etc/systemd/system/<service>.d/limits.conf`) that keeps builds polite: `Nice=10`,
+low IO priority, `CPUQuota=200%` (2 of 6 cores), `MemoryHigh=2500M`, `MemoryMax=3G`.
+
+If the runner shows **Offline** in GitHub: `systemctl status actions.runner.golamhabibpalash-EIMS.eims-vps`.
+If GitHub dropped the registration (it does after weeks offline), get a new token from
+Settings → Actions → Runners → New self-hosted runner and, in `/opt/cicd/runners/sms`, run
+`sudo -u github-runner ./config.sh --url https://github.com/golamhabibpalash/EIMS --token <token> --name eims-vps --labels eims --replace`.
 
 ## Releases that change the database
 

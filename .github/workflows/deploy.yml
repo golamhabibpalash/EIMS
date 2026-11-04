@@ -54,7 +54,7 @@ concurrency:
 jobs:
   # 1. Decide which instances this run targets ------------------------------
   setup:
-    runs-on: self-hosted
+    runs-on: [self-hosted, eims]
     outputs:
       windows: ${{ steps.pick.outputs.windows }}
       linux: ${{ steps.pick.outputs.linux }}
@@ -80,7 +80,7 @@ jobs:
   # 2. Build the Windows package ONCE (also proves the commit compiles) -----
   build:
     needs: setup
-    runs-on: self-hosted
+    runs-on: [self-hosted, eims]
     timeout-minutes: 20
     outputs:
       commit: ${{ steps.meta.outputs.git_commit }}
@@ -130,7 +130,7 @@ jobs:
   deploy-windows:
     needs: [setup, build]
     if: needs.setup.outputs.windows != '[]'
-    runs-on: self-hosted
+    runs-on: [self-hosted, eims]
     timeout-minutes: 45
     environment: ${{ matrix.client }}
     strategy:
@@ -293,7 +293,7 @@ jobs:
   deploy-linux:
     needs: [setup, build]       # only runs once the commit is known to compile
     if: needs.setup.outputs.linux != '[]'
-    runs-on: self-hosted
+    runs-on: [self-hosted, eims]
     timeout-minutes: 30
     environment: ${{ matrix.client }}
     strategy:
@@ -332,7 +332,7 @@ jobs:
   summary:
     needs: [setup, build, deploy-windows, deploy-linux]
     if: always()
-    runs-on: self-hosted
+    runs-on: [self-hosted, eims]
     steps:
       - shell: bash
         run: |
