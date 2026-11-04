@@ -13,7 +13,7 @@ Actions -> Deploy EIMS -> Run workflow   ->  pick one instance (or "all")
 | `DMCPS`         | https://eims.mcpsbd.com          | Windows shared hosting (Plesk) | FTP, self-contained win-x64 |
 | `Unityschoolbd` | https://eims.unityschoolbd.com   | Windows shared hosting (Plesk) | FTP, self-contained win-x64 |
 | `Curiosity`     | https://curiosity.mcpsbd.com     | Windows shared hosting (Plesk) | FTP, self-contained win-x64 |
-| `Noble`         | https://schoolbd.hekzor.com      | Linux VPS (systemd + nginx)    | SSH → `eims-deploy.sh` builds on the box |
+| `SchoolBD`      | https://schoolbd.hekzor.com      | Linux VPS (systemd + nginx)    | SSH → `eims-deploy.sh` builds on the box |
 
 ## What a run does
 

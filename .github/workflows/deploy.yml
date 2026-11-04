@@ -10,7 +10,7 @@ name: Deploy EIMS
 #   DMCPS          https://eims.mcpsbd.com           Windows shared hosting (IIS/Plesk)
 #   Unityschoolbd  https://eims.unityschoolbd.com    Windows shared hosting (IIS/Plesk)
 #   Curiosity      https://curiosity.mcpsbd.com      Windows shared hosting (IIS/Plesk)
-#   Noble          https://schoolbd.hekzor.com       Linux VPS (systemd + nginx)
+#   SchoolBD       https://schoolbd.hekzor.com       Linux VPS (systemd + nginx)
 #
 # Windows instances get a SELF-CONTAINED win-x64 package over FTP, so they never
 # depend on which .NET runtime the host happens to have installed.
@@ -44,7 +44,7 @@ on:
           - DMCPS
           - Unityschoolbd
           - Curiosity
-          - Noble
+          - SchoolBD
 
 # Two releases must never interleave on the same servers.
 concurrency:
@@ -63,7 +63,7 @@ jobs:
         shell: bash
         run: |
           windows=(DMCPS Unityschoolbd Curiosity)
-          linux=(Noble)
+          linux=(SchoolBD)
           sel="${{ github.event.inputs.client }}"
           if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ -z "$sel" ] || [ "$sel" = "all" ]; then
             win_sel=("${windows[@]}"); lin_sel=("${linux[@]}")
