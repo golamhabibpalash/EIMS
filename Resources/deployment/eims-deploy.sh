@@ -55,7 +55,8 @@ log "building commit $COMMIT"
 # ---- 2. Publish (framework-dependent, net8.0) ----
 PUB_DIR="$SRC_DIR/publish"
 rm -rf "$PUB_DIR"
-"$DOTNET" publish SMS_App/SMS_App.csproj -c Release -o "$PUB_DIR" --nologo \
+# Low CPU/IO priority: this VPS also serves other production apps.
+nice -n 10 ionice -c 3 "$DOTNET" publish SMS_App/SMS_App.csproj -c Release -o "$PUB_DIR" --nologo \
     -p:BuildNumber="$BUILD_NUMBER" \
     -p:GitCommit="$COMMIT" \
     -p:BuildTimestampUtc="$(date -u '+%Y-%m-%d %H:%M:%S')"

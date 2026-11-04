@@ -137,7 +137,7 @@ jobs:
     needs: [setup, build]
     if: needs.setup.outputs.windows != '[]'
     runs-on: [self-hosted, eims]
-    timeout-minutes: 45
+    timeout-minutes: 120        # a first deploy uploads the whole runtime; later ones are small
     environment: ${{ matrix.client }}
     strategy:
       fail-fast: false          # one instance failing must not block the others
@@ -205,6 +205,44 @@ jobs:
             echo "No web.config on the server - using the repo template."
             cp Resources/deployment/unityschoolbd/web.config web.config
           fi
+
+      # Most of the transfer happens while the site is still serving users. Safe because:
+      #  - files missing on the server (e.g. the bundled .NET runtime on a first deploy)
+      #    are not loaded by the running app, and
+      #  - wwwroot holds static files IIS never locks.
+      # The offline window below then only has to swap the app's own DLLs/config.
+      - name: Pre-stage new files (site stays online)
+        shell: bash
+        run: |
+          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
+          set ftp:passive-mode on
+          set ssl:verify-certificate no
+          set net:timeout 120
+          set net:max-retries 5
+          set net:reconnect-interval-base 5
+          set net:reconnect-interval-multiplier 1
+          set ftp:use-site-chmod no
+          set ftp:use-site-utime no
+          set file:charset utf-8
+          cd "$FTP_PATH"
+          mirror -R --only-missing --no-perms --no-umask \
+            --exclude-glob app_offline.htm \
+            --exclude-glob appsettings*.json \
+            --exclude-glob web.config \
+            --exclude-glob *.pdb \
+            --exclude Keys/ \
+            --exclude logs/ \
+            --exclude App_Data/ \
+            --exclude wwwroot/ \
+            --parallel=4 \
+            ./publish/ .
+          mirror -R --no-perms --no-umask \
+            --exclude Uploads/ \
+            --exclude Images/ \
+            --parallel=4 \
+            ./publish/wwwroot/ wwwroot
+          bye
+          EOF
 
       - name: Take the app offline
         shell: bash
