@@ -62,6 +62,12 @@ jobs:
       - id: pick
         shell: bash
         run: |
+          # Production only ever runs FinalDeployment, even if "Run workflow" is started
+          # from another branch in the GitHub UI.
+          if [ "$GITHUB_REF" != "refs/heads/FinalDeployment" ]; then
+            echo "::error::Deploys run only from FinalDeployment (this run is on $GITHUB_REF). Pick FinalDeployment under 'Use workflow from'."
+            exit 1
+          fi
           windows=(DMCPS Unityschoolbd Curiosity)
           linux=(SchoolBD)
           sel="${{ github.event.inputs.client }}"
@@ -142,6 +148,7 @@ jobs:
       FTP_SERVER: ${{ secrets.FTP_SERVER }}
       FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
       FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}   # read by lftp --env-password; keeps it out of `ps`
       FTP_PATH: ${{ secrets.FTP_PATH }}
     steps:
       - uses: actions/checkout@v4
@@ -163,19 +170,26 @@ jobs:
             [ -n "${!v}" ] || { echo "::error::Environment ${{ matrix.client }} is missing secret $v"; exit 1; }
           done
 
-      - name: Prepare web.config (keep the server's, point it at SMS_App.exe)
+      - name: Check FTP_PATH is an EIMS install + prepare web.config
         shell: bash
         run: |
-          rm -f server-web.config
-          lftp -u "$FTP_USERNAME,$FTP_PASSWORD" "ftp://$FTP_SERVER" <<EOF || true
+          rm -f server-web.config remote-check.txt
+          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF > remote-check.txt || true
           set ftp:passive-mode on
           set ssl:verify-certificate no
           set net:timeout 30
           set net:max-retries 2
           cd "$FTP_PATH"
+          cls -1 SMS_App.dll
           get web.config -o server-web.config
           bye
           EOF
+          # A wrong FTP_PATH would otherwise quietly upload a whole app into the wrong folder.
+          if ! grep -qx "SMS_App.dll" remote-check.txt; then
+            echo "::error::No SMS_App.dll in '$FTP_PATH' on $FTP_SERVER - wrong FTP_PATH, or the login failed. Nothing was changed."
+            exit 1
+          fi
+          echo "Found the existing EIMS install in $FTP_PATH."
           if [ -s server-web.config ]; then
             cp server-web.config web.config
             # Self-contained package: IIS must start SMS_App.exe, not "dotnet SMS_App.dll".
@@ -213,7 +227,7 @@ jobs:
           <p><small>This will only take a moment. Please refresh in a few seconds.</small></p>
           </div></body></html>
           EOF
-          lftp -u "$FTP_USERNAME,$FTP_PASSWORD" "ftp://$FTP_SERVER" <<EOF
+          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
           set ftp:passive-mode on
           set ssl:verify-certificate no
           set net:timeout 30
@@ -229,7 +243,7 @@ jobs:
         run: |
           # mirror -R without --delete: server-only files are never removed, and lftp
           # only sends files whose size/timestamp changed after the first run.
-          lftp -u "$FTP_USERNAME,$FTP_PASSWORD" "ftp://$FTP_SERVER" <<EOF
+          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
           set ftp:passive-mode on
           set ssl:verify-certificate no
           set net:timeout 120
@@ -255,7 +269,7 @@ jobs:
           bye
           EOF
           if [ -f web.config ]; then
-            lftp -u "$FTP_USERNAME,$FTP_PASSWORD" "ftp://$FTP_SERVER" <<EOF
+            lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
           set ftp:passive-mode on
           set ssl:verify-certificate no
           cd "$FTP_PATH"
@@ -268,7 +282,7 @@ jobs:
         if: always()
         shell: bash
         run: |
-          lftp -u "$FTP_USERNAME,$FTP_PASSWORD" "ftp://$FTP_SERVER" <<EOF
+          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
           set ftp:passive-mode on
           set ssl:verify-certificate no
           set net:timeout 30
@@ -287,7 +301,7 @@ jobs:
       - name: Cleanup
         if: always()
         shell: bash
-        run: rm -rf publish eims-win-x64.tgz app_offline.htm web.config server-web.config
+        run: rm -rf publish eims-win-x64.tgz app_offline.htm web.config server-web.config remote-check.txt
 
   # 3b. Linux VPS instance (on-box build over SSH) --------------------------
   deploy-linux:
