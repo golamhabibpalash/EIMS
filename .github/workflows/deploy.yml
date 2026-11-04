@@ -377,9 +377,12 @@ jobs:
           done
           key="$(mktemp)"; trap 'rm -f "$key"' EXIT
           printf '%s\n' "$SSH_KEY" > "$key"; chmod 600 "$key"
-          # Runs the repo's copy of the script, so server and repo never drift apart.
+          # Runs the repo's copy of the script, so server and repo never drift apart. It is
+          # copied to a file first and run with stdin closed: piping it into `bash -s` lets
+          # any command inside that reads stdin swallow the rest of the script.
           ssh -i "$key" -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 \
-            "$SSH_USER@$SSH_HOST" "sudo -n bash -s -- ${{ github.sha }} ${{ github.run_number }}" \
+            "$SSH_USER@$SSH_HOST" \
+            'f=$(mktemp /tmp/eims-deploy.XXXXXX) && cat > "$f" && sudo -n bash "$f" '"${{ github.sha }} ${{ github.run_number }}"' </dev/null; rc=$?; rm -f "$f"; exit $rc' \
             < Resources/deployment/eims-deploy.sh
 
       - name: Verify the new build is live
