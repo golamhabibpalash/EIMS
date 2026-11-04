@@ -145,7 +145,7 @@ jobs:
     needs: [setup, build]
     if: needs.setup.outputs.windows != '[]'
     runs-on: [self-hosted, eims]
-    timeout-minutes: 120        # a first deploy uploads the whole runtime; later ones are small
+    timeout-minutes: 180        # a first deploy uploads the whole runtime; later ones are small
     environment: ${{ matrix.client }}
     strategy:
       fail-fast: false          # one instance failing must not block the others
@@ -181,23 +181,16 @@ jobs:
       - name: Check FTP_PATH is an EIMS install + prepare web.config
         shell: bash
         run: |
+          source Resources/deployment/ftp-lib.sh
           rm -f server-web.config remote-check.txt
-          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF > remote-check.txt || true
-          set ftp:passive-mode on
-          set ssl:verify-certificate no
-          set net:timeout 30
-          set net:max-retries 2
-          cd "$FTP_PATH"
-          cls -1 SMS_App.dll
-          get web.config -o server-web.config
-          bye
-          EOF
-          # A wrong FTP_PATH would otherwise quietly upload a whole app into the wrong folder.
+          # cmd:fail-exit stops at a failing `cd`, so a wrong FTP_PATH lists nothing here.
+          ftp_retry 3 120 "cls -1 SMS_App.dll" > remote-check.txt || true
           if ! grep -qx "SMS_App.dll" remote-check.txt; then
-            echo "::error::No SMS_App.dll in '$FTP_PATH' on $FTP_SERVER - wrong FTP_PATH, or the login failed. Nothing was changed."
+            echo "::error::No SMS_App.dll in FTP_PATH on $FTP_SERVER - wrong FTP_PATH (use / if the FTP account opens straight into the site folder) or the login failed. Nothing was changed."
             exit 1
           fi
-          echo "Found the existing EIMS install in $FTP_PATH."
+          echo "Found the existing EIMS install."
+          ftp_retry 3 120 "get web.config -o server-web.config" || true
           if [ -s server-web.config ]; then
             cp server-web.config web.config
             # Self-contained package: IIS must start SMS_App.exe, not "dotnet SMS_App.dll".
@@ -214,47 +207,36 @@ jobs:
             cp Resources/deployment/unityschoolbd/web.config web.config
           fi
 
-      # Most of the transfer happens while the site is still serving users. Safe because:
-      #  - files missing on the server (e.g. the bundled .NET runtime on a first deploy)
-      #    are not loaded by the running app, and
-      #  - wwwroot holds static files IIS never locks.
-      # The offline window below then only has to swap the app's own DLLs/config.
+      # The hosting FTP server can't keep file timestamps (no MFMT/MLSD), so date
+      # comparison would resend all ~3,000 files every time. Instead:
+      #  - third-party files (runtime, NuGet DLLs, wwwroot/lib) are compared by SIZE
+      #    (--ignore-time); a version change always changes them, and
+      #  - files we build ourselves are ALWAYS sent, since a code change can keep the size.
+      #
+      # Most of the transfer happens while the site is still serving users. Safe because
+      # files missing on the server (e.g. the bundled .NET runtime on a first deploy) are
+      # not loaded by the running app, and wwwroot holds static files IIS never locks.
       - name: Pre-stage new files (site stays online)
         shell: bash
         run: |
-          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
-          set ftp:passive-mode on
-          set ssl:verify-certificate no
-          set net:timeout 120
-          set net:max-retries 5
-          set net:reconnect-interval-base 5
-          set net:reconnect-interval-multiplier 1
-          set ftp:use-site-chmod no
-          set ftp:use-site-utime no
-          set file:charset utf-8
-          cd "$FTP_PATH"
-          mirror -R --only-missing --no-perms --no-umask \
-            --exclude-glob app_offline.htm \
-            --exclude-glob appsettings*.json \
-            --exclude-glob web.config \
-            --exclude-glob *.pdb \
-            --exclude Keys/ \
-            --exclude logs/ \
-            --exclude App_Data/ \
-            --exclude wwwroot/ \
-            --parallel=4 \
-            ./publish/ .
-          mirror -R --no-perms --no-umask \
-            --exclude Uploads/ \
-            --exclude Images/ \
-            --parallel=4 \
-            ./publish/wwwroot/ wwwroot
-          bye
-          EOF
+          source Resources/deployment/ftp-lib.sh
+          ftp_retry 4 2400 "mirror -R --only-missing --no-perms --no-umask --parallel=2 \
+            --exclude-glob app_offline.htm --exclude-glob 'appsettings*.json' --exclude-glob web.config \
+            --exclude-glob '*.pdb' --exclude Keys/ --exclude logs/ --exclude App_Data/ --exclude wwwroot/ \
+            ./publish/ ."
+          ftp_retry 4 2400 "mirror -R --ignore-time --no-perms --no-umask --parallel=2 \
+            --exclude Uploads/ --exclude Images/ \
+            ./publish/wwwroot/ wwwroot"
+          # The app's own static files: small, always resent.
+          for d in js css Reports EmailTemplates; do
+            [ -d "publish/wwwroot/$d" ] || continue
+            ftp_retry 4 600 "mirror -R --no-perms --no-umask --parallel=2 ./publish/wwwroot/$d/ wwwroot/$d"
+          done
 
       - name: Take the app offline
         shell: bash
         run: |
+          source Resources/deployment/ftp-lib.sh
           cat > app_offline.htm <<'EOF'
           <!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -273,69 +255,31 @@ jobs:
           <p><small>This will only take a moment. Please refresh in a few seconds.</small></p>
           </div></body></html>
           EOF
-          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
-          set ftp:passive-mode on
-          set ssl:verify-certificate no
-          set net:timeout 30
-          set net:max-retries 3
-          cd "$FTP_PATH"
-          put app_offline.htm -o app_offline.htm
-          bye
-          EOF
+          ftp_retry 3 120 "put app_offline.htm -o app_offline.htm"
           sleep 10   # give IIS time to shut the app down and release the DLL locks
 
-      - name: Upload the release
+      - name: Swap the app files (site offline)
         shell: bash
         run: |
-          # mirror -R without --delete: server-only files are never removed, and lftp
-          # only sends files whose size/timestamp changed after the first run.
-          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
-          set ftp:passive-mode on
-          set ssl:verify-certificate no
-          set net:timeout 120
-          set net:max-retries 5
-          set net:reconnect-interval-base 5
-          set net:reconnect-interval-multiplier 1
-          set ftp:use-site-chmod no
-          set ftp:use-site-utime no
-          set file:charset utf-8
-          cd "$FTP_PATH"
-          mirror -R --verbose --no-perms --no-umask \
-            --exclude-glob app_offline.htm \
-            --exclude-glob appsettings*.json \
-            --exclude-glob web.config \
-            --exclude-glob *.pdb \
-            --exclude Keys/ \
-            --exclude logs/ \
-            --exclude App_Data/ \
-            --exclude wwwroot/Uploads/ \
-            --exclude wwwroot/Images/ \
-            --parallel=3 \
-            ./publish/ .
-          bye
-          EOF
+          source Resources/deployment/ftp-lib.sh
+          # wwwroot was staged while online. Here: third-party top-level files whose size
+          # changed, then our own build output, always. mirror never deletes server files.
+          ftp_retry 4 1200 "mirror -R --ignore-time --verbose --no-perms --no-umask --parallel=2 \
+            --exclude-glob app_offline.htm --exclude-glob 'appsettings*.json' --exclude-glob web.config \
+            --exclude-glob '*.pdb' --exclude Keys/ --exclude logs/ --exclude App_Data/ --exclude wwwroot/ \
+            ./publish/ ."
+          ftp_retry 4 600 "mput -O . publish/SMS*.dll publish/SMS_App.exe publish/SMS_App.deps.json \
+            publish/SMS_App.runtimeconfig.json publish/SiteMap.Config"
           if [ -f web.config ]; then
-            lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
-          set ftp:passive-mode on
-          set ssl:verify-certificate no
-          cd "$FTP_PATH"
-          put web.config -o web.config
-          bye
-          EOF
+            ftp_retry 3 120 "put web.config -o web.config"
           fi
 
       - name: Bring the app back online
         if: always()
         shell: bash
         run: |
-          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
-          set ftp:passive-mode on
-          set ssl:verify-certificate no
-          set net:timeout 30
-          cd "$FTP_PATH"
-          rm -f app_offline.htm
-          bye
-          EOF
+          source Resources/deployment/ftp-lib.sh
+          ftp_retry 5 120 "rm -f app_offline.htm"
 
       - name: Verify the new build is live
         shell: bash
