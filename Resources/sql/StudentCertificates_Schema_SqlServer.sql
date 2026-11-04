@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Student Certificates (Testimonial + Transfer Certificate) - SCHEMA (SQL SERVER)
 -- One table holds both certificate types as stored records with a student snapshot.
--- Drops the earlier per-type tables (if present) and creates StudentCertificates.
+-- Drops the earlier per-type tables (only if present AND empty) and creates StudentCertificates.
 -- IDEMPOTENT. Single batch, no GO. FK -> singular [Student]([Id]).
 -- (Fresh DBs get this table from the EF model automatically; this is for existing DBs.)
 -- ============================================================================
@@ -9,8 +9,16 @@
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 
-IF OBJECT_ID(N'[TransferCertificates]', N'U') IS NOT NULL DROP TABLE [TransferCertificates];
-IF OBJECT_ID(N'[Testimonials]', N'U') IS NOT NULL DROP TABLE [Testimonials];
+-- The earlier per-type tables are dropped ONLY when empty, so certificates already
+-- issued on an instance that ran the older version are never lost.
+IF OBJECT_ID(N'[TransferCertificates]', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.partitions
+                   WHERE object_id = OBJECT_ID(N'[TransferCertificates]') AND index_id IN (0, 1) AND rows > 0)
+    DROP TABLE [TransferCertificates];
+IF OBJECT_ID(N'[Testimonials]', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.partitions
+                   WHERE object_id = OBJECT_ID(N'[Testimonials]') AND index_id IN (0, 1) AND rows > 0)
+    DROP TABLE [Testimonials];
 
 IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = N'StudentCertificates')
 BEGIN
