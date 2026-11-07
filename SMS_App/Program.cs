@@ -171,6 +171,14 @@ builder.Services.AddAuthentication()
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
+if (string.IsNullOrWhiteSpace(jwtSettings.Key) || Encoding.UTF8.GetByteCount(jwtSettings.Key) < 32)
+{
+    // Fail at startup with an actionable message instead of throwing IDX10703 from
+    // JwtBearerOptions on every request (which surfaced as a blank HTTP 500).
+    throw new InvalidOperationException(
+        "Jwt:Key is missing or shorter than 32 characters. Add a \"Jwt\" section with a Key of at least 32 characters to appsettings.json " +
+        "(see Resources/deployment/unityschoolbd/appsettings.json.template).");
+}
 builder.Services.AddAuthentication().AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
 {
     options.MapInboundClaims = false; // keep claim types exactly as issued
