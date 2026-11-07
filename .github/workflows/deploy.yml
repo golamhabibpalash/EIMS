@@ -192,11 +192,11 @@ jobs:
           rm -f server-web.config remote-check.txt
 
           candidates=()
-          [ -n "${FTP_PATH:-}" ] && candidates+=("$FTP_PATH")
+          if [ -n "${FTP_PATH:-}" ]; then candidates+=("$FTP_PATH"); fi
           candidates+=( "/" "/httpdocs" "httpdocs" )
           if [ -n "${SITE_URL:-}" ]; then
             domain="$(printf '%s' "$SITE_URL" | sed -E 's#^[a-z]+://##; s#/.*$##')"
-            [ -n "$domain" ] && candidates+=("/$domain/httpdocs" "$domain/httpdocs")
+            if [ -n "$domain" ]; then candidates+=("/$domain/httpdocs" "$domain/httpdocs"); fi
           fi
 
           resolved=""
@@ -208,17 +208,17 @@ jobs:
           set net:max-retries 2
           set cmd:fail-exit yes
           cd "$p"
-          pwd
           cls -1 SMS_App.dll
           bye
           EOF
           )"
             # cmd:fail-exit makes a bad `cd` abort before `cls`, so a match here proves the
             # directory was entered - not that SMS_App.dll merely exists in the login home.
+            # Reuse the candidate that worked: lftp's `pwd` does not print a "/..." line,
+            # and the runner's `set -e` aborted the step when that grep found nothing.
             if printf '%s\n' "$out" | grep -qx "SMS_App.dll"; then
-              resolved="$(printf '%s\n' "$out" | grep -E '^/' | head -n1)"
-              resolved="${resolved:-$p}"
-              echo "FTP path '$p' contains SMS_App.dll (pwd: $resolved)."
+              resolved="$p"
+              echo "FTP path '$p' contains SMS_App.dll."
               break
             fi
           done
