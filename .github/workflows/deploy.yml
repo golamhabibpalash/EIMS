@@ -178,26 +178,87 @@ jobs:
             [ -n "${!v}" ] || { echo "::error::Environment ${{ matrix.client }} is missing secret $v"; exit 1; }
           done
 
-      - name: Check FTP_PATH is an EIMS install + prepare web.config
+      # Resolves the FTP folder that really contains the app, then proves it is writable.
+      # Plesk FTP users are often chrooted to httpdocs (so FTP_PATH must be "/") while the
+      # main subscription user sees httpdocs as a subfolder (so FTP_PATH must be "/httpdocs").
+      # Trying the candidates here means one bad secret can no longer fail later, mid-release.
+      - name: Resolve FTP path, verify writability + prepare web.config
+        id: ftp
         shell: bash
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
         run: |
+          set -uo pipefail
           rm -f server-web.config remote-check.txt
-          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF > remote-check.txt || true
+
+          candidates=()
+          [ -n "${FTP_PATH:-}" ] && candidates+=("$FTP_PATH")
+          candidates+=( "/" "/httpdocs" "httpdocs" )
+          if [ -n "${SITE_URL:-}" ]; then
+            domain="$(printf '%s' "$SITE_URL" | sed -E 's#^[a-z]+://##; s#/.*$##')"
+            [ -n "$domain" ] && candidates+=("/$domain/httpdocs" "$domain/httpdocs")
+          fi
+
+          resolved=""
+          for p in "${candidates[@]}"; do
+            out="$(lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" 2>&1 <<EOF || true
           set ftp:passive-mode on
           set ssl:verify-certificate no
           set net:timeout 30
           set net:max-retries 2
-          cd "$FTP_PATH"
+          set cmd:fail-exit yes
+          cd "$p"
+          pwd
           cls -1 SMS_App.dll
+          bye
+          EOF
+          )"
+            # cmd:fail-exit makes a bad `cd` abort before `cls`, so a match here proves the
+            # directory was entered - not that SMS_App.dll merely exists in the login home.
+            if printf '%s\n' "$out" | grep -qx "SMS_App.dll"; then
+              resolved="$(printf '%s\n' "$out" | grep -E '^/' | head -n1)"
+              resolved="${resolved:-$p}"
+              echo "FTP path '$p' contains SMS_App.dll (pwd: $resolved)."
+              break
+            fi
+          done
+
+          if [ -z "$resolved" ]; then
+            echo "::error::No SMS_App.dll found via FTP on $FTP_SERVER. Tried: ${candidates[*]}. Check FTP_PATH / the FTP user's home directory. Nothing was changed."
+            exit 1
+          fi
+          echo "ftp_path=$resolved" >> "$GITHUB_OUTPUT"
+
+          # Fail now - before app_offline.htm - if the account cannot write to that folder.
+          probe=".eims-write-test-$$"
+          printf 'ok\n' > "$probe"
+          if ! lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" 2>&1 <<EOF
+          set ftp:passive-mode on
+          set ssl:verify-certificate no
+          set net:timeout 30
+          set cmd:fail-exit yes
+          cd "$resolved"
+          put "$probe" -o "$probe"
+          rm -f "$probe"
+          bye
+          EOF
+          then
+            rm -f "$probe"
+            echo "::error::FTP user cannot write to '$resolved' on $FTP_SERVER. Fix the account's permissions/home directory. Nothing was changed."
+            exit 1
+          fi
+          rm -f "$probe"
+          echo "FTP path '$resolved' is writable."
+
+          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" 2>&1 <<EOF || true
+          set ftp:passive-mode on
+          set ssl:verify-certificate no
+          set net:timeout 30
+          set cmd:fail-exit yes
+          cd "$resolved"
           get web.config -o server-web.config
           bye
           EOF
-          # A wrong FTP_PATH would otherwise quietly upload a whole app into the wrong folder.
-          if ! grep -qx "SMS_App.dll" remote-check.txt; then
-            echo "::error::No SMS_App.dll in '$FTP_PATH' on $FTP_SERVER - wrong FTP_PATH, or the login failed. Nothing was changed."
-            exit 1
-          fi
-          echo "Found the existing EIMS install in $FTP_PATH."
           if [ -s server-web.config ]; then
             cp server-web.config web.config
             # Self-contained package: IIS must start SMS_App.exe, not "dotnet SMS_App.dll".
@@ -232,7 +293,7 @@ jobs:
           set ftp:use-site-chmod no
           set ftp:use-site-utime no
           set file:charset utf-8
-          cd "$FTP_PATH"
+          cd "${{ steps.ftp.outputs.ftp_path }}"
           mirror -R --only-missing --no-perms --no-umask \
             --exclude-glob app_offline.htm \
             --exclude-glob appsettings*.json \
@@ -278,7 +339,8 @@ jobs:
           set ssl:verify-certificate no
           set net:timeout 30
           set net:max-retries 3
-          cd "$FTP_PATH"
+          set cmd:fail-exit yes
+          cd "${{ steps.ftp.outputs.ftp_path }}"
           put app_offline.htm -o app_offline.htm
           bye
           EOF
@@ -299,7 +361,8 @@ jobs:
           set ftp:use-site-chmod no
           set ftp:use-site-utime no
           set file:charset utf-8
-          cd "$FTP_PATH"
+          set cmd:fail-exit yes
+          cd "${{ steps.ftp.outputs.ftp_path }}"
           mirror -R --verbose --no-perms --no-umask \
             --exclude-glob app_offline.htm \
             --exclude-glob appsettings*.json \
@@ -318,7 +381,8 @@ jobs:
             lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
           set ftp:passive-mode on
           set ssl:verify-certificate no
-          cd "$FTP_PATH"
+          set cmd:fail-exit yes
+          cd "${{ steps.ftp.outputs.ftp_path }}"
           put web.config -o web.config
           bye
           EOF
@@ -328,11 +392,14 @@ jobs:
         if: always()
         shell: bash
         run: |
+          # Nothing was taken offline if the path could not be resolved.
+          [ -n "${{ steps.ftp.outputs.ftp_path }}" ] || exit 0
           lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
           set ftp:passive-mode on
           set ssl:verify-certificate no
           set net:timeout 30
-          cd "$FTP_PATH"
+          set cmd:fail-exit yes
+          cd "${{ steps.ftp.outputs.ftp_path }}"
           rm -f app_offline.htm
           bye
           EOF

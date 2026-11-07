@@ -51,7 +51,7 @@ Remove the old `Mamitonnesa` environment — it is no longer deployed.
 | `FTP_SERVER`   | secret   | ✔ |   | host only, no `ftp://` |
 | `FTP_USERNAME` | secret   | ✔ |   | |
 | `FTP_PASSWORD` | secret   | ✔ |   | |
-| `FTP_PATH`     | secret   | ✔ |   | web root, e.g. `/httpdocs` |
+| `FTP_PATH`     | secret   | ✔ |   | web root **as the FTP client sees it**: Plesk chrooted user → `/`, subscription-root user → `/httpdocs` |
 | `SSH_HOST`     | secret   |   | ✔ | |
 | `SSH_USER`     | secret   |   | ✔ | needs passwordless `sudo` (`root` works) |
 | `SSH_KEY`      | secret   |   | ✔ | full private key (PEM) |
