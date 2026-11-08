@@ -23,5 +23,12 @@
   "SmtpSettings": {
     "Email": "YOUR_SMTP_EMAIL",
     "Password": "YOUR_SMTP_PASSWORD"
+  },
+  "Jwt": {
+    "Key": "GENERATE_A_RANDOM_KEY_OF_AT_LEAST_32_CHARACTERS",
+    "Issuer": "EIMS",
+    "Audience": "EIMS.Mobile",
+    "AccessTokenMinutes": 60,
+    "RefreshTokenDays": 30
   }
 }

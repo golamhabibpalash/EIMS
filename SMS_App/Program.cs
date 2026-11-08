@@ -1,5 +1,9 @@
 ﻿using GHPEncryptDecript;
 using Hangfire;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using SMS_App.Utilities.Jwt;
+using System.Security.Claims;
 using Hangfire.PostgreSql;
 using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Authorization;
@@ -160,6 +164,61 @@ builder.Services.AddAuthentication()
         options.AccessDeniedPath = "/AdmissionPortal/Login";
     });
 
+// JWT bearer for the mobile API (scheme "Bearer"), alongside the cookie schemes.
+// The default scheme stays the Identity cookie, so the web app is unaffected;
+// API endpoints opt in with [Authorize(AuthenticationSchemes = "Bearer")] and
+// the global policy below also accepts it.
+builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
+if (string.IsNullOrWhiteSpace(jwtSettings.Key) || Encoding.UTF8.GetByteCount(jwtSettings.Key) < 32)
+{
+    // Fail at startup with an actionable message instead of throwing IDX10703 from
+    // JwtBearerOptions on every request (which surfaced as a blank HTTP 500).
+    throw new InvalidOperationException(
+        "Jwt:Key is missing or shorter than 32 characters. Add a \"Jwt\" section with a Key of at least 32 characters to appsettings.json " +
+        "(see Resources/deployment/unityschoolbd/appsettings.json.template).");
+}
+builder.Services.AddAuthentication().AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+{
+    options.MapInboundClaims = false; // keep claim types exactly as issued
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = jwtSettings.Issuer,
+        ValidateAudience = true,
+        ValidAudience = jwtSettings.Audience,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key)),
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.FromMinutes(1),
+        NameClaimType = ClaimTypes.Name,
+        RoleClaimType = ClaimTypes.Role,
+    };
+    // Rehydrate permission claims onto the bearer principal, reusing the exact
+    // same cached logic as the web request pipeline, so policy checks
+    // (RequireClaim "View X") work for the mobile API without baking ~250
+    // claims into the token.
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var transformer = context.HttpContext.RequestServices
+                .GetRequiredService<Microsoft.AspNetCore.Authentication.IClaimsTransformation>();
+            context.Principal = await transformer.TransformAsync(context.Principal);
+        }
+    };
+});
+
+// CORS for the mobile app when it runs in a browser (Flutter web). Native
+// Android/iOS ignore CORS. Bearer tokens (not cookies) mean no credentials, so
+// any-origin is safe here.
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("MobileApi", policy =>
+        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+});
+
 // Rate limits for the public admission endpoints (sign-in, OTP, tracking), per client IP.
 builder.Services.AddRateLimiter(options =>
 {
@@ -185,10 +244,14 @@ builder.Services.AddControllers()
     .AddNewtonsoftJson(opt =>
         opt.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore);
 
-// Global Authorization
+// Global Authorization. Accept BOTH the Identity cookie and the mobile JWT
+// bearer scheme, so the site-wide "must be authenticated" filter doesn't block
+// bearer-authenticated API calls (which otherwise evaluate only the cookie).
 builder.Services.AddMvc(options =>
 {
-    var policy = new AuthorizationPolicyBuilder()
+    var policy = new AuthorizationPolicyBuilder(
+            IdentityConstants.ApplicationScheme,
+            JwtBearerDefaults.AuthenticationScheme)
         .RequireAuthenticatedUser()
         .Build();
 
@@ -323,6 +386,9 @@ app.UseStaticFiles();
 app.UseSession();      // Session BEFORE routing
 app.UseRouting();
 app.UseRateLimiter();
+
+// CORS must sit between routing and auth (for the Flutter web client).
+app.UseCors("MobileApi");
 
 // Auth middlewares
 app.UseAuthentication();

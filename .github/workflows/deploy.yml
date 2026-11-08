@@ -178,18 +178,82 @@ jobs:
             [ -n "${!v}" ] || { echo "::error::Environment ${{ matrix.client }} is missing secret $v"; exit 1; }
           done
 
-      - name: Check FTP_PATH is an EIMS install + prepare web.config
+      # Resolves the FTP folder that really contains the app, then proves it is writable.
+      # Plesk FTP users are often chrooted to httpdocs (so FTP_PATH must be "/") while the
+      # main subscription user sees httpdocs as a subfolder (so FTP_PATH must be "/httpdocs").
+      # Trying the candidates here means one bad secret can no longer fail later, mid-release.
+      - name: Resolve FTP path, verify writability + prepare web.config
+        id: ftp
         shell: bash
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
         run: |
           source Resources/deployment/ftp-lib.sh
+          set -uo pipefail
           rm -f server-web.config remote-check.txt
-          # cmd:fail-exit stops at a failing `cd`, so a wrong FTP_PATH lists nothing here.
-          ftp_retry 3 120 "cls -1 SMS_App.dll" > remote-check.txt || true
-          if ! grep -qx "SMS_App.dll" remote-check.txt; then
-            echo "::error::No SMS_App.dll in FTP_PATH on $FTP_SERVER - wrong FTP_PATH (use / if the FTP account opens straight into the site folder) or the login failed. Nothing was changed."
+
+          candidates=()
+          if [ -n "${FTP_PATH:-}" ]; then candidates+=("$FTP_PATH"); fi
+          candidates+=( "/" "/httpdocs" "httpdocs" )
+          if [ -n "${SITE_URL:-}" ]; then
+            domain="$(printf '%s' "$SITE_URL" | sed -E 's#^[a-z]+://##; s#/.*$##')"
+            if [ -n "$domain" ]; then candidates+=("/$domain/httpdocs" "$domain/httpdocs"); fi
+          fi
+
+          resolved=""
+          for p in "${candidates[@]}"; do
+            out="$(lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" 2>&1 <<EOF || true
+          set ftp:passive-mode on
+          set ssl:verify-certificate no
+          set net:timeout 30
+          set net:max-retries 2
+          set cmd:fail-exit yes
+          cd "$p"
+          cls -1 SMS_App.dll
+          bye
+          EOF
+          )"
+            # cmd:fail-exit makes a bad `cd` abort before `cls`, so a match here proves the
+            # directory was entered - not that SMS_App.dll merely exists in the login home.
+            # Reuse the candidate that worked: lftp's `pwd` does not print a "/..." line,
+            # and the runner's `set -e` aborted the step when that grep found nothing.
+            if printf '%s\n' "$out" | grep -qx "SMS_App.dll"; then
+              resolved="$p"
+              echo "FTP path '$p' contains SMS_App.dll."
+              break
+            fi
+          done
+
+          if [ -z "$resolved" ]; then
+            echo "::error::No SMS_App.dll found via FTP on $FTP_SERVER. Tried: ${candidates[*]}. Check FTP_PATH / the FTP user's home directory. Nothing was changed."
             exit 1
           fi
-          echo "Found the existing EIMS install."
+          # ftp-lib.sh reads FTP_PATH, so export the resolved folder for this and later steps.
+          export FTP_PATH="$resolved"
+          echo "FTP_PATH=$resolved" >> "$GITHUB_ENV"
+          echo "ftp_path=$resolved" >> "$GITHUB_OUTPUT"
+
+          # Fail now - before app_offline.htm - if the account cannot write to that folder.
+          probe=".eims-write-test-$$"
+          printf 'ok\n' > "$probe"
+          if ! lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" 2>&1 <<EOF
+          set ftp:passive-mode on
+          set ssl:verify-certificate no
+          set net:timeout 30
+          set cmd:fail-exit yes
+          cd "$resolved"
+          put "$probe" -o "$probe"
+          rm -f "$probe"
+          bye
+          EOF
+          then
+            rm -f "$probe"
+            echo "::error::FTP user cannot write to '$resolved' on $FTP_SERVER. Fix the account's permissions/home directory. Nothing was changed."
+            exit 1
+          fi
+          rm -f "$probe"
+          echo "FTP path '$resolved' is writable."
+
           ftp_retry 3 120 "get web.config -o server-web.config" || true
           if [ -s server-web.config ]; then
             cp server-web.config web.config
@@ -278,6 +342,8 @@ jobs:
         if: always()
         shell: bash
         run: |
+          # Nothing was taken offline if the path could not be resolved.
+          [ -n "${FTP_PATH:-}" ] || exit 0
           source Resources/deployment/ftp-lib.sh
           ftp_retry 5 120 "rm -f app_offline.htm"
 

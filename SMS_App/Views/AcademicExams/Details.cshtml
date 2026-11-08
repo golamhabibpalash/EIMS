@@ -90,6 +90,13 @@
                 <button class="btn btn-block btn-info" data-bs-toggle="modal" data-bs-target=".addStudentModal">Add Student</button>
             </span>
         </div>
+        <div class="row mt-1">
+            <span class="wall text-center">
+                <a class="btn btn-block btn-success" asp-action="ExportMarkEntrySheet" asp-route-id="@Model.Id" target="_blank">
+                    <i class="fa fa-download"></i> Export Mark Entry Sheet
+                </a>
+            </span>
+        </div>
         <div class="row">
             <div class="col-md-12 text-center">
                 <div class="card">

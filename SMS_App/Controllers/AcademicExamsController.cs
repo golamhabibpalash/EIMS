@@ -1,5 +1,6 @@
 using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -11,10 +12,12 @@ using SMS.Entities;
 using SMS.Entities.AdditionalModels;
 using SMS.Entities.Enums;
 using SMS_App.Utilities.MACIPServices;
+using SMS_App.Utilities.Reports;
 using SMS_App.ViewModels.ExamVM;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -37,7 +40,9 @@ public class AcademicExamsController : Controller
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly IAcademicExamGroupManager _examGroupManager;
     private readonly IGenderManager _genderManager;
-    public AcademicExamsController(IAcademicExamManager examManager, IAcademicSessionManager sessionManager, IAcademicClassManager classManager, IAcademicExamTypeManager examTypeManager, IAcademicSubjectManager academicSubjectManager, IEmployeeManager employeeManager, IMapper mapper, IAcademicSectionManager academicSectionManager, IStudentManager studentManager, IAcademicExamDetailsManager academicExamDetailsManager, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, IAcademicExamGroupManager academicExamGroupManager, IGenderManager genderManager)
+    private readonly IInstituteManager _instituteManager;
+    private readonly IWebHostEnvironment _host;
+    public AcademicExamsController(IAcademicExamManager examManager, IAcademicSessionManager sessionManager, IAcademicClassManager classManager, IAcademicExamTypeManager examTypeManager, IAcademicSubjectManager academicSubjectManager, IEmployeeManager employeeManager, IMapper mapper, IAcademicSectionManager academicSectionManager, IStudentManager studentManager, IAcademicExamDetailsManager academicExamDetailsManager, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, IAcademicExamGroupManager academicExamGroupManager, IGenderManager genderManager, IInstituteManager instituteManager, IWebHostEnvironment host)
     {
         _examManager = examManager;
         _sessionManager = sessionManager;
@@ -53,6 +58,8 @@ public class AcademicExamsController : Controller
         _roleManager = roleManager;
         _examGroupManager = academicExamGroupManager;
         _genderManager = genderManager;
+        _instituteManager = instituteManager;
+        _host = host;
     }
 
     // GET: AcademicExamsController
@@ -196,6 +203,69 @@ public class AcademicExamsController : Controller
         };
 
         return View(academicExamDetailVM);
+    }
+
+    // GET: AcademicExamsController/ExportMarkEntrySheet/5
+    // Printable sheet for physical data collection: school/exam/teacher header, a blank
+    // Class Roll | Name | Marks | Remarks grid, and signature lines at the bottom.
+    [HttpGet]
+    [Authorize(Policy = "DetailsAcademicExamPolicy")]
+    public async Task<IActionResult> ExportMarkEntrySheet(int id)
+    {
+        var exam = await _examManager.GetByIdAsync(id);
+        if (exam == null)
+        {
+            TempData["error"] = "Data not found";
+            return RedirectToAction("Index");
+        }
+
+        var user = await _userManager.GetUserAsync(User);
+        var roles = await _userManager.GetRolesAsync(user);
+        bool isAdminUser = roles.Any(r => r.Contains("Admin") || r.Contains("SuperAdmin"));
+
+        if (user.UserType == 'e' && user.ReferenceId != exam.EmployeeId && !isAdminUser)
+        {
+            return RedirectToAction("AccessDenied", "Accounts");
+        }
+
+        var institute = await _instituteManager.GetByIdAsync(1);
+        var sheet = new ExamMarkEntrySheetData
+        {
+            Institute = institute,
+            Logo = ReadInstituteImage(string.IsNullOrWhiteSpace(institute?.Logo) ? "smslogo.png" : institute.Logo)
+                   ?? ReadInstituteImage("smslogo.png"),
+            Signature = ReadInstituteImage("signature.jpg"),
+            ExamName = exam.AcademicExamGroup?.ExamGroupName,
+            SubjectName = exam.AcademicSubject?.SubjectName,
+            SubjectCode = exam.AcademicSubject?.SubjectCode?.ToString(),
+            ExamCategory = exam.ExamCategory,
+            ClassName = exam.AcademicClass?.Name,
+            SectionName = exam.AcademicSection?.Name ?? "All Sections",
+            SessionName = exam.AcademicExamGroup?.AcademicSession?.Name,
+            MonthName = System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(exam.AcademicExamGroup?.ExamMonthId ?? 0),
+            TotalMarks = exam.TotalMarks,
+            TeacherName = exam.Employee?.EmployeeName,
+            Students = exam.AcademicExamDetails?
+                .Where(d => d.Student != null && d.Student.Status)
+                .OrderBy(d => d.Student.ClassRoll)
+                .Select(d => new ExamMarkEntryStudent
+                {
+                    ClassRoll = d.Student.ClassRoll,
+                    Name = d.Student.Name
+                })
+                .ToList() ?? new List<ExamMarkEntryStudent>()
+        };
+
+        var pdf = new ExamMarkEntrySheetPdfBuilder(sheet).GeneratePdf();
+        var fileName = $"exam_mark_entry_{id}_{DateTime.Now:yyyyMMdd}.pdf";
+        return File(pdf, "application/pdf", fileName);
+    }
+
+    private byte[] ReadInstituteImage(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName)) return null;
+        var path = Path.Combine(_host.WebRootPath, "Images", "Institute", fileName);
+        return System.IO.File.Exists(path) ? System.IO.File.ReadAllBytes(path) : null;
     }
 
     private async Task<ActionResult> GetMergedExamDetails(int primaryExamId)

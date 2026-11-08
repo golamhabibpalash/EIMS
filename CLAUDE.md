@@ -121,6 +121,29 @@ In-app notifications are split deliberately across layers because Identity and t
 ### Areas
 Four areas: `API`, `Identity`, `SMSAPP`, `Student` — routed as `{area:exists}/{controller=Home}/{action=Index}/{id?}`
 
+### Mobile API (JWT bearer)
+The `API` area serves the SchoolBD Flutter app over JWT bearer auth, **alongside** the cookie-based
+web app (default scheme stays the cookie). Key pieces:
+- `Areas/API/Controllers/AuthController.cs` — `/API/Auth/login|refresh|me|logout`. Validates via
+  `SignInManager.CheckPasswordSignInAsync`; issues tokens from `Utilities/Jwt/JwtTokenService.cs`.
+- **Access tokens stay slim** (id, name, roles, security stamp). Permission claims are NOT baked in —
+  the JWT `OnTokenValidated` event (Program.cs) re-runs `PermissionClaimsTransformation`, so bearer
+  requests get the same ~250-claim set per request without overflowing proxy header limits (same
+  reason they're kept out of the cookie). Don't put permissions in the token.
+- **Refresh is stateless + security-stamp-checked** (no token table): a password/stamp change
+  invalidates outstanding refresh tokens.
+- The global auth filter (Program.cs `AddMvc`) accepts BOTH `IdentityConstants.ApplicationScheme`
+  and `JwtBearerDefaults.AuthenticationScheme`, so bearer calls aren't blocked by the site-wide
+  "must be authenticated" policy. API controllers add `[Authorize(AuthenticationSchemes = "Bearer")]`.
+- `Areas/API/Controllers/StudentController.cs` — student self-service (`/API/Student/profile`,
+  `dashboard`, `attendance`, `payments`, `results`, `academics`, `notices`), each scoped to the
+  signed-in student and reusing the same managers as the web student dashboard. Note the
+  `using StudentEntity = SMS.Entities.Student;` alias — bare `Student` binds to the sibling
+  `Areas.Student` namespace.
+- `Jwt` config lives in `appsettings.json` (`Key` ≥ 32 chars, set per instance like the connection
+  string); Program.cs throws at startup if it's missing/short. CORS policy `MobileApi` is for the
+  Flutter *web* build; native apps ignore CORS.
+
 ## Configuration & Secrets
 
 ### Database Provider Selection
