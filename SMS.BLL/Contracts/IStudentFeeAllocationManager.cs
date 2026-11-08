@@ -12,5 +12,7 @@ namespace SMS.BLL.Contracts
         Task<(int totalRecord, int filteredRecord, List<StudentFeeAllocation> data)> GetDataTableDataAsync(
             string searchValue, string orderColumn, string orderDirection, int start, int length);
         Task<List<StudentFeeAllocation>> GetStudentFeeAllocationsByStudentId(int studentId);
+        Task<(bool canDelete, string message)> CanDeleteAsync(int allocationId);
+        Task<(bool deleted, string message)> DeleteWithValidationAsync(int allocationId);
     }
 }

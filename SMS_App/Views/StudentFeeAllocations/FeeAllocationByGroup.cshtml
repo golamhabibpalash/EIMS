@@ -15,6 +15,7 @@
 
 <div class="row">
     <form action="FeeAllocationByGroup" method="post" id="myForm">
+        @Html.AntiForgeryToken()
         <div class="col-md-8">
             <div class="card mb-3" id="filterSummaryCard">
                 <div class="card-header bg-primary text-white">
@@ -120,7 +121,7 @@
                 <div class="form-group row">
                     <label class="col-md-4 col-form-label">Allocate Amount</label>
                     <div class="col-md-8">
-                        <input class="form-control" asp-for="AllocationAmount" />
+                        <input class="form-control" asp-for="AllocationAmount" type="number" min="0" step="any" placeholder="0 = free" />
                     </div>
                 </div>
             </fieldset>

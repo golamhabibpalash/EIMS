@@ -50,14 +50,23 @@ public class ClassFeeListManager : Manager<ClassFeeList>, IClassFeeListManager
         // find and set all allocations
         var studentAllAllocations =  await _studentFeeAllocationManager.GetStudentFeeAllocationsByStudentId(studentId);
 
-        if (studentAllAllocations!=null && studentAllAllocations.Count>0)
+        if (studentAllAllocations != null && studentAllAllocations.Count > 0)
         {
+            var activeAllocations = studentAllAllocations
+                .Where(s => s.StudentId == studentId && s.IsActive)
+                .ToList();
+
             foreach (var cfl in allClassFeeLists)
             {
-                var feeAllocatedAmount = studentAllAllocations.Where(s => s.StudentId == studentId && s.StudentFeeHeadId == cfl.StudentFeeHeadId)?.Sum(c => c.AllocatedAmount);
-                if (feeAllocatedAmount>0)
+                // Prefer the allocation tied to this exact class fee (head + session); fall back to
+                // legacy allocations saved without a ClassFeeListId, matched by fee head.
+                var allocation = activeAllocations.FirstOrDefault(a => a.ClassFeeListId == cfl.Id)
+                    ?? activeAllocations.FirstOrDefault(a => a.ClassFeeListId == null && a.StudentFeeHeadId == cfl.StudentFeeHeadId);
+
+                // A zero allocation is valid: it means the head is free for this student.
+                if (allocation != null)
                 {
-                    cfl.Amount = (double)feeAllocatedAmount;
+                    cfl.Amount = allocation.AllocatedAmount;
                 }
             }
         }

@@ -15,7 +15,6 @@ using System.Threading.Tasks;
 
 namespace SMS_App.Controllers;
 
-[Authorize(Roles = "SuperAdmin, Admin")]
 public class StudentFeeAllocationsController : Controller
 {
     #region Fields
@@ -59,7 +58,7 @@ public class StudentFeeAllocationsController : Controller
 
     [HttpGet]
     [Route("GetDataTableData")]
-    [AllowAnonymous]
+    [Authorize(Policy = "IndexStudentFeeAllocationsPolicy")]
     public async Task<IActionResult> GetDataTableData([FromQuery] int draw, [FromQuery] int start, [FromQuery] int length,
         [FromQuery] string searchValue, [FromQuery] string orderColumn, [FromQuery] string orderDirection)
     {
@@ -114,9 +113,9 @@ public class StudentFeeAllocationsController : Controller
 
             return Ok(response);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
+            return StatusCode(500, new { error = "Failed to load fee allocations." });
         }
     }
 
@@ -135,6 +134,7 @@ public class StudentFeeAllocationsController : Controller
 
     [Authorize(Policy = "GroupStudentFeeAllocationsPolicy")]
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<ActionResult> FeeAllocationByGroup(StudentFeeAllocationGroupVM studentFeeAllocationGroupVM)
     {
         var notifications = string.Empty;
@@ -142,12 +142,23 @@ public class StudentFeeAllocationsController : Controller
         int inserted = 0;
         int inactive = 0;
         var classFeeList = await _classFeeListManager.GetClassFeeListByClassIdFeeHeadIdSessionIdAsync(studentFeeAllocationGroupVM.AcademicClassId, studentFeeAllocationGroupVM.FeeHeadId, studentFeeAllocationGroupVM.AcademicSessionId);
-        if (studentFeeAllocationGroupVM.Students.Count>0)
+        if (studentFeeAllocationGroupVM.AllocationAmount < 0)
+        {
+            TempData["notifications"] = "Allocated amount cannot be negative. Use 0 to make the fee free.";
+            return RedirectToAction("FeeAllocationByGroup");
+        }
+        var classFee = classFeeList?.FirstOrDefault();
+        if (classFee == null)
+        {
+            TempData["notifications"] = "No class fee is set up for the selected class, fee and session. Add it to the class fee list first.";
+            return RedirectToAction("FeeAllocationByGroup");
+        }
+        if (studentFeeAllocationGroupVM.Students != null && studentFeeAllocationGroupVM.Students.Count > 0)
         {
             List<StudentFeeAllocation> studentFeeAllocations = new List<StudentFeeAllocation>();    
             foreach (var student in studentFeeAllocationGroupVM.Students)
             {
-                var existingAllocation =await _studentFeeAllocationManager.GetStudentFeeAllocationByUniqueIdClassFeeId(student.Student.UniqueId, classFeeList.FirstOrDefault().Id);
+                var existingAllocation =await _studentFeeAllocationManager.GetStudentFeeAllocationByUniqueIdClassFeeId(student.Student.UniqueId, classFee.Id);
                 if (student.IsChecked)
                 {
                     if (existingAllocation!=null)
@@ -168,7 +179,7 @@ public class StudentFeeAllocationsController : Controller
                             UniqueId = student.Student.UniqueId,
                             StudentFeeHeadId = studentFeeAllocationGroupVM.FeeHeadId,
                             AllocatedAmount = studentFeeAllocationGroupVM.AllocationAmount,
-                            ClassFeeListId = classFeeList.FirstOrDefault().Id,
+                            ClassFeeListId = classFee.Id,
                             IsActive = true,
                             CreatedAt = DateTime.Now,
                             CreatedBy = HttpContext.Session.GetString("UserId"),
@@ -222,23 +233,46 @@ public class StudentFeeAllocationsController : Controller
         studentFeeAllocation = studentFeeAllocationVM.SFAllocation;
         if (ModelState.IsValid)
         {
-            //check condition is duplicate or not?
-            var existingFeeAllocation = await _studentFeeAllocationManager.GetStudentFeeAllocationByUniqueIdClassFeeId(studentFeeAllocation.UniqueId, (int)studentFeeAllocation.ClassFeeListId);
-
-            if (existingFeeAllocation != null)
+            if (studentFeeAllocation.AllocatedAmount < 0)
             {
-                var exStudent = await _student.GetStudentByUniqueIdAsync(existingFeeAllocation.UniqueId);
-
-                var feeHead = await _studentFeeHeadManager.GetByIdAsync(existingFeeAllocation.StudentFeeHeadId);
-                TempData["failed"] = exStudent.Name + " is already allocated for " + feeHead.Name;
+                TempData["failed"] = "Allocated amount cannot be negative. Use 0 to make the fee free.";
                 return RedirectToAction("Index");
             }
 
             var student = await _student.GetStudentByUniqueIdAsync(studentFeeAllocation.UniqueId);
-            var classFeeList = await _classFeeListManager.GetByClassIdAndFeeHeadIdAsync(student.AcademicClassId, studentFeeAllocation.StudentFeeHeadId, student.AcademicSessionId);
-            if (classFeeList != null)
+            if (student == null)
             {
-                studentFeeAllocation.ClassFeeListId = classFeeList.Id;
+                TempData["failed"] = "Student not found.";
+                return RedirectToAction("Index");
+            }
+
+            // Use the class fee for the session chosen on the form; only fall back to the
+            // student's current session when the form didn't supply one.
+            ClassFeeList classFeeList = null;
+            if (studentFeeAllocation.ClassFeeListId is int postedClassFeeId && postedClassFeeId > 0)
+            {
+                classFeeList = await _classFeeListManager.GetByIdAsync(postedClassFeeId);
+                if (classFeeList != null && classFeeList.StudentFeeHeadId != studentFeeAllocation.StudentFeeHeadId)
+                {
+                    classFeeList = null;
+                }
+            }
+            classFeeList ??= await _classFeeListManager.GetByClassIdAndFeeHeadIdAsync(student.AcademicClassId, studentFeeAllocation.StudentFeeHeadId, student.AcademicSessionId);
+            if (classFeeList == null)
+            {
+                TempData["failed"] = "No class fee is set up for this fee in the selected session. Add it to the class fee list first.";
+                return RedirectToAction("Index");
+            }
+            studentFeeAllocation.ClassFeeListId = classFeeList.Id;
+
+            //check condition is duplicate or not?
+            var existingFeeAllocation = await _studentFeeAllocationManager.GetStudentFeeAllocationByUniqueIdClassFeeId(studentFeeAllocation.UniqueId, classFeeList.Id);
+
+            if (existingFeeAllocation != null)
+            {
+                var feeHead = await _studentFeeHeadManager.GetByIdAsync(existingFeeAllocation.StudentFeeHeadId);
+                TempData["failed"] = student.Name + " is already allocated for " + feeHead?.Name;
+                return RedirectToAction("Index");
             }
             var appUer = HttpContext.Session.GetString("UserId");
             if (appUer == null)
@@ -289,8 +323,13 @@ public class StudentFeeAllocationsController : Controller
         {
             try
             {
+                if (studentFeeAllocationVM.SFAllocation.AllocatedAmount < 0)
+                {
+                    TempData["failed"] = "Allocated amount cannot be negative. Use 0 to make the fee free.";
+                    return RedirectToAction("Index");
+                }
                 var existingAllocation = await _studentFeeAllocationManager.GetByIdAsync(studentFeeAllocationVM.SFAllocation.Id);
-                if (existingAllocation.Id != studentFeeAllocationVM.SFAllocation.Id)
+                if (existingAllocation == null || existingAllocation.Id != studentFeeAllocationVM.SFAllocation.Id)
                 {
                     TempData["deleted"] = "Data is miss matched";
                     return RedirectToAction("Index");
@@ -330,33 +369,45 @@ public class StudentFeeAllocationsController : Controller
         return View();
     }
 
+    // GET: /StudentFeeAllocations/CanDelete?id=5 — lets the delete dialog explain up front
+    // why an allocation can't be removed. The POST re-checks, so this is only a convenience.
+    [HttpGet]
+    [Authorize(Policy = "DeleteStudentFeeAllocationsPolicy")]
+    public async Task<JsonResult> CanDelete(int id)
+    {
+        var (canDelete, message) = await _studentFeeAllocationManager.CanDeleteAsync(id);
+        return Json(new { canDelete, message });
+    }
+
     // POST: StudentFeeAllocationsController/Delete/5
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Policy = "DeleteStudentFeeAllocationsPolicy")]
     public async Task<ActionResult> Delete(int id, IFormCollection formCollection)
     {
-        //StudentFeeAllocationId
-        try
+        if (!int.TryParse(formCollection["StudentFeeAllocationId"], out var allocationId) || allocationId <= 0)
         {
-            var existingAllocation = await _studentFeeAllocationManager.GetByIdAsync(Convert.ToInt32(formCollection["StudentFeeAllocationId"]));
-            if (existingAllocation.Id != Convert.ToInt32(formCollection["StudentFeeAllocationId"]))
-            {
-                TempData["error"] = "Data is miss matched";
-                return RedirectToAction("Index");
-            }
-            var isDeleted = await _studentFeeAllocationManager.RemoveAsync(existingAllocation);
-            if (isDeleted)
-            {
-                TempData["deleted"] = "Data Deleted successfully";
-            }
+            TempData["failed"] = "No allocation was selected to delete.";
             return RedirectToAction(nameof(Index));
         }
-        catch
+
+        try
         {
-            TempData["error"] = "Exception Occured";
-            return RedirectToAction("Index");
+            var (deleted, message) = await _studentFeeAllocationManager.DeleteWithValidationAsync(allocationId);
+            if (deleted)
+            {
+                TempData["deleted"] = message;
+            }
+            else
+            {
+                TempData["failed"] = message;
+            }
         }
+        catch (Exception)
+        {
+            TempData["failed"] = "Something went wrong while deleting the allocation. Please try again.";
+        }
+        return RedirectToAction(nameof(Index));
     }
 
     #endregion Methods

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SMS.BLL.Contracts;
 using SMS.Entities;
@@ -29,6 +30,7 @@ namespace SMS_App.Controllers.Api
         }
 
         [HttpPost("GetDataTableData")]
+        [Authorize(Policy = "IndexStudentFeeAllocationsPolicy")]
         public IActionResult GetDataTableData([FromBody] DataTableRequest request)
         {
             if (request == null)

@@ -1,9 +1,13 @@
 @model SMS_App.ViewModels.Students.StudentFeeAllocationVM
 
 @inject UserManager<ApplicationUser> _userManager;
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService _authorizationService
 
 @{
     GlobalUI.PageTitle = "Student Fee Allocation";
+    var canEditAllocation = (await _authorizationService.AuthorizeAsync(User, "EditStudentFeeAllocationsPolicy")).Succeeded;
+    var canDeleteAllocation = (await _authorizationService.AuthorizeAsync(User, "DeleteStudentFeeAllocationsPolicy")).Succeeded;
 
 }
 
@@ -142,7 +146,7 @@
                 <div class="form-group row">
                     <label class="col-md-4 col-form-label text-end">Allocate Amount</label>
                     <div class="col-md-8">
-                        <input class="form-control" asp-for="SFAllocation.AllocatedAmount" />
+                        <input class="form-control" asp-for="SFAllocation.AllocatedAmount" type="number" min="0" step="any" placeholder="0 = free" />
                     </div>
                 </div>
                 <div class="form-group row">
@@ -201,11 +205,12 @@
                     </tr>
                 </table>
             </div>
+            <div class="alert alert-warning mx-3 mb-0 d-none" id="deleteBlockedMessage" role="alert"></div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary col-form-label" data-bs-dismiss="modal">Cancel</button>
                 <form asp-action="delete" method="post">
                     <input type="hidden" name="StudentFeeAllocationId" id="StudentFeeAllocationId" />
-                    <button type="submit" class="btn btn-danger col-form-label">Delete Confirm</button>
+                    <button type="submit" class="btn btn-danger col-form-label" id="deleteConfirmBtn">Delete Confirm</button>
                 </form>
             </div>
         </div>
@@ -214,10 +219,28 @@
 
 
 @section Scripts {
-    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
+    <script>
+        $(function () {
+            var messages = {
+                created: @Html.Raw(Json.Serialize(TempData["created"]?.ToString() ?? "")),
+                updated: @Html.Raw(Json.Serialize(TempData["updated"]?.ToString() ?? "")),
+                failed: @Html.Raw(Json.Serialize(TempData["failed"]?.ToString() ?? "")),
+                error: @Html.Raw(Json.Serialize(TempData["error"]?.ToString() ?? "")),
+                deleted: @Html.Raw(Json.Serialize(TempData["deleted"]?.ToString() ?? ""))
+            };
+            if (messages.created) alertify.success(messages.created);
+            if (messages.updated) alertify.message(messages.updated);
+            if (messages.failed) alertify.error(messages.failed);
+            if (messages.error) alertify.error(messages.error);
+            if (messages.deleted) alertify.error(messages.deleted);
+        });
+    </script>
     <script src="https://cdn.datatables.net/2.1.8/js/dataTables.bootstrap5.js"></script>
 
     <script>
+        var canEditAllocation = @(canEditAllocation ? "true" : "false");
+        var canDeleteAllocation = @(canDeleteAllocation ? "true" : "false");
+
         $(document).ready(async function () {
             await loadAcademicSessions();
             await loadAcademicClasses();
@@ -271,6 +294,34 @@
                 $('#deleteClassRoll').html(stClassRoll);
                 $('#deletePaymentType').html(feeTypeName);
                 $('#deleteAmount').html(amount);
+
+                // Ask the server whether this allocation can be removed before enabling the button.
+                var $confirm = $('#deleteConfirmBtn');
+                var $blocked = $('#deleteBlockedMessage');
+                $confirm.prop('disabled', true).text('Checking...');
+                $blocked.addClass('d-none').text('');
+                $.ajax({
+                    url: '@Url.Action("CanDelete", "StudentFeeAllocations")',
+                    data: { id: id },
+                    cache: false,
+                    type: 'GET',
+                    dataType: 'json'
+                }).done(function (result) {
+                    if (result.canDelete) {
+                        $confirm.prop('disabled', false).text('Delete Confirm');
+                    } else {
+                        $confirm.prop('disabled', true).text('Delete Confirm');
+                        $blocked.removeClass('d-none').text(result.message);
+                        alertify.error(result.message);
+                    }
+                }).fail(function (xhr) {
+                    var message = xhr.status === 403
+                        ? 'You do not have permission to delete fee allocations.'
+                        : 'Could not check whether this allocation can be deleted. Please try again.';
+                    $confirm.prop('disabled', true).text('Delete Confirm');
+                    $blocked.removeClass('d-none').text(message);
+                    alertify.error(message);
+                });
             });
         });
 
@@ -458,7 +509,7 @@
                         render: function(data, type, row, meta) {
                             return `
                                 <div class="d-flex gap-1 justify-content-center">
-                                    <button class="btn btn-sm btn-outline-primary updateBtn py-1 px-2" 
+                                    ${canEditAllocation ? `<button class="btn btn-sm btn-outline-primary updateBtn py-1 px-2" 
                                         data-classid="${row.classFeeList?.academicClassId || ''}"
                                         data-studentid="${row.studentId}"
                                         data-feetype="${row.studentFeeHeadId}"
@@ -471,8 +522,8 @@
                                         data-feetypename="${row.studentFeeHead?.name || ''}"
                                         title="Edit">
                                         <i class="fa fa-pen"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger deleteBtn py-1 px-2" 
+                                    </button>` : ''}
+                                    ${canDeleteAllocation ? `<button class="btn btn-sm btn-outline-danger deleteBtn py-1 px-2" 
                                         data-studentname="${row.student?.name || ''}"
                                         data-classroll="${row.student?.classRoll || ''}"
                                         data-feetypename="${row.studentFeeHead?.name || ''}"
@@ -486,7 +537,7 @@
                                         data-bs-toggle="modal" data-bs-target="#deleteModal"
                                         title="Delete">
                                         <i class="fa fa-trash"></i>
-                                    </button>
+                                    </button>` : ''}
                                 </div>
                             `;
                         }
