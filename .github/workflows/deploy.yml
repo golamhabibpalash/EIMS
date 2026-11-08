@@ -26,6 +26,10 @@ name: Deploy EIMS
 # uploads), wwwroot/Uploads/, and uploaded images. A server's own web.config is kept;
 # only its processPath is pointed at the self-contained SMS_App.exe when needed.
 #
+# Windows uploads are checksum deltas: each release leaves a manifest in the site root and
+# the next one sends only changed files (Resources/deployment/ftp-delta.sh). A first deploy,
+# or "Run workflow" with full_sync ticked, mirrors everything instead.
+#
 # Every deploy ends by reading <SITE_URL>/build-info and FAILS unless the instance
 # reports the commit that was just shipped.
 
@@ -45,6 +49,11 @@ on:
           - Unityschoolbd
           - Curiosity
           - SchoolBD
+      full_sync:
+        description: "Windows: ignore the server's release manifest and mirror every file (slow; use if a server's files may have been changed by hand)"
+        required: false
+        default: false
+        type: boolean
 
 # Two releases must never interleave on the same servers.
 concurrency:
@@ -90,6 +99,7 @@ jobs:
     timeout-minutes: 20
     outputs:
       commit: ${{ steps.meta.outputs.git_commit }}
+      release_dir: ${{ steps.stash.outputs.release_dir }}
     steps:
       - uses: actions/checkout@v4
 
@@ -129,16 +139,21 @@ jobs:
           rm -f  ./publish/*.pdb
           rm -rf ./publish/publish ./publish/wwwroot/Images
 
-      - name: Package
+      # Every job runs on this same self-hosted runner, so the deploy jobs read the package
+      # straight from disk instead of round-tripping it through GitHub artifact storage
+      # (that upload + 3 downloads cost ~3-4 minutes per release). Keyed by run id so a
+      # "Re-run failed jobs" still finds it; the summary job prunes old releases.
+      - name: Stash the release on the runner + write its manifest
+        id: stash
         shell: bash
-        run: tar -czf eims-win-x64.tgz -C publish .
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: eims-win-x64
-          path: eims-win-x64.tgz
-          retention-days: 3
-          if-no-files-found: error
+        run: |
+          source Resources/deployment/ftp-delta.sh
+          rel="$(cd "$RUNNER_WORKSPACE/.." && pwd)/_eims-releases/${{ github.run_id }}"
+          rm -rf "$rel" && mkdir -p "$rel"
+          mv publish "$rel/publish"
+          delta_manifest "$rel/publish" "$rel/manifest.txt"
+          echo "Release: $rel ($(wc -l < "$rel/manifest.txt") files)"
+          echo "release_dir=$rel" >> "$GITHUB_OUTPUT"
 
   # 3a. Windows / IIS instances (FTP) ---------------------------------------
   deploy-windows:
@@ -158,18 +173,21 @@ jobs:
       FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
       LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}   # read by lftp --env-password; keeps it out of `ps`
       FTP_PATH: ${{ secrets.FTP_PATH }}
+      RELEASE_DIR: ${{ needs.build.outputs.release_dir }}
+      PUBLISH: ${{ needs.build.outputs.release_dir }}/publish
+      FULL_SYNC: ${{ github.event.inputs.full_sync == 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: Resources/deployment
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: eims-win-x64
-
-      - name: Unpack
+      - name: Locate the release
         shell: bash
-        run: rm -rf publish && mkdir publish && tar -xzf eims-win-x64.tgz -C publish
+        run: |
+          if [ ! -f "$PUBLISH/SMS_App.dll" ] || [ ! -s "$RELEASE_DIR/manifest.txt" ]; then
+            echo "::error::Release package not found at $PUBLISH. It is kept on the runner for the last few runs only - use 'Re-run all jobs' to rebuild it."
+            exit 1
+          fi
 
       - name: Check secrets
         shell: bash
@@ -271,6 +289,33 @@ jobs:
             cp Resources/deployment/unityschoolbd/web.config web.config
           fi
 
+      # Fast path: diff this release's checksums against the manifest the previous release
+      # left on the server, and upload only what changed. Falls back to the full mirror
+      # below on a first deploy, an unreadable manifest, a very large change, or full_sync.
+      - name: Plan the upload
+        id: plan
+        shell: bash
+        run: |
+          source Resources/deployment/ftp-lib.sh
+          source Resources/deployment/ftp-delta.sh
+          rm -f server-manifest.txt online.txt offline.txt
+          mode=full
+          if [ "$FULL_SYNC" = "true" ]; then
+            echo "Full sync requested - mirroring every file."
+          elif ! delta_fetch_server_manifest server-manifest.txt; then
+            echo "No usable release manifest on the server (first fast deploy?) - mirroring every file this time."
+          else
+            delta_plan "$RELEASE_DIR/manifest.txt" server-manifest.txt online.txt offline.txt
+            total=$(( $(grep -c . online.txt || true) + $(grep -c . offline.txt || true) ))
+            if [ "$total" -gt "$DELTA_MAX_FILES" ]; then
+              echo "$total files changed (more than $DELTA_MAX_FILES) - one mirror pass is faster."
+            else
+              mode=delta
+              echo "Delta release: $(grep -c . online.txt || true) file(s) while online, $(grep -c . offline.txt || true) during the swap."
+            fi
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
       # The hosting FTP server can't keep file timestamps (no MFMT/MLSD), so date
       # comparison would resend all ~3,000 files every time. Instead:
       #  - third-party files (runtime, NuGet DLLs, wwwroot/lib) are compared by SIZE
@@ -284,17 +329,22 @@ jobs:
         shell: bash
         run: |
           source Resources/deployment/ftp-lib.sh
+          source Resources/deployment/ftp-delta.sh
+          if [ "${{ steps.plan.outputs.mode }}" = "delta" ]; then
+            delta_upload "$PUBLISH" online.txt "Online"
+            exit $?
+          fi
           ftp_retry 4 2400 "mirror -R --only-missing --no-perms --no-umask --parallel=2 \
             --exclude-glob app_offline.htm --exclude-glob 'appsettings*.json' --exclude-glob web.config \
             --exclude-glob '*.pdb' --exclude Keys/ --exclude logs/ --exclude App_Data/ --exclude wwwroot/ \
-            ./publish/ ."
+            \"$PUBLISH/\" ."
           ftp_retry 4 2400 "mirror -R --ignore-time --no-perms --no-umask --parallel=2 \
             --exclude Uploads/ --exclude Images/ \
-            ./publish/wwwroot/ wwwroot"
+            \"$PUBLISH/wwwroot/\" wwwroot"
           # The app's own static files: small, always resent.
           for d in js css Reports EmailTemplates; do
-            [ -d "publish/wwwroot/$d" ] || continue
-            ftp_retry 4 600 "mirror -R --no-perms --no-umask --parallel=2 ./publish/wwwroot/$d/ wwwroot/$d"
+            [ -d "$PUBLISH/wwwroot/$d" ] || continue
+            ftp_retry 4 600 "mirror -R --no-perms --no-umask --parallel=2 \"$PUBLISH/wwwroot/$d/\" wwwroot/$d"
           done
 
       - name: Take the app offline
@@ -326,17 +376,29 @@ jobs:
         shell: bash
         run: |
           source Resources/deployment/ftp-lib.sh
-          # wwwroot was staged while online. Here: third-party top-level files whose size
-          # changed, then our own build output, always. mirror never deletes server files.
-          ftp_retry 4 1200 "mirror -R --ignore-time --verbose --no-perms --no-umask --parallel=2 \
-            --exclude-glob app_offline.htm --exclude-glob 'appsettings*.json' --exclude-glob web.config \
-            --exclude-glob '*.pdb' --exclude Keys/ --exclude logs/ --exclude App_Data/ --exclude wwwroot/ \
-            ./publish/ ."
-          ftp_retry 4 600 "mput -O . publish/SMS*.dll publish/SMS_App.exe publish/SMS_App.deps.json \
-            publish/SMS_App.runtimeconfig.json publish/SiteMap.Config"
-          if [ -f web.config ]; then
-            ftp_retry 3 120 "put web.config -o web.config"
+          source Resources/deployment/ftp-delta.sh
+          if [ "${{ steps.plan.outputs.mode }}" = "delta" ]; then
+            # Only the locked files whose checksum changed (always includes SMS_App.dll,
+            # which embeds the commit).
+            delta_upload "$PUBLISH" offline.txt "Swap" || exit 1
+          else
+            # wwwroot was staged while online. Here: third-party top-level files whose size
+            # changed, then our own build output, always. mirror never deletes server files.
+            ftp_retry 4 1200 "mirror -R --ignore-time --verbose --no-perms --no-umask --parallel=2 \
+              --exclude-glob app_offline.htm --exclude-glob 'appsettings*.json' --exclude-glob web.config \
+              --exclude-glob '*.pdb' --exclude Keys/ --exclude logs/ --exclude App_Data/ --exclude wwwroot/ \
+              \"$PUBLISH/\" ." || exit 1
+            ftp_retry 4 600 "lcd \"$PUBLISH\"
+              mput -O . SMS*.dll SMS_App.exe SMS_App.deps.json SMS_App.runtimeconfig.json SiteMap.Config" || exit 1
           fi
+          if [ -f web.config ]; then
+            ftp_retry 3 120 "put web.config -o web.config" || exit 1
+          fi
+          # Written last: the server now holds exactly this release, so the next deploy can
+          # upload only what changes after it.
+          # Not fatal: without it the next deploy just falls back to a full mirror.
+          delta_record "$RELEASE_DIR/manifest.txt" \
+            || echo "::warning::Could not store the release manifest; the next deploy will do a full mirror."
 
       - name: Bring the app back online
         if: always()
@@ -357,7 +419,7 @@ jobs:
       - name: Cleanup
         if: always()
         shell: bash
-        run: rm -rf publish eims-win-x64.tgz app_offline.htm web.config server-web.config remote-check.txt
+        run: rm -f app_offline.htm web.config server-web.config remote-check.txt server-manifest.txt online.txt offline.txt
 
   # 3b. Linux VPS instance (on-box build over SSH) --------------------------
   deploy-linux:
@@ -407,6 +469,13 @@ jobs:
     if: always()
     runs-on: [self-hosted, eims]
     steps:
+      - name: Prune old release packages on the runner
+        shell: bash
+        run: |
+          dir="$(cd "$RUNNER_WORKSPACE/.." && pwd)/_eims-releases"
+          [ -d "$dir" ] || exit 0
+          # Keep the 3 most recent so "Re-run failed jobs" keeps working for a while.
+          ls -1dt "$dir"/*/ 2>/dev/null | tail -n +4 | xargs -r rm -rf
       - shell: bash
         run: |
           {

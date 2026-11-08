@@ -35,8 +35,10 @@ EOF
 ftp_retry() {
     local attempts="$1" limit="$2" cmds="$3" i rc why
     for i in $(seq 1 "$attempts"); do
-        ftp_session "$cmds" "$limit"; rc=$?
-        [ "$rc" -eq 0 ] && return 0
+        # `&&` keeps a failed attempt from tripping the runner's `bash -e`, which would
+        # otherwise end the step before any retry ran.
+        ftp_session "$cmds" "$limit" && return 0
+        rc=$?
         if [ "$i" -lt "$attempts" ]; then
             [ "$rc" -eq 124 ] && why="timed out" || why="exit $rc"
             echo "::warning::FTP attempt $i/$attempts failed ($why); resuming in 30s"

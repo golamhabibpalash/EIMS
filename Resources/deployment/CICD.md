@@ -19,11 +19,18 @@ Actions -> Deploy EIMS -> Run workflow   ->  pick one instance (or "all")
 
 1. **Build** the self-contained `win-x64` package once (this also proves the commit compiles
    before any server is touched).
+   The package stays on the runner's disk (`_work/_eims-releases/<run id>`, last 3 kept)
+   instead of going through GitHub artifact storage, since every job runs on the same runner.
 2. **Windows instances** (two at a time; one failing never blocks the others):
    - read the server's `web.config` and, if it still says `dotnet SMS_App.dll`, point
      `processPath` at `.\SMS_App.exe` — every other setting in it is kept;
-   - upload `app_offline.htm`, mirror the package over FTP (only changed files after the
-     first run), upload the patched `web.config` if needed, remove `app_offline.htm`.
+   - compare the package's checksum manifest with `.eims-deploy-manifest.txt` (left in the
+     site root by the previous release) and upload **only the changed files**: new files and
+     `wwwroot` changes while the site is still up, changed DLLs behind `app_offline.htm`.
+     Then upload the patched `web.config` if needed, write the new manifest, remove
+     `app_offline.htm`. A first deploy, a missing/unreadable manifest, more than 400 changed
+     files, or **Run workflow → full_sync** falls back to a full `lftp mirror` (slow, ~3,000
+     remote files listed). Use full_sync if files on a server were changed by hand.
 3. **Linux instance**: SSH in and run the repo's `eims-deploy.sh` for the exact commit —
    it backs up the live release, builds, swaps, restarts `eims-noble.service` and health-checks.
 4. **Verify**: request `<SITE_URL>/build-info` (returns `<version> <commit>`) and fail the job
