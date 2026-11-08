@@ -21,6 +21,23 @@
         {
             border-radius: 100%;
         }
+
+        /* Square, circular employee photo that never distorts: the box keeps a 1:1
+           ratio at any column width and object-fit crops instead of stretching. */
+        .employee-avatar
+        {
+            display: block;
+            width: 100%;
+            max-width: 140px;
+            aspect-ratio: 1 / 1;
+            height: auto;
+            margin: 0 auto 0.5rem;
+            object-fit: cover;
+            object-position: center top; /* keep faces in frame on portrait photos */
+            border-radius: 50%;
+            border: 1px solid #d6d6d6;
+            background-color: #f8f9fa;
+        }
     </style>
 }
 
