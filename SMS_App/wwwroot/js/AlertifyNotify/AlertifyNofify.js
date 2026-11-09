@@ -6,7 +6,7 @@ $(document).ready(function () {
             }
 
         if (failed != "") {
-            alertify.updated(failed);
+            alertify.error(failed);
             }
 
         if (deleted != "") {
