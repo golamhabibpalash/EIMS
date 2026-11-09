@@ -2,153 +2,178 @@
 
 @{
     GlobalUI.PageTitle = "Institution information";
-    ViewData["Title"] = "Edit";
+    ViewData["Title"] = "Edit Institute";
+    const string blankImage = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+    // Each image the institute uses: form field, stored file, and how to show it.
+    var images = new[]
+    {
+        new { Field = "Logo", Label = "Logo", Hint = "Square image, shown in the header and on reports.", File = Model.Logo, Accept = "image/*", Wide = false },
+        new { Field = "Banner", Label = "Banner", Hint = "Wide image used on printed documents.", File = Model.Banner, Accept = "image/*", Wide = true },
+        new { Field = "fav_Icon", Label = "Title icon", Hint = "Small icon shown in the browser tab (.ico or .png).", File = Model.FavIcon, Accept = ".ico,.png", Wide = false },
+    };
 }
 
-<div class="row">
-    <div class="col-md-10 offset-md-1">
-        <form asp-action="Edit" enctype="multipart/form-data" method="post">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <input type="hidden" asp-for="Id" />
+@section Styles {
+    <style>
+        .institute-edit .card-header { background-color: #1e3a8a; color: #fff; }
+        .institute-edit .section-title {
+            font-size: .8rem; font-weight: 600; letter-spacing: .5px;
+            text-transform: uppercase; color: #6c757d;
+            border-bottom: 1px solid #e9ecef; padding-bottom: .4rem; margin-bottom: 1rem;
+        }
+        .institute-edit .form-label { font-weight: 500; margin-bottom: .25rem; }
+        .institute-edit .image-tile {
+            border: 1px solid #dee2e6; border-radius: .5rem; padding: .75rem; height: 100%;
+            display: flex; flex-direction: column; gap: .5rem;
+        }
+        .institute-edit .image-preview {
+            height: 110px; border-radius: .375rem; background: #f8f9fa;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+        }
+        .institute-edit .image-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .institute-edit .image-preview .placeholder-text { color: #adb5bd; font-size: .85rem; }
+    </style>
+}
 
-            <div class="form-group row">
-                <label asp-for="Name" class="control-label col-md-2 text-md-end col-form-label bg-blue-sky rounded"></label>
-                <div class="col-md-10">
-                    <input readonly spellcheck="true" asp-for="Name" class="form-control inputClass rounded" />
-                    <span asp-validation-for="Name" class="text-danger"></span>
+<div class="row justify-content-center institute-edit">
+    <div class="col-12 col-xl-10">
+        <form asp-action="Edit" asp-route-id="@Model.Id" enctype="multipart/form-data" method="post">
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="Logo" />
+            <input type="hidden" asp-for="Banner" />
+            <input type="hidden" asp-for="FavIcon" />
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <span class="h5 mb-0"><i class="fa fa-university me-2"></i>Edit institute information</span>
+                    <a asp-action="Index" class="btn btn-sm btn-light">Back</a>
                 </div>
-            </div>
-@*            <div class="form-group row">
-                <label asp-for="ISO" class="control-label col-md-2 text-md-end col-form-label bg-blue-sky rounded"></label>
-                <div class="col-md-10">
-                    <input readonly asp-for="ISO" class="form-control inputClass rounded" />
-                    <span asp-validation-for="ISO" class="text-danger"></span>
-                </div>
-            </div>*@
-            <div class="form-group row">
-                <label asp-for="EIIN" class="control-label col-md-2 text-md-end col-form-label bg-blue-sky rounded"></label>
-                <div class="col-md-10">
-                    <input readonly asp-for="EIIN" class="form-control inputClass rounded" />
-                    <span asp-validation-for="EIIN" class="text-danger"></span>
-                </div>
-            </div>
-            <div class="form-group row">
-                <label asp-for="Slogan" class="control-label col-md-2 text-md-end col-form-label bg-blue-sky rounded"></label>
-                <div class="col-md-10">
-                    <input readonly asp-for="Slogan" class="form-control inputClass rounded" />
-                    <span asp-validation-for="Slogan" class="text-danger"></span>
-                </div>
-            </div>
-            <div class="form-group row">
-                <label asp-for="Banner" class="control-label col-md-2 text-md-end col-form-label bg-blue-sky rounded"></label>
-                <div class="col-md-5 imageClass" hidden>
-                    <input type="hidden" asp-for="Banner" />
-                    <input hidden type="file" accept="image/*" name="Banner" class="form-control imageClass" id="BannerId" />
-                    <span asp-validation-for="Banner" class="text-danger"></span>
-                </div>
-                <div class="col-md-5">
-                    <div id="existingBannerDiv">
-                        @if (Model.Banner != null)
+
+                <div class="card-body">
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2"></div>
+
+                    <div class="section-title">General</div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-8">
+                            <label asp-for="Name" class="form-label"></label>
+                            <input asp-for="Name" class="form-control" spellcheck="true" />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="ShortName" class="form-label"></label>
+                            <input asp-for="ShortName" class="form-control" />
+                            <span asp-validation-for="ShortName" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="EIIN" class="form-label"></label>
+                            <input asp-for="EIIN" class="form-control" />
+                            <span asp-validation-for="EIIN" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-8">
+                            <label asp-for="BranchName" class="form-label"></label>
+                            <input asp-for="BranchName" class="form-control" />
+                            <span asp-validation-for="BranchName" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Slogan" class="form-label"></label>
+                            <input asp-for="Slogan" class="form-control" spellcheck="true" />
+                            <span asp-validation-for="Slogan" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="section-title">Contact</div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label asp-for="Phone1" class="form-label"></label>
+                            <input asp-for="Phone1" class="form-control" />
+                            <span asp-validation-for="Phone1" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="Phone2" class="form-label"></label>
+                            <input asp-for="Phone2" class="form-control" />
+                            <span asp-validation-for="Phone2" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="Email" class="form-label"></label>
+                            <input asp-for="Email" class="form-control" />
+                            <span asp-validation-for="Email" class="text-danger small"></span>
+                        </div>
+                        <div class="col-12">
+                            <label asp-for="Address" class="form-label"></label>
+                            <input asp-for="Address" class="form-control" />
+                            <span asp-validation-for="Address" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="section-title">School time</div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <label asp-for="StartingTime" class="form-label"></label>
+                            <input asp-for="StartingTime" type="time" class="form-control" />
+                            <span asp-validation-for="StartingTime" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="LateTime" class="form-label"></label>
+                            <input asp-for="LateTime" type="time" class="form-control" />
+                            <span asp-validation-for="LateTime" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label asp-for="ClosingTime" class="form-label"></label>
+                            <input asp-for="ClosingTime" type="time" class="form-control" />
+                            <span asp-validation-for="ClosingTime" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="section-title">Images</div>
+                    <div class="row g-3">
+                        @foreach (var image in images)
                         {
-                            <img src="~/Images/Institute/@Model.Banner" alt="Institute Banner" style="height:60px" />
+                            var hasImage = !string.IsNullOrWhiteSpace(image.File);
+                            <div class="@(image.Wide ? "col-md-6" : "col-md-3")">
+                                <div class="image-tile">
+                                    <div class="fw-semibold">@image.Label</div>
+                                    <div class="image-preview">
+                                        <img id="preview_@image.Field"
+                                             src="@(hasImage ? Url.Content($"~/Images/Institute/{image.File}") : blankImage)"
+                                             alt="@image.Label"
+                                             class="@(hasImage ? "" : "d-none")" />
+                                        <span id="placeholder_@image.Field" class="placeholder-text @(hasImage ? "d-none" : "")">No @image.Label.ToLower() yet</span>
+                                    </div>
+                                    <input type="file" name="@image.Field" accept="@image.Accept"
+                                           class="form-control form-control-sm image-input" data-target="@image.Field" />
+                                    <div class="form-text mt-0">@image.Hint Max 5 MB.</div>
+                                </div>
+                            </div>
                         }
                     </div>
-                    <div id="newBannerDiv" style="display:none">
-                        <img class="img-fluid" id="sBannerId" src="#" alt="Banner" style="height:130px;" />
-                    </div>
                 </div>
-            </div>
-            <div class="form-group row">
-                <label asp-for="Logo" class="control-label col-md-2 text-md-end col-form-label bg-blue-sky rounded"></label>
-                <div class="col-md-5 imageClass" hidden>
-                    <input type="hidden" asp-for="Logo" />
-                    <input hidden type="file" accept="image/*" name="Logo" class="form-control imageClass" id="inputGroupFile02" />
-                    <span asp-validation-for="Logo" class="text-danger"></span>
-                </div>
-                <div class="col-md-5">
-                    <div id="existingLogoDiv">
-                        @if (Model.Logo != null)
-                        {
-                            <img src="~/Images/Institute/@Model.Logo" alt="Institute Logo" style="height:60px" />
-                        }
-                    </div>
-                    <div id="newLogoDiv" style="display:none">
-                        <img class="img-fluid" id="sLogoId" src="#" alt="Logo" style="height:130px;" />
-                    </div>
-                </div>
-            </div>
-            <div class="form-group row">
-                <label asp-for="Address" class="control-label col-md-2 text-md-end col-form-label bg-blue-sky rounded"></label>
-                <div class="col-md-10">
-                    <input readonly asp-for="Address" class="form-control inputClass rounded" />
-                    <span asp-validation-for="Address" class="text-danger"></span>
-                </div>
-            </div>
-            <div class="form-group row">
-                <label asp-for="BranchName" class="control-label col-md-2 text-md-end col-form-label bg-blue-sky rounded"></label>
-                <div class="col-md-10">
-                    <input readonly asp-for="BranchName" class="form-control inputClass rounded" />
-                    <span asp-validation-for="BranchName" class="text-danger"></span>
-                </div>
-            </div>
-            <div class="form-group row">
-                <div class="col-md-10 offset-md-2">
-                    <button id="submitButton" hidden class="btn btn-info btn-sm" type="submit">Update</button>
+
+                <div class="card-footer bg-white d-flex justify-content-end gap-2">
+                    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary"><i class="fa fa-save me-1"></i>Save changes</button>
                 </div>
             </div>
         </form>
     </div>
-    <div class="col-md-1 text-end">
-        <button id="editButton" type="button" class="btn btn-sm btn-outline-info" title="Edit"
-                data-bs-toggle="tooltip" data-bs-placement="right"><i class="fa fa-edit"></i></button>
-    </div>
 </div>
-
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
-<script>
-    $(document).ready(function () {
-        $('#editButton').click(function () {
-            $(this).hide();
-            $('.inputClass').removeAttr('readonly');
-            $('.imageClass').removeAttr('hidden');
-            $('#submitButton').removeAttr('hidden');
-
-        });
-
-        $('#submitButton').click(function () {
-            $(this).hide();
-            $('#editButton').show();
-            // was addAttr(), which is not a jQuery method and threw a
-            // TypeError on every click.
-            $('.inputClass').attr('readonly', true);
-        });
-
-        function readURL(input, idName) {
-            if (input.files && input.files[0]) {
+    <script>
+        $(function () {
+            // Preview a newly chosen image in place of the current one.
+            $('.image-input').on('change', function () {
+                var field = $(this).data('target');
+                var file = this.files && this.files[0];
+                if (!file) return;
                 var reader = new FileReader();
-
                 reader.onload = function (e) {
-                    $(idName).attr('src', e.target.result);
-                }
-
-                reader.readAsDataURL(input.files[0]); // convert to base64 string
-            }
-        }
-        $("#BannerId").change(function () {
-            $("#newBannerDiv").show();
-            $("#existingBannerDiv").hide();
-            let imgId = "#sBannerId";
-            readURL(this, imgId);
+                    $('#preview_' + field).attr('src', e.target.result).removeClass('d-none');
+                    $('#placeholder_' + field).addClass('d-none');
+                };
+                reader.readAsDataURL(file);
+            });
         });
-
-        $("#inputGroupFile02").change(function () {
-            $("#newLogoDiv").show();
-            $("#existingLogoDiv").hide();
-            let imgId = "#sLogoId";
-            readURL(this, imgId);
-        });
-    });
-</script>
+    </script>
 }

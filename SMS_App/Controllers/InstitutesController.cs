@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using SchoolManagementSystem;
 using SMS_App.Utilities.MACIPServices;
 using SMS_App.ViewModels.InstituteVM;
@@ -19,9 +20,15 @@ public class InstitutesController : Controller
 {
     private readonly IInstituteManager _instituteManager;
     private readonly IWebHostEnvironment _host;
+    private readonly ILogger<InstitutesController> _logger;
 
-    public InstitutesController(IInstituteManager instituteManager, IWebHostEnvironment host)
+    private const string ImageFolder = "Images/Institute";
+    private const long MaxImageBytes = 5 * 1024 * 1024;
+    private static readonly string[] AllowedImageExtensions = { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".bmp" };
+
+    public InstitutesController(IInstituteManager instituteManager, IWebHostEnvironment host, ILogger<InstitutesController> logger)
     {
+        _logger = logger;
         _instituteManager = instituteManager;
         _host = host;
     }
@@ -111,8 +118,56 @@ public class InstitutesController : Controller
 
     public async Task<ActionResult> Edit(int id)
     {
-        var institute = await _instituteManager.GetByIdAsync(id);
+        // There is one institute row; /Institutes/Edit without an id used to load "institute 0",
+        // get null and crash the view. Fall back to the stored institute instead.
+        var institute = id > 0 ? await _instituteManager.GetByIdAsync(id) : null;
+        institute ??= (await _instituteManager.GetAllAsync()).FirstOrDefault();
+        if (institute == null)
+        {
+            return RedirectToAction(nameof(Create));
+        }
         return View(institute);
+    }
+
+    /// <summary>
+    /// Saves an uploaded institute image under wwwroot/Images/Institute and returns the new
+    /// file name, or an error message the user can act on.
+    /// </summary>
+    private async Task<(string fileName, string error)> SaveInstituteImageAsync(IFormFile file, string prefix, string label)
+    {
+        var ext = Path.GetExtension(file.FileName)?.ToLowerInvariant() ?? string.Empty;
+        if (!AllowedImageExtensions.Contains(ext))
+        {
+            return (null, $"{label} must be an image file ({string.Join(", ", AllowedImageExtensions)}).");
+        }
+        if (file.Length == 0)
+        {
+            return (null, $"The selected {label.ToLowerInvariant()} file is empty.");
+        }
+        if (file.Length > MaxImageBytes)
+        {
+            return (null, $"{label} is too large ({file.Length / 1024 / 1024.0:0.#} MB). Please use an image under 5 MB.");
+        }
+
+        var fileName = prefix + Guid.NewGuid() + ext;
+        var directory = Path.Combine(_host.WebRootPath, ImageFolder);
+        try
+        {
+            Directory.CreateDirectory(directory);
+            await using var stream = new FileStream(Path.Combine(directory, fileName), FileMode.Create);
+            await file.CopyToAsync(stream);
+            return (fileName, null);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogError(ex, "No write permission for institute image folder {Directory}", directory);
+            return (null, $"The server does not allow saving the {label.ToLowerInvariant()} (no write permission on {ImageFolder}). Ask the hosting provider to give the site write access to that folder.");
+        }
+        catch (IOException ex)
+        {
+            _logger.LogError(ex, "Could not write institute image to {Directory}", directory);
+            return (null, $"The {label.ToLowerInvariant()} could not be saved on the server. Please try again.");
+        }
     }
 
 
@@ -134,7 +189,7 @@ public class InstitutesController : Controller
                 Institute institute = await _instituteManager.GetByIdAsync(id);
                 if (institute == null)
                 {
-                    TempData["failed"] = "Institute not found.";
+                    TempData["error"] = "Institute not found.";
                     return RedirectToAction("Index");
                 }
 
@@ -151,67 +206,54 @@ public class InstitutesController : Controller
                 institute.ClosingTime = existingInstitute.ClosingTime;
                 institute.LateTime = existingInstitute.LateTime;
 
-                string img = "";
-                string root = _host.WebRootPath;
-                string folder = "Images/Institute/";
-                if (logo != null)
+                var uploads = new (IFormFile file, string prefix, string label, Action<string> apply)[]
                 {
-                    string fileExt = Path.GetExtension(logo.FileName);
-                    img = "instituteLogo_" + Guid.NewGuid() + fileExt;
-                    string pathCombine = Path.Combine(root, folder, img);
-                    using (var stream = new FileStream(pathCombine, FileMode.Create))
+                    (logo, "instituteLogo_", "Logo", f => institute.Logo = f),
+                    (banner, "instituteBanner_", "Banner", f => institute.Banner = f),
+                    (fav_Icon, "instituteFavIcon_", "Title icon", f => institute.FavIcon = f),
+                };
+                foreach (var upload in uploads)
+                {
+                    if (upload.file == null) continue;
+                    var (fileName, error) = await SaveInstituteImageAsync(upload.file, upload.prefix, upload.label);
+                    if (error != null)
                     {
-                        await logo.CopyToAsync(stream);
+                        // Nothing has been saved to the database yet, so stop here.
+                        TempData["error"] = error;
+                        return RedirectToAction(nameof(Index));
                     }
-                    institute.Logo = img;
+                    upload.apply(fileName);
                 }
 
-                if (banner != null)
-                {
-                    string fileExt = Path.GetExtension(banner.FileName);
-                    img = "instituteBanner_" + Guid.NewGuid() + fileExt;
-                    string pathCombine = Path.Combine(root, folder, img);
-                    using (var stream = new FileStream(pathCombine, FileMode.Create))
-                    {
-                        await banner.CopyToAsync(stream);
-                    }
-                    institute.Banner = img;
-                }
-
-                if (fav_Icon !=null)
-                {
-                    string fileExt = Path.GetExtension(fav_Icon.FileName);
-                    img = "instituteFavIcon_" + Guid.NewGuid() + fileExt;
-                    string pathCombine = Path.Combine(root, folder, img);
-                    using (var stream = new FileStream(pathCombine, FileMode.Create))
-                    {
-                        await fav_Icon.CopyToAsync(stream);
-                    }
-                    institute.FavIcon = img;
-                }
                 institute.EditedAt = DateTime.Now;
                 institute.EditedBy = HttpContext.Session.GetString("UserId");
                 institute.MACAddress = MACService.GetMAC();
                 bool isUpdate = await _instituteManager.UpdateAsync(institute);
                 if (isUpdate)
                 {
-                    //TempData["updated"] = "Information updated successfully";
                     TempData["created"] = "Information updated successfully";
                 }
                 else
                 {
-                    TempData["failed"] = "Failed to update.";
+                    TempData["error"] = "Failed to update the institute information. Please try again.";
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                TempData["failed"] = "Exception! Failed to Update";
-                return View(existingInstitute);
+                // Used to render the Edit view from this POST, which then broke on its own
+                // (see Edit GET) and hid the real error. Log it and go back to the page.
+                _logger.LogError(ex, "Updating institute {InstituteId} failed", id);
+                TempData["error"] = "Failed to update the institute information. The error has been logged.";
             }
         }
         else
         {
-            TempData["error"] = "Input value something wrong.";
+            var problems = ModelState
+                .Where(e => e.Value.Errors.Count > 0)
+                .Select(e => e.Value.Errors.First().ErrorMessage)
+                .Where(m => !string.IsNullOrWhiteSpace(m))
+                .Distinct();
+            TempData["error"] = "Please check the form: " + string.Join(" ", problems);
         }
         return RedirectToAction("Index");
     }
