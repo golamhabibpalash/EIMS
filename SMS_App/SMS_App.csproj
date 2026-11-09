@@ -14,6 +14,12 @@
 	</PropertyGroup>
 
 	<PropertyGroup Condition=" '$(RunConfiguration)' == 'SchoolManagementSystem' " />
+	<!-- Release notes shown in the Version dialog (ReleaseNotes.cs). Embedded so they always
+	     match the deployed DLL and need no extra file on the servers. -->
+	<ItemGroup>
+		<EmbeddedResource Include="..\CHANGELOG.md" LogicalName="CHANGELOG.md" Link="CHANGELOG.md" />
+	</ItemGroup>
+
 	<ItemGroup>
 		<Compile Remove="FakesAssemblies\**" />
 		<Compile Remove="ViewModels\Students\NewFolder\**" />

@@ -675,44 +675,88 @@
         <!-- Modal -->
         <div class="modal fade" id="versionModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
              aria-labelledby="staticBackdropLabel" aria-hidden="true">
-            <div class="modal-dialog">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h1 class="modal-title fs-5" id="staticBackdropLabel">Version Info</h1>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <dl class="row mb-0">
-                            <dt class="col-5">Version</dt>
-                            <dd class="col-7">@BuildInfo.Version</dd>
-
-                            <dt class="col-5">Build</dt>
-                            <dd class="col-7">@(BuildInfo.IsOfficialBuild ? "Deployment build" : "Local build")</dd>
-
-                            <dt class="col-5">Commit</dt>
-                            <dd class="col-7"><code>@BuildInfo.Commit</code></dd>
-
-                            @if (!string.IsNullOrWhiteSpace(BuildInfo.BuiltUtc))
+                        <div class="d-flex flex-wrap align-items-baseline gap-2 mb-3">
+                            <span class="fs-5 fw-semibold">Version @BuildInfo.Version</span>
+                            @if (!string.IsNullOrWhiteSpace(ReleaseNotes.Date))
                             {
-                                <dt class="col-5">Built (UTC)</dt>
-                                <dd class="col-7">@BuildInfo.BuiltUtc</dd>
+                                <span class="text-muted small">released @ReleaseNotes.Date</span>
                             }
+                        </div>
 
-                            <dt class="col-5">Institute</dt>
-                            <dd class="col-7">@instituteName</dd>
-
-                            <dt class="col-5">Components</dt>
-                            <dd class="col-7">
-                                @foreach (var component in BuildInfo.ComponentCommits())
+                        <h2 class="fs-6 fw-semibold text-uppercase text-muted mb-2">What's new in this version</h2>
+                        @if (ReleaseNotes.HasNotes)
+                        {
+                            foreach (var section in ReleaseNotes.Sections)
+                            {
+                                var badge = section.Heading switch
                                 {
-                                    <div>@component.Name: <code>@component.Commit</code></div>
+                                    "Added" => "bg-success",
+                                    "Fixed" => "bg-primary",
+                                    "Changed" => "bg-info text-dark",
+                                    "Removed" => "bg-danger",
+                                    "Security" => "bg-warning text-dark",
+                                    _ => "bg-secondary"
+                                };
+                                var label = section.Heading switch
+                                {
+                                    "Added" => "New features",
+                                    "Fixed" => "Bug fixes",
+                                    "Changed" => "Improvements",
+                                    _ => section.Heading
+                                };
+                                <div class="mb-3">
+                                    <span class="badge @badge mb-1">@label</span>
+                                    <ul class="mb-0 ps-3">
+                                        @foreach (var item in section.ItemsHtml)
+                                        {
+                                            <li class="mb-1">@Html.Raw(item)</li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted">No release notes recorded for this version.</p>
+                        }
+
+                        <details class="mt-3 border-top pt-2">
+                            <summary class="text-muted small" style="cursor:pointer">Technical details</summary>
+                            <dl class="row mb-0 mt-2 small">
+                                <dt class="col-5">Build</dt>
+                                <dd class="col-7">@(BuildInfo.IsOfficialBuild ? "Deployment build" : "Local build")</dd>
+
+                                <dt class="col-5">Commit</dt>
+                                <dd class="col-7"><code>@BuildInfo.Commit</code></dd>
+
+                                @if (!string.IsNullOrWhiteSpace(BuildInfo.BuiltUtc))
+                                {
+                                    <dt class="col-5">Built (UTC)</dt>
+                                    <dd class="col-7">@BuildInfo.BuiltUtc</dd>
                                 }
-                            </dd>
-                        </dl>
+
+                                <dt class="col-5">Institute</dt>
+                                <dd class="col-7">@instituteName</dd>
+
+                                <dt class="col-5">Components</dt>
+                                <dd class="col-7">
+                                    @foreach (var component in BuildInfo.ComponentCommits())
+                                    {
+                                        <div>@component.Name: <code>@component.Commit</code></div>
+                                    }
+                                </dd>
+                            </dl>
+                        </details>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="button" class="btn btn-primary">Understood</button>
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
