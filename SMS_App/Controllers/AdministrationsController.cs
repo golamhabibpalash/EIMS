@@ -31,7 +31,8 @@ namespace SMS_App.Controllers
         private readonly IClaimStoreManager _claimStoreManager;
         private readonly IProjectModuleManager _projectModuleManager;
         private readonly IMemoryCache _cache;
-        public AdministrationsController(IEmployeeManager employeeManager, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, IClaimStoreManager claimStoreManager, IProjectModuleManager projectModuleManager, IMemoryCache cache)
+        private readonly SMS.BLL.MultiTenancy.ITenantContext _tenant;
+        public AdministrationsController(IEmployeeManager employeeManager, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, IClaimStoreManager claimStoreManager, IProjectModuleManager projectModuleManager, IMemoryCache cache, SMS.BLL.MultiTenancy.ITenantContext tenant)
         {
             _employeeManager = employeeManager;
             _userManager = userManager;
@@ -39,6 +40,7 @@ namespace SMS_App.Controllers
             _claimStoreManager = claimStoreManager;
             _projectModuleManager = projectModuleManager;
             _cache = cache;
+            _tenant = tenant;
         }
 
         [Authorize(Policy = "ViewUserProfileAdministrationsPolicy")]
@@ -148,7 +150,7 @@ namespace SMS_App.Controllers
                 // request reloads fresh claims - no logout/login needed. This also
                 // makes revocations effective immediately (safer than waiting for
                 // cookie/cache expiry).
-                _cache.Remove(PermissionClaimsTransformation.CacheKey(
+                _cache.Remove(PermissionClaimsTransformation.CacheKey(_tenant,
                     aUser.Id, await _userManager.GetSecurityStampAsync(aUser)));
 
                 // Roles

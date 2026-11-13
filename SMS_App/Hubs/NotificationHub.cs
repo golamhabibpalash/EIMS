@@ -15,14 +15,25 @@ namespace SMS_App.Hubs
     {
         public const string ReceiveNotification = "receiveNotification";
 
-        public static string GroupFor(string userId) => $"user:{userId}";
+        // Group names are built only on the server, from the resolved school and the authenticated
+        // user id; clients cannot join groups (the hub has no methods). Two schools' databases can
+        // contain the same user id, so the school is part of the name.
+        public static string GroupFor(SMS.BLL.MultiTenancy.ITenantContext tenant, string userId) =>
+            SMS.BLL.MultiTenancy.TenantContextExtensions.Scoped(tenant, $"user:{userId}");
+
+        private readonly SMS.BLL.MultiTenancy.ITenantContext _tenant;
+
+        public NotificationHub(SMS.BLL.MultiTenancy.ITenantContext tenant)
+        {
+            _tenant = tenant;
+        }
 
         public override async Task OnConnectedAsync()
         {
             var userId = Context.UserIdentifier;
             if (!string.IsNullOrEmpty(userId))
             {
-                await Groups.AddToGroupAsync(Context.ConnectionId, GroupFor(userId));
+                await Groups.AddToGroupAsync(Context.ConnectionId, GroupFor(_tenant, userId));
             }
 
             await base.OnConnectedAsync();

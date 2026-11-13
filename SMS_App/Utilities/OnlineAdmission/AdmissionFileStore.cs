@@ -20,12 +20,16 @@ namespace SMS_App.Utilities.OnlineAdmission
         // path traversal when a stored name comes back from the database.
         private static readonly Regex StoredNamePattern = new("^[a-f0-9]{32}\\.(jpg|jpeg|png|pdf)$", RegexOptions.Compiled);
 
-        private readonly string _root;
+        private readonly SMS_App.MultiTenancy.ITenantFileStorage _storage;
 
-        public AdmissionFileStore(IWebHostEnvironment host)
+        // Scoped: the root is the current school's private folder (App_Data/AdmissionFiles in
+        // single-tenant mode, {StorageRoot}/{school}/AdmissionFiles in multi-tenant mode).
+        public AdmissionFileStore(SMS_App.MultiTenancy.ITenantFileStorage storage)
         {
-            _root = Path.Combine(host.ContentRootPath, "App_Data", "AdmissionFiles");
+            _storage = storage;
         }
+
+        private string _root => _storage.PrivatePath("AdmissionFiles");
 
         public string RootPath => _root;
 

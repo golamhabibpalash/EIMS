@@ -25,18 +25,22 @@ public class PermissionClaimsTransformation : IClaimsTransformation
 {
     private static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(15);
 
-    public static string CacheKey(string userId, string securityStamp) =>
-        $"permclaims:{userId}:{securityStamp}";
+    // Includes the school: two school databases can contain the same user id and stamp.
+    public static string CacheKey(SMS.BLL.MultiTenancy.ITenantContext tenant, string userId, string securityStamp) =>
+        $"{SMS.BLL.MultiTenancy.TenantContextExtensions.Required(tenant).Key}:permclaims:{userId}:{securityStamp}";
 
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly IMemoryCache _cache;
+    private readonly SMS.BLL.MultiTenancy.ITenantContext _tenant;
 
     public PermissionClaimsTransformation(
         UserManager<ApplicationUser> userManager,
         RoleManager<IdentityRole> roleManager,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        SMS.BLL.MultiTenancy.ITenantContext tenant)
     {
+        _tenant = tenant;
         _userManager = userManager;
         _roleManager = roleManager;
         _cache = cache;
@@ -52,7 +56,12 @@ public class PermissionClaimsTransformation : IClaimsTransformation
             return principal;
 
         var stamp = principal.FindFirstValue(_userManager.Options.ClaimsIdentity.SecurityStampClaimType);
-        var cacheKey = CacheKey(userId, stamp);
+        // A login that belongs to another school gets no permissions here (it is also rejected by
+        // the cookie/JWT validators; this is defence in depth for any other scheme).
+        if (!SMS_App.MultiTenancy.TenantClaims.Matches(principal, _tenant))
+            return principal;
+
+        var cacheKey = CacheKey(_tenant, userId, stamp);
 
         if (!_cache.TryGetValue(cacheKey, out List<Claim> claims))
         {

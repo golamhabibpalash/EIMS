@@ -31,6 +31,7 @@ namespace SMS_App.Utilities.OnlineAdmission
                 new Claim(AccountIdClaim, account.Id.ToString()),
                 new Claim(ClaimTypes.Name, account.FullName ?? account.MobileNumber)
             }, Scheme);
+            SMS_App.MultiTenancy.TenantClaims.AddTo(identity, httpContext);
 
             return httpContext.SignInAsync(Scheme, new ClaimsPrincipal(identity), new AuthenticationProperties
             {

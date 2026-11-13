@@ -27,6 +27,7 @@ using SMS_App.Utilities.LoggerService;
 using SMS_App.ViewModels.ModuleSubModuleVM;
 using Microsoft.AspNetCore.RateLimiting;
 using SMS_App.Utilities.OnlineAdmission;
+using SMS_App.MultiTenancy;
 using System;
 using System.IO;
 using System.Text;
@@ -41,11 +42,20 @@ QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 // Database provider selection
 string dbProvider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "SqlServer";
 
-// Connection string
+// Multi-tenant mode (one deployment, many schools, database per school) is opt-in. When it is
+// off, everything below behaves exactly as before: one school, DefaultConnection.
+bool multiTenant = builder.Configuration.GetValue<bool>("MultiTenancy:Enabled");
+
+// Connection string (single-tenant mode only; in multi-tenant mode each school's connection
+// comes from the platform registry per request)
 var rawConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 string connectionString;
 
-if (dbProvider == "PostgreSQL")
+if (multiTenant)
+{
+    connectionString = null;
+}
+else if (dbProvider == "PostgreSQL")
 {
     connectionString = rawConnectionString;
 }
@@ -64,28 +74,16 @@ bool hangfireEnabled = builder.Configuration.GetValue<bool>("Hangfire:IsEnabled"
 string dashboardPath = builder.Configuration.GetValue<string>("Hangfire:DashboardPath") ?? "/hangfire";
 int workerCount = builder.Configuration.GetValue<int>("Hangfire:WorkerCount");
 
-// DB Context
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-{
-    if (dbProvider == "PostgreSQL")
-    {
-        options.UseNpgsql(connectionString, npgsqlOptions =>
-        {
-            npgsqlOptions.EnableRetryOnFailure(5);
-            npgsqlOptions.CommandTimeout(180);
-        });
-    }
-    else
-    {
-        options.UseSqlServer(connectionString, sqlOptions =>
-        {
-            sqlOptions.EnableRetryOnFailure(5);
-            sqlOptions.CommandTimeout(180);
-        });
-    }
+// Tenancy + school DB context (per-request provider/connection; see TenancyServiceCollectionExtensions)
+builder.AddSchoolBdTenancy(dbProvider, connectionString);
 
-    options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
-});
+if (multiTenant && hangfireEnabled)
+{
+    // Hangfire jobs do not carry a school yet (Phase B), and its storage is a single database.
+    // Running them here would execute one school's jobs against nobody's (or the wrong) database.
+    Console.WriteLine("[STARTUP WARNING] Hangfire is not supported in multi-tenant mode yet; it has been disabled.");
+    hangfireEnabled = false;
+}
 
 // HTTP Client
 builder.Services.AddHttpClient();
@@ -162,6 +160,8 @@ builder.Services.AddAuthentication()
         options.SlidingExpiration = true;
         options.LoginPath = "/AdmissionPortal/Login";
         options.AccessDeniedPath = "/AdmissionPortal/Login";
+        // A guardian cookie issued by another school is rejected.
+        options.Events.OnValidatePrincipal = context => SMS_App.MultiTenancy.TenantClaims.ValidateCookieAsync(context);
     });
 
 // JWT bearer for the mobile API (scheme "Bearer"), alongside the cookie schemes.
@@ -211,6 +211,14 @@ builder.Services.AddAuthentication().AddJwtBearer(JwtBearerDefaults.Authenticati
             if (!string.Equals(tokenType, JwtTokenService.AccessTokenType, StringComparison.Ordinal))
             {
                 context.Fail("Only access tokens are accepted.");
+                return;
+            }
+
+            // The token must have been issued by the school this request is for.
+            var tenantContext = context.HttpContext.RequestServices.GetRequiredService<SMS.BLL.MultiTenancy.ITenantContext>();
+            if (!SMS_App.MultiTenancy.TenantClaims.Matches(context.Principal, tenantContext))
+            {
+                context.Fail("Token was issued for another institute.");
                 return;
             }
 
@@ -296,8 +304,14 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LoginPath = "/Accounts/Login";
     options.AccessDeniedPath = "/Accounts/AccessDenied";
 
-    // Force cookie refresh
-    options.Events.OnValidatePrincipal = SecurityStampValidator.ValidatePrincipalAsync;
+    // Reject a cookie issued by another school, then the usual security-stamp refresh.
+    options.Events.OnValidatePrincipal = async context =>
+    {
+        if (await SMS_App.MultiTenancy.TenantClaims.ValidateCookieAsync(context))
+        {
+            await SecurityStampValidator.ValidatePrincipalAsync(context);
+        }
+    };
 
     // Avoid chunked cookies if possible
     options.Cookie.Name = ".AspNetCore.Identity.Application";  
@@ -337,7 +351,18 @@ builder.Services.AddDataProtection()
 
 var app = builder.Build();
 
-// Auto-create database schema and seed on startup
+SchoolManagementSystem.GlobalUI.Configure(app.Services.GetRequiredService<IHttpContextAccessor>());
+
+// `SMS_App platform ...` runs a tenant-registry command (create schools, domains, databases) and exits.
+if (SMS_App.MultiTenancy.PlatformCli.IsInvocation(args))
+{
+    return await SMS_App.MultiTenancy.PlatformCli.RunAsync(app.Services, args);
+}
+
+// Single-tenant: auto-create database schema and seed on startup, as before.
+// Multi-tenant: nothing touches a school database at startup, so one school's broken database can
+// never stop the platform (schools are initialised with `platform tenant-init`).
+if (!multiTenant)
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -363,7 +388,8 @@ using (var scope = app.Services.CreateScope())
 // log instead of the first real user's upload failing with a 500 (see TicketsController).
 try
 {
-    Directory.CreateDirectory(Path.Combine(app.Environment.WebRootPath, "Uploads", "Tickets"));
+    if (!multiTenant) // per-school folders are created by TenantFileStorage
+        Directory.CreateDirectory(Path.Combine(app.Environment.WebRootPath, "Uploads", "Tickets"));
 }
 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 {
@@ -373,7 +399,8 @@ catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 // Same for admission uploads (stored privately under App_Data, never under wwwroot).
 try
 {
-    Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "App_Data", "AdmissionFiles"));
+    if (!multiTenant)
+        Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "App_Data", "AdmissionFiles"));
 }
 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 {
@@ -385,11 +412,42 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
 
+// Plain-text build stamp ("<version> <commit>") so the deploy workflow can confirm each instance
+// is really running the build it just shipped, and a liveness probe for nginx/Docker. Answered
+// here, before tenancy and authentication, so they work on any host and never open a school
+// database (auth handlers construct Identity, which needs one).
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path;
+    if (path.Equals("/build-info", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.ContentType = "text/plain";
+        await context.Response.WriteAsync($"{SchoolManagementSystem.BuildInfo.Version} {SchoolManagementSystem.BuildInfo.Commit}");
+        return;
+    }
+    if (path.Equals("/health", StringComparison.OrdinalIgnoreCase))
+    {
+        // Multi-tenant mode also checks that the platform registry is reachable.
+        var healthy = !multiTenant || await context.RequestServices
+            .GetRequiredService<SMS.DAL.Platform.IPlatformRepository>().CanConnectAsync(context.RequestAborted);
+        context.Response.StatusCode = healthy ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable;
+        context.Response.ContentType = "text/plain";
+        await context.Response.WriteAsync(healthy ? "ok" : "platform database unreachable");
+        return;
+    }
+    await next();
+});
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
+
+// Binds the request to one school from the Host header (registry lookup); unknown or suspended
+// hosts are answered here and never reach MVC or a school database. Placed after the exception
+// handler so its re-executed /Error request is bound to the same school.
+app.UseMiddleware<SMS_App.MultiTenancy.TenantResolutionMiddleware>();
 
 // Sits inside the error-page handler above, so it sees every unhandled exception
 // first, records it in the Logs table (visible at /Logs), then rethrows and lets
@@ -397,6 +455,7 @@ if (!app.Environment.IsDevelopment())
 app.UseMiddleware<ExceptionLoggingMiddleware>();
 
 app.UseHttpsRedirection();
+app.UseTenantStaticFiles(); // /Images, /Uploads from the current school's folder (multi-tenant only)
 app.UseStaticFiles();
 
 // ORDER IS IMPORTANT
@@ -432,12 +491,6 @@ app.MapControllers();
 // Real-time notifications hub (groups keyed by the signed-in user's id)
 app.MapHub<SMS_App.Hubs.NotificationHub>("/hubs/notifications");
 
-// Plain-text build stamp ("<version> <commit>") so the deploy workflow can confirm
-// each instance is really running the build it just shipped. No data, no auth needed.
-app.MapGet("/build-info", () => Results.Text(
-        $"{SchoolManagementSystem.BuildInfo.Version} {SchoolManagementSystem.BuildInfo.Commit}"))
-    .AllowAnonymous();
-
 // AREA routing
 app.MapControllerRoute(
     name: "areas",
@@ -451,3 +504,4 @@ app.MapControllerRoute(
 app.MapRazorPages();
 
 app.Run();
+return 0;

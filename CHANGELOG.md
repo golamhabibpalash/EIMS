@@ -25,6 +25,23 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-14
+
+### Added
+- **One installation for many schools**: SchoolBD can now run many schools from a single
+  installation. Each school has its own web address (for example abc.schoolbd.net, or the
+  school's own domain) and its own separate database, so no school can see another school's
+  students, payments, photos or logins. Existing school sites keep working exactly as before.
+
+### Fixed
+- **Page titles mixing between users**: when several people used the system at the same
+  time, a page could show the title of a page someone else had just opened. Each page now
+  always shows its own title.
+
+### Changed
+- CI: added an automated test project (SMS.Tests) for school-isolation checks; it is not
+  part of the deployed package.
+
 ## [1.3.0] - 2026-11-09
 
 ### Added

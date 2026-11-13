@@ -35,10 +35,13 @@ public abstract class StudentCertificateControllerBase : Controller
     protected readonly UserManager<ApplicationUser> _userManager;
     protected readonly IWebHostEnvironment _host;
 
+    private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
+
     protected StudentCertificateControllerBase(IStudentCertificateManager certManager, IStudentManager studentManager,
         IInstituteManager instituteManager, IAcademicSessionManager sessionManager, IAcademicClassManager classManager,
-        IAcademicSectionManager sectionManager, UserManager<ApplicationUser> userManager, IWebHostEnvironment host)
+        IAcademicSectionManager sectionManager, UserManager<ApplicationUser> userManager, IWebHostEnvironment host, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles)
     {
+        _tenantFiles = tenantFiles;
         _certManager = certManager;
         _studentManager = studentManager;
         _instituteManager = instituteManager;
@@ -343,7 +346,7 @@ public abstract class StudentCertificateControllerBase : Controller
     protected byte[] ReadInstituteImage(string fileName)
     {
         if (string.IsNullOrWhiteSpace(fileName)) return null;
-        var path = Path.Combine(_host.WebRootPath, "Images", "Institute", fileName);
+        var path = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", fileName);
         return System.IO.File.Exists(path) ? System.IO.File.ReadAllBytes(path) : null;
     }
 

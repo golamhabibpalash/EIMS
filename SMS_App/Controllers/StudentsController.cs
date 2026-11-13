@@ -69,8 +69,11 @@ public class StudentsController : Controller
     #endregion
 
     #region Constructor
-    public StudentsController(IStudentManager studentManager, IAcademicClassManager academicClassManager, IWebHostEnvironment host, IMapper mapper, IAcademicSessionManager academicSessionManager, IStudentPaymentManager studentPaymentManager, IDistrictManager districtManager, IUpazilaManager upazilaManager, IAcademicSectionManager academicSectionManager, IBloodGroupManager bloodGroupManager, IDivisionManager divisionManager, INationalityManager nationalityManager, IGenderManager genderManager, IReligionManager religionManager, IStudentFeeHeadManager studentFeeHeadManager, IClassFeeListManager classFeeListManager, UserManager<ApplicationUser> userManager, IPhoneSMSManager phoneSMSManager, IAttendanceMachineManager attendanceMachineManager, IInstituteManager instituteManager, IStudentActivateHistManager studentActivateHistManager, IOffDayManager offDayManager, IStudentFeeAllocationManager studentFeeAllocationManager, IAppLogger appLogger, IStudentBulkImportManager studentBulkImportManager, IAcademicExamManager academicExamManager = null, IAttachDocManager attachDocManager = null)
+    private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
+
+    public StudentsController(IStudentManager studentManager, IAcademicClassManager academicClassManager, IWebHostEnvironment host, IMapper mapper, IAcademicSessionManager academicSessionManager, IStudentPaymentManager studentPaymentManager, IDistrictManager districtManager, IUpazilaManager upazilaManager, IAcademicSectionManager academicSectionManager, IBloodGroupManager bloodGroupManager, IDivisionManager divisionManager, INationalityManager nationalityManager, IGenderManager genderManager, IReligionManager religionManager, IStudentFeeHeadManager studentFeeHeadManager, IClassFeeListManager classFeeListManager, UserManager<ApplicationUser> userManager, IPhoneSMSManager phoneSMSManager, IAttendanceMachineManager attendanceMachineManager, IInstituteManager instituteManager, IStudentActivateHistManager studentActivateHistManager, IOffDayManager offDayManager, IStudentFeeAllocationManager studentFeeAllocationManager, IAppLogger appLogger, IStudentBulkImportManager studentBulkImportManager, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles, IAcademicExamManager academicExamManager = null, IAttachDocManager attachDocManager = null)
     {
+        _tenantFiles = tenantFiles;
         _academicClassManager = academicClassManager;
         _host = host;
         _studentManager = studentManager;
@@ -322,7 +325,7 @@ public class StudentsController : Controller
     private string ResolveStudentPhotoUrl(string photo)
     {
         if (string.IsNullOrEmpty(photo)) return "/Images/noProfileImage.png";
-        var path = System.IO.Path.Combine(_host.WebRootPath, "Images/Student/", photo);
+        var path = System.IO.Path.Combine(_tenantFiles.WebRootPath, "Images/Student/", photo);
         if (!System.IO.File.Exists(path)) return "/Images/noProfileImage.png";
         return $"/Images/Student/{photo}?v={System.IO.File.GetLastWriteTimeUtc(path).Ticks}";
     }
@@ -531,7 +534,7 @@ public class StudentsController : Controller
 
                         await _appLogger.InfoAsync($"File validation passed");
                         // Prepare paths
-                        string root = _host.WebRootPath;
+                        string root = _tenantFiles.WebRootPath;
                         string folder = Path.Combine("Images", "Student");
 
                         // Ensure folder exists
@@ -581,7 +584,7 @@ public class StudentsController : Controller
                             throw new InvalidOperationException("File size must not exceed 1 MB.");
                         }
 
-                        string root = _host.WebRootPath;
+                        string root = _tenantFiles.WebRootPath;
                         string folder = "Images/Student/";
 
                         // Ensure folder exists
@@ -1085,7 +1088,7 @@ public class StudentsController : Controller
                         }
 
                         // Prepare paths
-                        string root = _host.WebRootPath;
+                        string root = _tenantFiles.WebRootPath;
                         string folder = Path.Combine("Images", "Student");
 
                         // Ensure folder exists
@@ -1116,7 +1119,7 @@ public class StudentsController : Controller
                     if (DOBFile != null && DOBFile.Length > 0)
                     {
                         string fileExt = Path.GetExtension(DOBFile.FileName);
-                        string root = _host.WebRootPath;
+                        string root = _tenantFiles.WebRootPath;
                         string folder = "Images/Student/";
                         string fileName = "S_" + student.DOB.ToString("ddMMyyyy") + "_" + student.ClassRoll + fileExt;
                         string pathCombine = Path.Combine(root, folder, fileName);
@@ -1390,7 +1393,7 @@ public class StudentsController : Controller
     private string ResolveStudentPhotoPath(string photo)
     {
         if (string.IsNullOrEmpty(photo)) return null;
-        var path = Path.Combine(_host.WebRootPath, "Images", "Student", photo);
+        var path = Path.Combine(_tenantFiles.WebRootPath, "Images", "Student", photo);
         return System.IO.File.Exists(path) ? path : null;
     }
 
@@ -1398,7 +1401,7 @@ public class StudentsController : Controller
     private byte[] ReadInstituteImage(string fileName)
     {
         if (string.IsNullOrWhiteSpace(fileName)) return null;
-        var path = Path.Combine(_host.WebRootPath, "Images", "Institute", fileName);
+        var path = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", fileName);
         return System.IO.File.Exists(path) ? System.IO.File.ReadAllBytes(path) : null;
     }
 

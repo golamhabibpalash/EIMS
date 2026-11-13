@@ -15,8 +15,8 @@ public class TransferCertificatesController : StudentCertificateControllerBase
 {
     public TransferCertificatesController(IStudentCertificateManager certManager, IStudentManager studentManager,
         IInstituteManager instituteManager, IAcademicSessionManager sessionManager, IAcademicClassManager classManager,
-        IAcademicSectionManager sectionManager, UserManager<ApplicationUser> userManager, IWebHostEnvironment host)
-        : base(certManager, studentManager, instituteManager, sessionManager, classManager, sectionManager, userManager, host)
+        IAcademicSectionManager sectionManager, UserManager<ApplicationUser> userManager, IWebHostEnvironment host, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles)
+        : base(certManager, studentManager, instituteManager, sessionManager, classManager, sectionManager, userManager, host, tenantFiles)
     {
     }
 

@@ -42,8 +42,11 @@ public class AcademicExamsController : Controller
     private readonly IGenderManager _genderManager;
     private readonly IInstituteManager _instituteManager;
     private readonly IWebHostEnvironment _host;
-    public AcademicExamsController(IAcademicExamManager examManager, IAcademicSessionManager sessionManager, IAcademicClassManager classManager, IAcademicExamTypeManager examTypeManager, IAcademicSubjectManager academicSubjectManager, IEmployeeManager employeeManager, IMapper mapper, IAcademicSectionManager academicSectionManager, IStudentManager studentManager, IAcademicExamDetailsManager academicExamDetailsManager, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, IAcademicExamGroupManager academicExamGroupManager, IGenderManager genderManager, IInstituteManager instituteManager, IWebHostEnvironment host)
+    private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
+
+    public AcademicExamsController(IAcademicExamManager examManager, IAcademicSessionManager sessionManager, IAcademicClassManager classManager, IAcademicExamTypeManager examTypeManager, IAcademicSubjectManager academicSubjectManager, IEmployeeManager employeeManager, IMapper mapper, IAcademicSectionManager academicSectionManager, IStudentManager studentManager, IAcademicExamDetailsManager academicExamDetailsManager, UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, IAcademicExamGroupManager academicExamGroupManager, IGenderManager genderManager, IInstituteManager instituteManager, IWebHostEnvironment host, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles)
     {
+        _tenantFiles = tenantFiles;
         _examManager = examManager;
         _sessionManager = sessionManager;
         _classManager = classManager;
@@ -264,7 +267,7 @@ public class AcademicExamsController : Controller
     private byte[] ReadInstituteImage(string fileName)
     {
         if (string.IsNullOrWhiteSpace(fileName)) return null;
-        var path = Path.Combine(_host.WebRootPath, "Images", "Institute", fileName);
+        var path = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", fileName);
         return System.IO.File.Exists(path) ? System.IO.File.ReadAllBytes(path) : null;
     }
 

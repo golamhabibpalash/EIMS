@@ -17,12 +17,16 @@ namespace SMS_App.Configurations;
 /// </summary>
 public class AppClaimsPrincipalFactory : UserClaimsPrincipalFactory<ApplicationUser, IdentityRole>
 {
+    private readonly SMS.BLL.MultiTenancy.ITenantContext _tenant;
+
     public AppClaimsPrincipalFactory(
         UserManager<ApplicationUser> userManager,
         RoleManager<IdentityRole> roleManager,
-        IOptions<IdentityOptions> options)
+        IOptions<IdentityOptions> options,
+        SMS.BLL.MultiTenancy.ITenantContext tenant)
         : base(userManager, roleManager, options)
     {
+        _tenant = tenant;
     }
 
     protected override async Task<ClaimsIdentity> GenerateClaimsAsync(ApplicationUser user)
@@ -34,6 +38,8 @@ public class AppClaimsPrincipalFactory : UserClaimsPrincipalFactory<ApplicationU
 
         identity.AddClaim(new Claim(Options.ClaimsIdentity.UserIdClaimType, await UserManager.GetUserIdAsync(user)));
         identity.AddClaim(new Claim(Options.ClaimsIdentity.UserNameClaimType, await UserManager.GetUserNameAsync(user)));
+        // Binds the cookie to the school it was issued for (checked on every request, see TenantClaims).
+        identity.AddClaim(SMS_App.MultiTenancy.TenantClaims.For(_tenant));
 
         if (UserManager.SupportsUserSecurityStamp)
         {

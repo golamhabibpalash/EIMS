@@ -22,8 +22,11 @@ namespace SMS_App.Controllers
         private readonly IAcademicSubjectManager _academicSubjectManager;
         private readonly IQuestionManager _questionManager;
         private readonly IWebHostEnvironment _host;
-        public QuestionBanksController(IAcademicClassManager academicClassManager, IQuestionManager questionManager, IAcademicSubjectManager academicSubjectManager, IWebHostEnvironment host)
+        private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
+
+        public QuestionBanksController(IAcademicClassManager academicClassManager, IQuestionManager questionManager, IAcademicSubjectManager academicSubjectManager, IWebHostEnvironment host, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles)
         {
+        _tenantFiles = tenantFiles;
             _academicSubjectManager = academicSubjectManager;
             _academicClassManager = academicClassManager;
             _questionManager = questionManager;
@@ -55,7 +58,7 @@ namespace SMS_App.Controllers
             {
                 string questionImage = "";
                 string timeDate = DateTime.Now.Year.ToString() + "_" + DateTime.Now.Month.ToString().PadLeft(2,'0') + "_" + DateTime.Now.Day.ToString().PadLeft(2, '0') + "_" + DateTime.Now.ToString("hhmmss");
-                string root = _host.WebRootPath;
+                string root = _tenantFiles.WebRootPath;
                 if (string.IsNullOrEmpty(root))
                 {
                     root = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
@@ -166,7 +169,7 @@ namespace SMS_App.Controllers
             {
                 string questionImage = "";
                 string timeDate = DateTime.Now.Year.ToString() + "_" + DateTime.Now.Month.ToString().PadLeft(2, '0') + "_" + DateTime.Now.Day.ToString().PadLeft(2, '0') + "_" + DateTime.Now.ToString("hhmmss"); 
-                string root = _host.WebRootPath;
+                string root = _tenantFiles.WebRootPath;
                 if (string.IsNullOrEmpty(root))
                 {
                     root = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
