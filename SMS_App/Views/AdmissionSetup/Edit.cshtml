@@ -1,0 +1,106 @@
+@model AdmissionSessionEditVM
+@{
+    var isNew = Model.Session.Id == 0;
+    ViewData["Title"] = isNew ? "New admission session" : "Edit admission session";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+    var s = Model.Session;
+}
+<form asp-action="Save" method="post">
+    <input type="hidden" asp-for="Session.Id" />
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger small"></div>
+
+    <div class="card shadow-sm mb-3"><div class="card-body">
+        <h5>Session &amp; dates</h5>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label asp-for="Session.Title" class="form-label">Title *</label>
+                <input asp-for="Session.Title" class="form-control" placeholder="e.g. Admission 2027 - Class 1 to 9" required />
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Session.AcademicSessionId" class="form-label">Enrol students into *</label>
+                <select asp-for="Session.AcademicSessionId" asp-items="Model.AcademicSessionList" class="form-select"><option value="">Select</option></select>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Session.PublishFrom" class="form-label">Publish from (optional)</label>
+                <input asp-for="Session.PublishFrom" type="date" value="@s.PublishFrom?.ToString("yyyy-MM-dd")" class="form-control" />
+                <div class="form-text">Scheduled publication: stays hidden until this date.</div>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Session.ApplicationStartDate" class="form-label">Applications open *</label>
+                <input asp-for="Session.ApplicationStartDate" type="date" value="@s.ApplicationStartDate.ToString("yyyy-MM-dd")" class="form-control" required />
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Session.ApplicationEndDate" class="form-label">Deadline (inclusive) *</label>
+                <input asp-for="Session.ApplicationEndDate" type="date" value="@s.ApplicationEndDate.ToString("yyyy-MM-dd")" class="form-control" required />
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Session.ClosingSoonDays" class="form-label">"Closing soon" days</label>
+                <input asp-for="Session.ClosingSoonDays" type="number" min="0" max="60" class="form-control" />
+            </div>
+            <div class="col-12">
+                <label asp-for="Session.ImportantDates" class="form-label">Important dates (exam, interview, results...)</label>
+                <textarea asp-for="Session.ImportantDates" rows="3" class="form-control"></textarea>
+            </div>
+        </div>
+    </div></div>
+
+    <div class="card shadow-sm mb-3"><div class="card-body">
+        <h5>Public notice</h5>
+        <div class="mb-3">
+            <label asp-for="Session.NoticeSummary" class="form-label">Short summary (shown on the notice board)</label>
+            <input asp-for="Session.NoticeSummary" class="form-control" maxlength="500" />
+        </div>
+        <div>
+            <label asp-for="Session.NoticeDetails" class="form-label">Full notice</label>
+            <textarea asp-for="Session.NoticeDetails" rows="6" class="form-control"></textarea>
+        </div>
+    </div></div>
+
+    <div class="card shadow-sm mb-3"><div class="card-body">
+        <h5>Eligibility &amp; guidelines <small class="text-muted">(both required to publish; Bangla text is fine)</small></h5>
+        <div class="mb-3">
+            <label asp-for="Session.EligibilityContent" class="form-label">Admission eligibility</label>
+            <textarea asp-for="Session.EligibilityContent" rows="6" class="form-control" placeholder="Who can apply: age, previous class/result, documents, other conditions and exceptions."></textarea>
+            <div class="form-text">Age and GPA limits that should be checked automatically are set per class.</div>
+        </div>
+        <div class="row g-3">
+            <div class="col-md-9">
+                <label asp-for="Session.PolicyContent" class="form-label">Admission policy / guidelines</label>
+                <textarea asp-for="Session.PolicyContent" rows="8" class="form-control" placeholder="Procedure, documents and verification, selection (test/interview/lottery), fees, refund and cancellation, seats and waiting list, corrections, withdrawal, false information, contact."></textarea>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Session.PolicyVersion" class="form-label">Policy version</label>
+                <input asp-for="Session.PolicyVersion" class="form-control" maxlength="30" />
+                <div class="form-text">Change it when you change the wording - each application records the version the guardian accepted.</div>
+            </div>
+        </div>
+    </div></div>
+
+    <div class="card shadow-sm mb-3"><div class="card-body">
+        <h5>Fees &amp; payment</h5>
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label asp-for="Session.PaymentStage" class="form-label">Admission fee is payable</label>
+                <select asp-for="Session.PaymentStage" class="form-select" asp-items="Html.GetEnumSelectList<AdmissionPaymentStage>()"></select>
+            </div>
+            <div class="col-md-4">
+                <label asp-for="Session.OfferValidityDays" class="form-label">Approved applicants must pay within (days)</label>
+                <input asp-for="Session.OfferValidityDays" type="number" min="1" max="365" class="form-control" placeholder="No limit" />
+            </div>
+            <div class="col-md-4 pt-md-4">
+                <div class="form-check"><input asp-for="Session.AllowOfflinePayment" class="form-check-input" /><label asp-for="Session.AllowOfflinePayment" class="form-check-label">Offline payment (bank / mobile banking / cash)</label></div>
+                <div class="form-check"><input asp-for="Session.AllowPartialPayment" class="form-check-input" /><label asp-for="Session.AllowPartialPayment" class="form-check-label">Allow partial payment (instalments)</label></div>
+                <div class="form-check"><input asp-for="Session.AllowOnlinePayment" class="form-check-input" disabled /><label class="form-check-label text-muted">Online gateway - not configured yet</label></div>
+            </div>
+            <div class="col-12">
+                <label asp-for="Session.OfflinePaymentInstructions" class="form-label">Offline payment instructions (shown to guardians)</label>
+                <textarea asp-for="Session.OfflinePaymentInstructions" rows="4" class="form-control" placeholder="Where/how to pay, account or merchant number, what reference to use, office hours."></textarea>
+            </div>
+        </div>
+    </div></div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a asp-action="@(isNew ? "Index" : "Details")" asp-route-id="@(isNew ? null : s.Id)" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+</form>

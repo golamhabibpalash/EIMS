@@ -11,5 +11,6 @@ namespace SMS.BLL.Contracts
     public interface IOffDayManager:IManager<OffDay>
     {
         Task<List<DateTime>> GetMonthlyHolidaysAsync(string monthYear);
+        Task<List<OffDay>> GetYearlyHolidaysAsync(int Year);
     }
 }

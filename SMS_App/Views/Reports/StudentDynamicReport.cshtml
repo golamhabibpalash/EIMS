@@ -1,0 +1,247 @@
+﻿@model SMS_App.ViewModels.ReportVM.RptStudentDynamicReportVM
+
+@{
+    ViewData["Title"] = "Student Reports";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+}
+
+@section Styles {
+    <style>
+
+        @@keyframes blinkRedBorder {
+            0%, 100%
+            {
+                border: 2px solid transparent;
+            }
+
+            50% {
+                border: 2px solid red;
+            }
+        }
+
+        .blink-red {
+            animation: blinkRedBorder 0.8s ease-in-out 3; /* 0.5s duration, repeat 3 times */
+        }
+    </style>
+}
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="row">
+            <div class="col-md-12">
+                <fieldset class="border-primary p-2 border overflow-hidden">
+                    <legend class="w-auto text-primary">Students Information</legend>
+                    <form id="studentInfoForm" asp-action="StudentDynamicReport">
+                        <div class="form-group row">
+                            <label asp-for="AcademicSessionId" class="col-md-4 col-form-label">Session :</label>
+                            <div class="col-md-8">
+                                <select class="form-control" asp-for="AcademicSessionId" asp-items="Model.AcademicSessionList">
+                                    <option selected disabled value="">Select Academic Session</option>
+                                </select>
+                                <span asp-validation-for="AcademicSessionId" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label asp-for="AcademicClassId" class="col-md-4 col-form-label">Class :</label>
+                            <div class="col-md-8">
+                                <select class="form-control" asp-for="AcademicClassId" asp-items="Model.AcademicClassList">
+                                    <option selected disabled value="">Select Academic Class</option>
+                                    <option value="">All Class</option>
+                                </select>
+                                <span asp-validation-for="AcademicClassId" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label asp-for="AcademicSectionId" class="col-md-4 col-form-label">Section :</label>
+                            <div class="col-md-8">
+                                <select class="form-control" asp-for="AcademicSectionId">
+                                    <option selected disabled value="">Select Academic Section</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="col-form-label ">Columns : (<span id="max9Info">Maximum 9 Info</span>)</label>
+                            <div class="checkbox-container d-flex flex-wrap">
+                                @foreach (var col in Model.ColumnMap)
+                                {
+                                    <div class="checkbox-item mr-3 mb-2" style="width: fit-content; min-width:40%">
+                                        @if (col.Key == "Name" || col.Key=="ClassRoll")
+                                        {
+                                            <input type="checkbox" name="columns" value="@col.Key" id="col_@col.Key" checked="checked" disabled/>
+                                        }
+                                        else
+                                        {
+                                            <input type="checkbox" name="columns" value="@col.Key" id="col_@col.Key" />
+                                        }
+                                        <label for="col_@col.Key">@col.Value</label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="form-group row float-right">
+                            <div class="">
+                                <span id="LoadButton" class="btn btn-warning btn-sm">Load Report</span>
+                                @*<button id="viewReportSubmit" type="submit" class="btn btn-primary" name="@Model.ReportType" value="view">View Report</button>*@
+                            </div>
+                        </div>
+                    </form>
+                </fieldset>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12" id="InvalidForm" style="display:none">
+                <div><h2 class="text-danger" id="invalidFormText"> Please Select all the field</h2></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-9" id="iframe-container" style="display:none">
+        <div class="col-md-9 text-center" id="loading" style="display:none; position:absolute">
+            <div class="d-flex justify-content-center h-100 align-content-center align-items-center">
+                <h2 class="text-danger"><span class="spinner-border" role="status" aria-hidden="true"></span> Please wait while the data is loading...</h2>
+            </div>
+        </div>
+        <div class="row" style="height:600px;">
+            <iframe id="myIframe" style="width: 100%; height: 100%;"></iframe>
+        </div>
+        <div class="row">
+            <div class="col-md-12 d-flex justify-content-end">
+                <form asp-action="StudentDynamicReportExport" method="get" id="exportForm">
+                    <input type="hidden" id="exportAcademicSessionId" name="academicSessionId" />
+                    <input type="hidden" id="exportAcademicClassId" name="academicClassId" />
+                    <input type="hidden" id="exportAcademicSectionId" name="academicSectionId" />
+                    <div class="btn-group btn-sm mr-2 " role="group" aria-label="First group">
+                        <input type="hidden" name="fileName" value="students List" />
+                        <button type="submit" name="reportType" value="pdf" class="btn-sm btn btn-danger" data-toggle="tooltip" title="Export PDF" data-placement="left"><i class="fas fa-file-pdf"></i></button>
+                        <button type="submit" name="reportType" value="EXCEL" class="btn-sm btn btn-success" data-toggle="tooltip" title="Export xls" data-placement="top"><i class="fas fa-file-excel"></i></button>
+                        <button type="submit" name="reportType" value="word" class="btn-sm btn btn-primary" data-toggle="tooltip" title="Export doc" data-placement="top"><i class="fas fa-file-word"></i></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+@section scripts {
+    <script>
+        $(document).ready(function () {
+
+            $('#LoadButton').click(function () {
+                const reportType = 'pdf';
+                const academicSessionId = $('#AcademicSessionId').val() || '0';
+                const academicClassId = $('#AcademicClassId').val() || '';
+                const academicSectionId = $('#AcademicSectionId').val() || '';
+
+                // Collect selected column names
+                const selectedColumns = [];
+                $('input[name="columns"]:checked').each(function () {
+                    selectedColumns.push($(this).val());
+                });
+
+                // Optional: Check max allowed columns (e.g., max 6)
+                if (selectedColumns.length === 0) {
+                    $('#iframe-container').hide();
+                }
+
+                if (selectedColumns.length > 9) {
+                    $('#invalidFormText').text('Please select maximum 9 column');
+                    $('#InvalidForm').show();
+                    blinkField('max9Info');
+                    return;
+                }
+                if(academicSessionId=='0' || academicSessionId == null){
+                    $('#invalidFormText').text('Please select Session from dropdown list');
+                    $('#InvalidForm').show();
+                    blinkField('AcademicSessionId');
+                    return;
+                }
+                else{
+                    $('#InvalidForm').hide();
+                }
+                // Set export input values for form download (if needed)
+                $('#exportAcademicSessionId').val(academicSessionId);
+                $('#exportAcademicClassId').val(academicClassId);
+                $('#exportAcademicSectionId').val(academicSectionId);
+
+                // Convert to query string, ensuring columns is formatted as columns=Name&columns=Age
+                const query = $.param({
+                    reportType: reportType,
+                    academicSessionId: academicSessionId,
+                    academicClassId: academicClassId,
+                    academicSectionId: academicSectionId
+                }) + '&' + selectedColumns.map(col => `columns=${encodeURIComponent(col)}`).join('&');
+
+                $('#myIframe').attr('src', '/Reports/StudentDynamicReportExport?' + query);
+                $('#iframe-container').show();
+                $('#loading').show();
+
+                $('#myIframe').on('load', function () {
+                    $('#loading').hide();
+                    $('#iframe-container').show();
+                });
+            });
+
+            $('#exportForm').on('submit', function (e) {
+                // Remove any previous column inputs
+                $(this).find('input[name="columns"]').remove();
+
+                // Add hidden inputs for each selected column
+                $('input[name="columns"]:checked').each(function () {
+                    $('<input>').attr({
+                        type: 'hidden',
+                        name: 'columns',
+                        value: $(this).val()
+                    }).appendTo('#exportForm');
+                });
+            });
+
+            $('#AcademicClassId').change(function () {
+                let id = $('#AcademicClassId option:selected').val();
+                const sessionId = $('#AcademicSessionId').val() || '0';
+
+                $.ajax({
+                    url: "/api/academicsections/getbyclasswithsessionId?classId=" + id + "&sessionId=" + sessionId,
+                    dataType: "JSON",
+                    type: "POST",
+                    cache: false,
+                    success: function (data) {
+                        $('#AcademicSectionId').empty();
+
+                        if (data != null || data != '') {
+                            var o = '<option disabled selected value="">Select Section Name</option>';
+                            var o2 = '<option value="">All Section</option>';
+                            $('#AcademicSectionId').append(o);
+                            $('#AcademicSectionId').append(o2);
+                            $.each(data, function (i, obj) {
+                                var op = '<option value="' + obj.id + '">' + obj.name + '</option>';
+                                $('#AcademicSectionId').append(op);
+                            });
+                        }
+                        else {
+                            var o = '<option disabled selected>Section Not Found</option>';
+                            $('#AcademicSectionId').append(o);
+                        }
+                    },
+                    error: function (err) {
+                        console.log(err);
+                    }
+                });
+            });
+
+            function blinkField(inputId) {
+                var field = document.getElementById(inputId);
+                if (!field) {
+                    console.warn("Element with id='" + inputId + "' not found.");
+                    return;
+                }
+                field.classList.remove("blink-red"); // reset if already applied
+                void field.offsetWidth; // reflow hack
+                field.classList.add("blink-red");
+            }
+
+        });
+
+    </script>
+}

@@ -1,0 +1,89 @@
+﻿@model IEnumerable<SMS.Entities.AcademicSection>
+
+@{
+    ViewData["Title"] = "Sections";
+    GlobalUI.PageTitle = "Section List";
+    int sl = 1;
+}
+<div class="card mb-4">
+    <div class="card-header">
+        <h3><i class="bi bi-layout-split"></i> Academic Sections</h3>
+    </div>
+    <div class="card-body">
+        <table class="table table-responsive-sm datatable" id="myTable">
+            <thead>
+                <tr>
+                    <th>
+                        #
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.Name)
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.AcademicClass.Name)
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.AcademicSession.Name)
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.Status)
+                    </th>
+                    <th>
+                        <a class="btn-sm btn-info rounded-pill" asp-action="Create"><i class="fa fa-plus"></i> Add New</a>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.OrderByDescending(m => m.AcademicSessionId).ThenBy(m => m.AcademicClassId))
+                {
+                    <tr>
+                        <td>
+                            @(sl++)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.Name)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.AcademicClass.Name)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.AcademicSession.Name)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.Status)
+                        </td>
+
+                        <td>
+                            <partial name="_Edit_Details_Delete" model="@item.Id" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts{
+
+    <script>
+        $(document).ready(function () {
+            // $('#myTable').DataTable();
+
+            $(function () {
+                let saved = '@TempData["saved"]';
+                let deleted = '@TempData["deleted"]';
+                let edited = '@TempData["update"]';
+
+                if (saved != "") {
+                    alertify.success(saved);
+                }
+                if (deleted != "") {
+                    alertify.error("Deleted Successfully");
+                }
+                if (edited != "") {
+                    alertify.message('Updated Successfully');
+                }
+            });
+        });
+    </script>
+}

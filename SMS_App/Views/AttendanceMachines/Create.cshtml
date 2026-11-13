@@ -1,0 +1,79 @@
+﻿@model SMS.Entities.Tran_MachineRawPunch
+
+@{
+    ViewData["Title"] = "Add new Attendance";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+}
+
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="Create" method="post">
+            <fieldset class="border border-dark p-2">
+                <legend class="float-none w-auto text-primary px-2"
+                        style="font-size: 1.1rem; position: relative;">
+                    Add Manual Attendance
+                </legend>
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="form-group">
+                    <label for="AcademicClassId" class="control-label">Academic Class</label>
+                    <select id="AcademicClassId" class="form-control" asp-items="ViewBag.AcademicClassList">
+                        <option selected disabled>Select Class</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label asp-for="CardNo" class="control-label">Student</label>
+                    <select asp-for="CardNo" class="form-control">
+                        <option selected disabled>Select Student</option>
+                    </select>
+                    <span asp-validation-for="CardNo" class="text-danger"></span>
+                </div>
+                <div class="form-group">
+                    <label asp-for="PunchDatetime" class="control-label"></label>
+                    <input value="@DateTime.Now" asp-for="PunchDatetime" class="form-control" />
+                    <span asp-validation-for="PunchDatetime" class="text-danger"></span>
+                </div>
+                <input type="hidden" asp-for="ISManual"  value="Y" />
+                <input type="hidden" asp-for="MachineNo"  value="0" />
+                <span class="text-danger">(Check In From: @ViewBag.checkinStart to @ViewBag.checkinEnd)</span>
+                <span class="text-danger">(Check Out From: @ViewBag.checkoutStart to @ViewBag.checkoutEnd)</span>
+                <div class="form-group text-end">
+                    <input type="submit" value="Create" class="btn btn-primary" />
+                </div>
+            </fieldset>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+        $(document).ready(function () {
+
+            $('#AcademicClassId').change(function () {
+                let id = $('#AcademicClassId option:selected').val();
+                let sessionId = "3";
+
+                $.ajax({
+                    url: "/api/students/getbyclasswithsessionId?academicClassId=" + id + "&sessionId=" + sessionId,
+                    dataType: "JSON",
+                    type: "POST",
+                    cache: false,
+                    success: function (data) {
+                        $.each(data, function (i, obj) {
+                            var op = '<option value="' + obj.uniqueId + '">' +obj.classRoll+" ("+ obj.name +")"+'</option>';
+                            $('#CardNo').append(op);
+                        });
+
+                    },
+                    error: function (err) {
+                        console.log(err);
+                    }
+                });
+            });
+        });
+    </script>
+}

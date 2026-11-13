@@ -1,0 +1,42 @@
+@model AdmissionDocumentRequirementEditVM
+@{
+    var d = Model.Requirement;
+    ViewData["Title"] = (d.Id == 0 ? "Add document - " : "Edit document - ") + Model.Session.Title;
+    GlobalUI.PageTitle = "Admission - Required Document";
+}
+<h5>@ViewData["Title"]</h5>
+<form asp-action="SaveDocument" method="post" style="max-width:720px">
+    <input type="hidden" asp-for="Requirement.Id" />
+    <input type="hidden" asp-for="Requirement.AdmissionSessionId" />
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger small"></div>
+    <div class="card shadow-sm mb-3"><div class="card-body">
+        <div class="mb-3">
+            <label asp-for="Requirement.Name" class="form-label">Document name *</label>
+            <input asp-for="Requirement.Name" class="form-control" placeholder="e.g. Birth registration certificate" required />
+        </div>
+        <div class="mb-3">
+            <label asp-for="Requirement.Description" class="form-label">Instructions for the guardian</label>
+            <input asp-for="Requirement.Description" class="form-control" placeholder="e.g. Online copy with the 17-digit number clearly visible" />
+        </div>
+        <div class="row g-3">
+            <div class="col-md-5">
+                <label asp-for="Requirement.AllowedExtensions" class="form-label">Allowed file types</label>
+                <input asp-for="Requirement.AllowedExtensions" class="form-control" />
+                <div class="form-text">Any of .jpg, .jpeg, .png, .pdf</div>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="Requirement.MaxSizeKb" class="form-label">Max size (KB)</label>
+                <input asp-for="Requirement.MaxSizeKb" type="number" min="50" max="10240" class="form-control" />
+            </div>
+            <div class="col-md-2">
+                <label asp-for="Requirement.SortOrder" class="form-label">Order</label>
+                <input asp-for="Requirement.SortOrder" type="number" class="form-control" />
+            </div>
+            <div class="col-md-2 pt-md-4">
+                <div class="form-check"><input asp-for="Requirement.IsMandatory" class="form-check-input" /><label asp-for="Requirement.IsMandatory" class="form-check-label">Required</label></div>
+            </div>
+        </div>
+    </div></div>
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a asp-action="Details" asp-route-id="@d.AdmissionSessionId" class="btn btn-outline-secondary">Cancel</a>
+</form>

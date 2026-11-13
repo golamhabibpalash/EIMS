@@ -1,0 +1,105 @@
+﻿@using Microsoft.AspNetCore.Http
+@using SMS_App.ViewModels.ModuleSubModuleVM
+@model SiteMap
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IProjectModuleManager _moduleManager;
+@inject IClaimStoreManager _claimManager;
+@inject UserManager<ApplicationUser> _userManager;
+
+<style>
+    .activeLi{
+        background: lightgray !important;
+        color:#000000;
+    }
+    .activeLi a{
+        color:#000000 !important;
+    }
+</style>
+
+@{
+    var currentController = ViewData["CurrentController"]?.ToString();
+    var currentAction = ViewData["CurrentAction"]?.ToString();
+
+    var allModules = await _moduleManager.GetAllAsync();
+    var allActiveModules = allModules.ToList().Where(s => s.Status == true);
+
+    // Check if any navigation is active
+    bool hasActiveNav = Model.Modules.Any(module =>
+        module.Submodules.Any(sub =>
+            sub.Items.Any(item =>
+                string.Equals(item.Controller, currentController, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(item.Action, currentAction, StringComparison.OrdinalIgnoreCase)
+            )
+        )
+    );
+
+    // If no navigation is active, set to Index action of current controller
+    if (!hasActiveNav && !string.IsNullOrEmpty(currentController))
+    {
+        var indexItem = Model.Modules
+            .SelectMany(m => m.Submodules)
+            .SelectMany(s => s.Items)
+            .FirstOrDefault(item =>
+                string.Equals(item.Controller, currentController, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(item.Action, "Index", StringComparison.OrdinalIgnoreCase)
+            );
+
+        if (indexItem != null)
+        {
+            currentAction = indexItem.Action; // "Index"
+        }
+    }
+}
+
+@foreach (var module in Model.Modules)
+{
+    if (!module.Submodules.Any(s => s.Items.Any()))
+    {
+        continue;
+    }
+    var canAccessModule = allActiveModules.ToList().Any(s => s.ModuleName == module.SystemName);
+
+    if (!canAccessModule) { continue; }
+
+    // check if this module has an active sub/item
+    var isModuleActive = module.Submodules.Any(sub =>
+    sub.Items.Any(item =>
+    string.Equals(item.Controller, currentController, StringComparison.OrdinalIgnoreCase) &&
+    string.Equals(item.Action, currentAction, StringComparison.OrdinalIgnoreCase)));
+    <li class="nav-item shadow @(isModuleActive ? "open active" : "")">
+        <a href="#" class="nav-link nav-toggle">
+            <i class="@module.Icon"></i>
+            <span class="title">@module.DisplayName</span>
+            <span class="arrow"></span>
+        </a>
+        <ul class="sub-menu">
+            @foreach(var sub in module.Submodules)
+            {
+                if (!sub.Items.Any())
+                {
+                    continue;
+                }
+                var isSubActive = sub.Items.Any(item => string.Equals(item.Controller, currentController, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Action, currentAction, StringComparison.OrdinalIgnoreCase));
+
+                <li class="nav-item @(isSubActive ? "open active" : "")">
+                    <a href="#" class="nav-link nav-toggle">
+                        <i class="@sub.Icon"></i>
+                        <span class="title">@sub.DisplayName</span>
+                        <span class="arrow"></span>
+                    </a>
+                    <ul class="sub-menu">
+                        @foreach(var item in sub.Items)
+                        {
+                            var isActive = string.Equals(item.Controller, currentController, StringComparison.OrdinalIgnoreCase)
+                            && string.Equals(item.Action, currentAction, StringComparison.OrdinalIgnoreCase);
+
+                            <li class="nav-item @(isActive ? "open activeLi" : "")">
+                                <a class="nav-link" asp-action="@item.Action" asp-controller="@item.Controller">@item.DisplayName</a>
+                            </li>
+                        }
+                    </ul>
+                </li>
+            }
+        </ul>
+    </li>
+}

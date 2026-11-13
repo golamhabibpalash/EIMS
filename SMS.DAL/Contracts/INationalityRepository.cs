@@ -6,9 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SMS.DAL.Contracts
+namespace SMS.DAL.Contracts;
+public interface INationalityRepository : IRepository<Nationality>
 {
-    public interface INationalityRepository : IRepository<Nationality>
-    {
-    }
 }

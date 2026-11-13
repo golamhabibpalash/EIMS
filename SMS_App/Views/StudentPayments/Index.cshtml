@@ -1,0 +1,106 @@
+﻿@model SMS_App.ViewModels.StudentPaymentVM
+
+@{
+    ViewData["Title"] = "Student Payment";
+    GlobalUI.PageTitle = "Student Payment";
+}
+<div class="row pt-3 pb-2 bg-navy-blue">
+    <div class="col-md-12 text-center">
+
+        <form id="frmSearchByRollId" asp-action="Payment" asp-controller="StudentPayments"
+      method="get" class="mb-3">
+            <div class="row justify-content-center">
+                
+                <!-- Input + Go Button -->
+                <div class="col-md-6 col-lg-5">
+                <div class="input-group input-group">
+                    <input id="rollInput"
+                        name="stRoll"
+                        class="form-control form-control-sm"
+                        placeholder="Input Student Roll Number"
+                        value="@ViewBag.roll" />
+                    <button class="btn btn-info text-white" type="submit">
+                    <i class="fas fa-search me-1"></i> Go
+                    </button>
+                </div>
+                </div>
+
+                <!-- Select Button -->
+                <div class="col-auto ps-0">
+                <button type="button" class="btn btn-info text-white"
+                        data-bs-toggle="modal" data-bs-target="#exampleModal">
+                    <i class="fas fa-list me-1"></i> Select
+                </button>
+                </div>
+
+            </div>
+        </form>
+
+
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content text-center">
+            <div class="modal-header text-center">
+                <h4 class="text-center">Select Student</h4>
+            </div>
+            <div class="modal-body">
+                <form action="/" method="post">
+                    <div class="form-group row">
+                        <label class="col-md-4 text-md-end col-form-label">Academic Class</label>
+                        <div class="col-md-8">
+                            <select class="form-control" asp-items="ViewBag.AcademicClassList" id="modalAcademicClassId">
+                                <option selected disabled>-Select Class-</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-md-4 text-md-end col-form-label">Student</label>
+                        <div class="col-md-8">
+                            <select class="form-control" id="studentListId">
+                                <option selected disabled>-Select Student-</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(ViewBag.msg))
+{
+    <div class="row mt-3" id="msgId">
+        <div class="col-md-12 text-center">
+            <h6 class="alert alert-warning">@ViewBag.msg</h6>
+
+        </div>
+    </div>
+
+}
+@section Scripts {
+
+    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
+
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+
+<script>
+        let created = '@TempData["created"]';
+        let updated = "@TempData["studentNotFound"]";
+
+    $(document).ready(function () {
+            $('#msgId').fadeOut(6000);
+
+         
+
+        });</script>
+    <script src="~/js/StudentPayments/Payment.js"></script>
+    
+}

@@ -1,0 +1,137 @@
+﻿@using Microsoft.AspNetCore.Http
+@using SMS_App.ViewModels.ModuleSubModuleVM
+@model SiteMap
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IProjectModuleManager _moduleManager;
+@inject IClaimStoreManager _claimManager;
+@inject UserManager<ApplicationUser> _userManager;
+
+@{
+    var currentController = ViewData["CurrentController"]?.ToString();
+    var currentAction = ViewData["CurrentAction"]?.ToString();
+
+    var allModules = await _moduleManager.GetAllAsync();
+    var allActiveModules = allModules.ToList().Where(s => s.Status == true);
+
+    // Check if any navigation is active
+    bool hasActiveNav = Model.Modules.Any(module =>
+        module.Submodules.Any(sub =>
+            sub.Items.Any(item =>
+                string.Equals(item.Controller, currentController, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(item.Action, currentAction, StringComparison.OrdinalIgnoreCase)
+            )
+        )
+    );
+
+    // If no navigation is active, set to Index action of current controller
+    if (!hasActiveNav && !string.IsNullOrEmpty(currentController))
+    {
+        var indexItem = Model.Modules
+            .SelectMany(m => m.Submodules)
+            .SelectMany(s => s.Items)
+            .FirstOrDefault(item =>
+                string.Equals(item.Controller, currentController, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(item.Action, "Index", StringComparison.OrdinalIgnoreCase)
+            );
+
+        if (indexItem != null)
+        {
+            currentAction = indexItem.Action; // "Index"
+        }
+    }
+}
+
+<aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+    
+    <!--begin::Sidebar Brand-->
+    <div class="sidebar-brand">
+        <!--begin::Brand Link-->
+        <a href="./index.html" class="brand-link">
+            <!--begin::Brand Image-->
+            <img src="./assets/img/AdminLTELogo.png"
+                 alt="AdminLTE Logo"
+                 class="brand-image opacity-75 shadow" />
+            <!--end::Brand Image-->
+            <!--begin::Brand Text-->
+            <span class="brand-text fw-light">AdminLTE 4</span>
+            <!--end::Brand Text-->
+        </a>
+        <!--end::Brand Link-->
+    </div>
+    <!--end::Sidebar Brand-->
+    <!--begin::Sidebar Wrapper-->
+    <div class="sidebar-wrapper">
+        <nav class="mt-2">
+            <!--begin::Sidebar Menu-->
+            <ul class="nav sidebar-menu flex-column"
+                data-lte-toggle="treeview"
+                role="navigation"
+                aria-label="Main navigation"
+                data-accordion="false"
+                id="navigation">
+                @foreach (var module in Model.Modules)
+                {
+                    var canAccessModule = allActiveModules.ToList().Any(s => s.ModuleName == module.SystemName);
+
+                    if (!canAccessModule) { continue; }
+
+                    // check if this module has an active sub/item
+                    var isModuleActive = module.Submodules.Any(sub =>
+                    sub.Items.Any(item =>
+                    string.Equals(item.Controller, currentController, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(item.Action, currentAction, StringComparison.OrdinalIgnoreCase)));
+
+                    <li class="nav-header">@module.DisplayName</li>
+                    <li class="nav-item  @(isModuleActive ? "menu-open" : "")">
+                        <a class="nav-link @(isModuleActive ? "active" : "")">
+                            <i class="@module.Icon text-light preIcon"></i>
+                            <p>
+                                @module.DisplayName
+                                <i class="nav-arrow bi bi-chevron-right"></i>
+                            </p>
+                        </a>
+
+                        <ul class="nav nav-treeview" style="background:#35404f">
+                            @foreach (var sub in module.Submodules)
+                            {
+                                var isSubActive = sub.Items.Any(item => string.Equals(item.Controller, currentController, StringComparison.OrdinalIgnoreCase) && string.Equals(item.Action, currentAction, StringComparison.OrdinalIgnoreCase));
+
+
+                                <li class="nav-item">
+                                    <a class="nav-link @(isSubActive ? "active" : "")" href="#">
+                                        <p>
+                                            <i class="@sub.Icon fa-1x preIcon"></i> @sub.DisplayName
+                                            <i class="nav-arrow bi bi-chevron-right"></i>
+                                        </p>
+                                    </a>
+
+                                    <ul class="nav nav-treeview" style="margin-left:20px; border-left:0.5px solid #666;border-bottom:0.5px solid #666">
+                                        @foreach (var item in sub.Items)
+                                        {
+                                            var isActive = string.Equals(item.Controller, currentController, StringComparison.OrdinalIgnoreCase)
+                                            && string.Equals(item.Action, currentAction, StringComparison.OrdinalIgnoreCase);
+
+                                            <li class="nav-item">
+                                                <a class="nav-link @(isActive ? "active" : "")"
+                                                   asp-controller="@item.Controller" asp-action="@item.Action"
+                                                   style="border-bottom:1px solid #29344C">
+                                                    <p>
+                                                        <i class="nav-icon fas fa-arrow-right"></i> @item.DisplayName
+                                                    </p>
+                                                </a>
+                                            </li>
+                                        }
+                                    </ul>
+                                </li>
+                            }
+                        </ul>
+                    </li>
+                }
+
+            </ul>
+            <!--end::Sidebar Menu-->
+        </nav>
+    </div>
+        <!--end::Sidebar Wrapper-->
+</aside>
+

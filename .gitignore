@@ -7,8 +7,16 @@
 /SMS.Report/
 
 
-# Ignore changes in the 'SMS.Report' project
+# Ignore changes in the 'SMS.Reports' project
 /SMS.Reports/
+
+# Publish output folders
+publish-output/
+PublishOutput/
+publish/
+
+# Data Protection keys (machine-specific, sensitive)
+SMS_App/Keys/
 
 # User-specific files
 *.rsuser
@@ -267,6 +275,7 @@ UpgradeLog*.XML
 UpgradeLog*.htm
 ServiceFabricBackup/
 *.rptproj.bak
+*.bak
 
 # SQL Server files
 *.mdf
@@ -368,7 +377,43 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-/SMS.App/appsettings.json
-/SMS.App/appsettings.json
-/SMS.App/appsettings.json
-/SMS.App/appsettings.json
+
+# App Settings - sensitive configuration files
+**/appsettings.json
+**/appsettings.*.json
+!**/appsettings.Development.json
+!**/appsettings.Production.json
+!**/appsettings.*.local.json
+
+# Build archives
+*.tar.gz
+
+#for_MacBook
+.DS_Store
+
+# Claude
+.claude/
+
+# Local self-contained publish output for Plesk deployment (437MB, has secrets when filled)
+Resources/deployment/unityschoolbd/publish/
+
+# Bulk student import staging files (previews awaiting confirmation)
+SMS_App/App_Data/BulkImports/
+
+# JetBrains Rider / ReSharper IDEs (machine-specific workspace/config)
+.idea/
+.fleet/
+
+# One-off scratch scripts / accidental Word saves at the repo root
+decrypt.cs
+sql.rtf
+
+# PostgreSQL dump files (large, regenerable)
+*.dump
+
+# Never commit build outputs or database dumps (a 286 MB publish-fd/ build was once committed)
+publish-fd/
+**/publish-*/
+*.dump
+*.backup
+Resources/DB Backup/

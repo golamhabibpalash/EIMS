@@ -1,0 +1,262 @@
+﻿@using System.Globalization
+@{
+    ViewData["Title"] = "Daily Attendance Report";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+}
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="row">
+            <div class="col-md-12">
+                <form asp-action="DailyAttendanceReport" method="post">
+                    <fieldset class="border border-info p-2">
+                        <legend  class="float-none w-auto text-primary px-2"
+                        style="font-size: 1.1rem; position: relative;">Daily Attendance Info</legend>
+
+                        <input type="hidden" id="attendancForId" />
+                        <div class="form-group row">
+                            <label class="col-sm-3 col-form-label">Attendance Date</label>
+                            <div class="col-sm-9">
+                                <input class="form-control" type="date" id="sFromDate" name="fromDate" value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label for="AttendanceFor" class="col-sm-3 col-form-label">Attendnace For</label>
+                            <div class="col-sm-9">
+                                <select id="AttendanceFor" class="form-control" onchange="attendanceForChange()">
+                                    <option disabled selected value="">-Select Attendance For-</option>
+                                    <option value="s">Student</option>
+                                    <option value="e">Employee</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row academicClassPortion" id="academicClassPortion" style="display:none">
+                            <label for="classId" class="col-sm-3 col-form-label">Academic Class</label>
+                            <div class="col-sm-9">
+                                <select id="AcademicClassId" class="form-control" asp-items="ViewBag.AcademicClass">
+                                    <option disabled selected value="">-Select Class-</option>
+                                    <option value="">All Class-</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row academicSectionPortion" id="academicSectionPortion" style="display:none">
+                            <label for="AcademicSectionId" class="col-sm-3 col-form-label">Academic Section</label>
+                            <div class="col-sm-9">
+                                <select id="AcademicSectionId" class="form-control">
+                                    <option value="">Section</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row attendanceCategoryPortion" id="attendanceCategoryPortion">
+                            <label for="AttendanceCategory" class="col-sm-3 col-form-label">Attendance Category</label>
+                            <div class="col-sm-9">
+                                <select id="AttendanceCategory" class="form-control" onchange="attendanceCatergoryChanged()">
+                                    <option value="In">Check In</option>
+                                    <option value="Out">Check Out</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row" id="attendanceTypeRow" style="display:none">
+                            <label for="classId" class="col-sm-3 col-form-label">Attendancy Type</label>
+                            <div class="col-sm-9">
+                                <select id="AttendanceType" class="form-control">
+                                    <option selected>Select Attendace Type</option>
+                                    <option value="attended">attended</option>
+                                    <option value="absent" >absent</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row" id="smsRow" style="display:none">
+                            <label for="sms" class="col-sm-3 col-form-label">SMS Sent</label>
+                            <div class="col-sm-9">
+                                <select id="sms" class="form-control">
+                                    <option selected >All</option>
+                                    <option value="sms">SMS Sent</option>
+                                    <option value="no" >SMS Not Sent</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span id="loadReportBtn" class="btn btn-sm btn-info"><i class="fa fa-file-pdf"></i> Load Report</span>
+                            <span id="exportExcelBtn" class="btn btn-sm btn-success" title="Download as Excel (.xlsx)"><i class="fa fa-file-excel"></i> Excel</span>
+                            <span id="exportCsvBtn" class="btn btn-sm btn-secondary" title="Download as CSV"><i class="fa fa-file-csv"></i> CSV</span>
+                        </div>
+                    </fieldset>
+                </form>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12" id="InvalidForm" style="display:none">
+                <div><h2 class="text-danger"> Please Select the required field</h2></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8" id="iframe-container" style="display:none">
+        <div class="row" style="height:600px;">
+            <iframe id="myIframe" style="width: 100%; height: 100%;"></iframe>
+        </div>
+    </div>
+    <div class="col-md-8 text-center" id="loading" style="display:none">
+        <div class="d-flex justify-content-center h-100 align-content-center align-items-center">
+            <h2 class="text-danger"><span class="spinner-border" role="status" aria-hidden="true"></span> Please wait while the data is loading...</h2>
+        </div>
+    </div>
+</div>
+
+
+
+@section Scripts{
+    <script>
+        $(document).ready(function () {
+
+            // Reads and validates the filter form. Returns the shared parameter set, or null
+            // (and surfaces the "required field" message) when the date or audience is missing.
+            function collectReportParams() {
+                const fromDate = $('#sFromDate').val();
+                const attendanceFor = $('#AttendanceFor option:selected').val();
+                if (!fromDate || !attendanceFor) {
+                    $('#InvalidForm').show();
+                    $('#AcademicClassId').focus();
+                    $('#iframe-container').hide();
+                    $('#loading').hide();
+                    return null;
+                }
+                $('#InvalidForm').hide();
+                // Empty class/section means "all" — the report filters only when these parse to
+                // an int, so sending '0' would wrongly match class/section id 0 (i.e. nobody).
+                return {
+                    reportType: 'pdf',
+                    fromDate: fromDate,
+                    academicClassId: $('#AcademicClassId option:selected').val() || '',
+                    academicSectionId: $('#AcademicSectionId option:selected').val() || '',
+                    attendanceType: $('#AttendanceType option:selected').val() || 'all',
+                    attendanceFor: attendanceFor,
+                    attendanceCategory: $('#AttendanceCategory option:selected').val() || 'In',
+                    sms: $('#sms option:selected').val() || '',
+                    fileName: ''
+                };
+            }
+
+            // Builds the export endpoint URL for a given output format (pdf | xlsx | csv).
+            function buildReportUrl(p, format) {
+                const q = new URLSearchParams({
+                    reportType: p.reportType,
+                    fromDate: p.fromDate,
+                    academicClassId: p.academicClassId,
+                    academicSectionId: p.academicSectionId,
+                    attendanceType: p.attendanceType,
+                    fileName: p.fileName,
+                    attendanceFor: p.attendanceFor,
+                    attendanceCategory: p.attendanceCategory,
+                    sms: p.sms,
+                    format: format
+                });
+                return '/Reports/DailyAttendaceReportExport?' + q.toString();
+            }
+
+            $('#loadReportBtn').click(function () {
+                $('#myIframe').attr('src', '');
+                const p = collectReportParams();
+                if (!p) return;
+
+                $('#myIframe').attr('src', buildReportUrl(p, 'pdf'));
+                var iframe = document.getElementById('myIframe');
+                $('#loading').show();
+                $('#iframe-container').hide();
+                iframe.onload = function () {
+                    $('#loading').hide();
+                    $('#iframe-container').show();
+                };
+            });
+
+            // Excel / CSV download: same parameters, just a different format. The file comes back
+            // with an attachment disposition, so the browser downloads it without leaving the page.
+            $('#exportExcelBtn').click(function () {
+                const p = collectReportParams();
+                if (p) window.location.href = buildReportUrl(p, 'xlsx');
+            });
+            $('#exportCsvBtn').click(function () {
+                const p = collectReportParams();
+                if (p) window.location.href = buildReportUrl(p, 'csv');
+            });
+
+            $('#AcademicClassId').change(function () {
+                let id = $('#AcademicClassId option:selected').val();
+                let sessionId = $('#AcademicSessionId option:selected').val();
+
+                $.ajax({
+                    url: "/api/academicsections/getbyclasswithsessionId?classId=" + id + "&sessionId=" + sessionId,
+                    dataType: "JSON",
+                    type: "POST",
+                    cache: false,
+                    success: function (data) {
+                        $('#AcademicSectionId').empty();
+
+                        if (data != null || data != '') {
+                            var o = '<option disabled selected value="">Select Section Name</option>';
+                            var o2 = '<option value="">All Section</option>';
+                            $('#AcademicSectionId').append(o);
+                            $('#AcademicSectionId').append(o2);
+                            $.each(data, function (i, obj) {
+                                console.log(obj.name);
+                                var op = '<option value="' + obj.id + '">' + obj.name + '</option>';
+                                $('#AcademicSectionId').append(op);
+                            });
+                        }
+                        else {
+                            var o = '<option disabled selected>Section Not Found</option>';
+                            $('#AcademicSectionId').append(o);
+                        }
+                    },
+                    error: function (err) {
+                        console.log(err);
+                    }
+                });
+            });            
+        });
+        function attendanceForChange(){
+
+            var attendanceForSelect = document.querySelector('select[onchange="attendanceForChange()"]');
+            var selectedValue = attendanceForSelect.value;
+
+            var smsRow = document.getElementById('smsRow');
+
+            var academicClassPortion = document.querySelector('.academicClassPortion');
+            var academicSectionPortion = document.querySelector('.academicSectionPortion');
+            var attendaceFor = document.getElementById('attendancForId');
+            var attendanceTypeRow = document.getElementById('attendanceTypeRow');
+
+            if (selectedValue === 'e') { // 'e' stands for Employee
+                academicClassPortion.style.display = 'none';
+                academicSectionPortion.style.display = 'none';
+                attendanceTypeRow.style.display = 'flex';
+                smsRow.style.display = 'flex';
+                if (attendaceForHiddenInput) {
+                    attendaceForHiddenInput.value = 'e';
+                }
+            } else { // 's' for Student, or the default/unselected option
+                academicClassPortion.style.display = 'flex'; // Or 'block' depending on your CSS framework/needs
+                academicSectionPortion.style.display = 'flex'; // Or 'block'
+                attendanceTypeRow.style.display = 'flex';
+                smsRow.style.display = 'flex';
+                var attendaceForHiddenInput = document.getElementById('attendancForId');
+                if (attendaceForHiddenInput) {
+                    attendaceForHiddenInput.value = 's';
+                }
+            }
+        }
+        function attendanceCatergoryChanged(){
+            var attedanceCategorySelect = document.getElementById('AttendanceCategory');
+            var attendanceTypeRow = document.getElementById('attendanceTypeRow');
+            if(attedanceCategorySelect.value=='Out')
+            {
+                $('#attendanceTypeRow').hide();
+            }
+            else{
+                $('#attendanceTypeRow').show();
+            }
+        }
+
+    </script>
+}

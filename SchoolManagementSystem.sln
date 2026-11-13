@@ -3,10 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.32014.148
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SMS.App", "SMS.App\SMS.App.csproj", "{F6439877-6D14-4AC6-B897-CB1595936D2F}"
-	ProjectSection(ProjectDependencies) = postProject
-		{6B958658-2D28-42CD-9701-20E00202C1E3} = {6B958658-2D28-42CD-9701-20E00202C1E3}
-	EndProjectSection
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SMS_App", "SMS_App\SMS_App.csproj", "{F6439877-6D14-4AC6-B897-CB1595936D2F}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SMS.Entities", "SMS.Entities\SMS.Entities.csproj", "{DF3572FF-36AF-4E48-A212-FF2DA7CB282E}"
 EndProject
@@ -16,11 +13,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SMS.DAL", "SMS.DAL\SMS.DAL.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SMS.BLL", "SMS.BLL\SMS.BLL.csproj", "{369A13F5-179F-4C8E-9F2E-44EA717B21EE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SMS.Reports", "SMS.Reports\SMS.Reports.csproj", "{C910C73E-0504-4E89-B137-CB7C4500841A}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SMS.Frameworks", "SMS.Frameworks\SMS.Frameworks.csproj", "{CD5CA80C-ACB3-4F83-BCCB-83EEF3D117BD}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SMS.Test", "SMS.Test", "{AF6991AA-E38A-4EAA-93DA-05598C6C2704}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SMS.Tests", "SMS.Tests\SMS.Tests.csproj", "{9B088BAA-32D2-4BCB-AFA7-1F04865D2E94}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -59,17 +54,18 @@ Global
 		{369A13F5-179F-4C8E-9F2E-44EA717B21EE}.DebugLocal|Any CPU.Build.0 = Debug|Any CPU
 		{369A13F5-179F-4C8E-9F2E-44EA717B21EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{369A13F5-179F-4C8E-9F2E-44EA717B21EE}.Release|Any CPU.Build.0 = Release|Any CPU
-		{C910C73E-0504-4E89-B137-CB7C4500841A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{C910C73E-0504-4E89-B137-CB7C4500841A}.DebugLocal|Any CPU.ActiveCfg = Debug|Any CPU
-		{C910C73E-0504-4E89-B137-CB7C4500841A}.DebugLocal|Any CPU.Build.0 = Debug|Any CPU
-		{C910C73E-0504-4E89-B137-CB7C4500841A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{C910C73E-0504-4E89-B137-CB7C4500841A}.Release|Any CPU.Build.0 = Release|Any CPU
 		{CD5CA80C-ACB3-4F83-BCCB-83EEF3D117BD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{CD5CA80C-ACB3-4F83-BCCB-83EEF3D117BD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CD5CA80C-ACB3-4F83-BCCB-83EEF3D117BD}.DebugLocal|Any CPU.ActiveCfg = Debug|Any CPU
 		{CD5CA80C-ACB3-4F83-BCCB-83EEF3D117BD}.DebugLocal|Any CPU.Build.0 = Debug|Any CPU
 		{CD5CA80C-ACB3-4F83-BCCB-83EEF3D117BD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CD5CA80C-ACB3-4F83-BCCB-83EEF3D117BD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9B088BAA-32D2-4BCB-AFA7-1F04865D2E94}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9B088BAA-32D2-4BCB-AFA7-1F04865D2E94}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9B088BAA-32D2-4BCB-AFA7-1F04865D2E94}.DebugLocal|Any CPU.ActiveCfg = Debug|Any CPU
+		{9B088BAA-32D2-4BCB-AFA7-1F04865D2E94}.DebugLocal|Any CPU.Build.0 = Debug|Any CPU
+		{9B088BAA-32D2-4BCB-AFA7-1F04865D2E94}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9B088BAA-32D2-4BCB-AFA7-1F04865D2E94}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

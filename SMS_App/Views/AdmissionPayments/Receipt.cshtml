@@ -1,0 +1,7 @@
+@model AdmissionPayment
+@{
+    ViewData["Title"] = "Admission Receipt " + Model.ReceiptNo;
+    GlobalUI.PageTitle = "Admission Receipt";
+}
+<partial name="_AdmissionStaffAlerts" />
+<partial name="_AdmissionReceipt" model="Model" />

@@ -11,5 +11,6 @@ namespace SMS.BLL.Contracts
     public interface IEmployeeManager : IManager<Employee>
     {
         Task<Employee> GetByPhoneAttendance(string phoneLast9Digit);
+        Task<Employee> GetByMachineUserIdAsync(string machineUserId);
     }
 }

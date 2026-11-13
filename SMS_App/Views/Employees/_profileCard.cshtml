@@ -1,0 +1,86 @@
+﻿@model SMS.Entities.Employee
+
+@using Microsoft.AspNetCore.Identity;
+@using System.IO;
+@using Microsoft.AspNetCore.Hosting;
+
+@inject IWebHostEnvironment env;
+@{
+    var blurSize = Model.Status == true ? "" : "2px";
+}
+
+<div class="col-md-4">
+    <div class="card mb-2">
+        <div class="card-body" >
+            <div class="row">
+                <div class="col-md-4 col-sm-4 text-center px-0">
+                    <div class="" style="filter:blur(@blurSize)">
+                        <a href="#">
+                            @{
+                                var avatarImg = $"/Images/Employee/photo/maleEmployee.png";
+                                if (!string.IsNullOrEmpty(Model.Image))
+                                {
+                                    string root = env.WebRootPath;
+                                    string folder = "Images/Employee/photo/";
+                                    var path = System.IO.Path.Combine(root, folder, Model.Image);
+                                    if (System.IO.File.Exists(path))
+                                    {
+                                        avatarImg = $"/Images/Employee/photo/" + Model.Image;
+                                    }
+                                }
+                            }
+                            <img src="@avatarImg"
+                                class="employee-avatar"
+                                alt="@Model.EmployeeName"
+                                loading="lazy"
+                                onerror="this.onerror=null;this.src='/Images/Employee/photo/maleEmployee.png';" />
+
+                        </a>
+                    </div>
+                </div>
+                <div class="col-md-8 text-lg-left text-md-start text-center">
+                    @if (Model.EmployeeName.Length > 18)
+                    {
+                        <h6 class="card-title mb-0 text-primary" style="text-transform:capitalize">@Model.EmployeeName</h6>
+                    }
+                    else
+                    {
+                        <h5 class="card-title mb-0 text-primary" style="text-transform:capitalize">@Model.EmployeeName</h5>
+                    }
+                    <br />
+                    <br />
+                    <p class="p-0 m-0">(@Model.Designation.DesignationName)</p>
+                    <text>Employee Id : @Model.Id.ToString().PadLeft(5, '0')</text>
+                    <hr class="p-0 m-0" />
+                    <address class="pt-2">
+                        <span class="text-capitalize">@Model.PresentAddress</span>, @Model.PresentUpazila.Name,<br />
+                        @Model.PresentDistrict.Name<br /> <br />
+                        <abbr title="Phone"><i class="fa fa-phone fa-lg text-info"></i></abbr> @Model.Phone <br />
+
+                        <abbr title="Email"><i class="fa fa-envelope text-primary fa-lg"></i></abbr>
+                        @if (Model.Email.Length > 25)
+                        {
+                            <span style="font-size:10px">@Model.Email</span>
+                        }
+                        else
+                        {
+                            <span style="">@Model.Email</span>
+                        }
+
+                    </address>
+                    <div class="btn-group">
+                        @if (User.IsInRole("Admin") || User.IsInRole("SuperAdmin"))
+                        {
+                            <a class="btn btn-primary btn-sm" asp-action="Edit" asp-route-id="@Model.Id" title="Update">
+                                <i class="fa fa-edit"></i>
+                            </a>
+                        }
+                        <a class="btn btn-info btn-sm" asp-action="Details" asp-route-id="@Model.Id" title="Details">
+                            <i class="fa fa-info"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

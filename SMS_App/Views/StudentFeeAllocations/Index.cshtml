@@ -1,0 +1,609 @@
+@model SMS_App.ViewModels.Students.StudentFeeAllocationVM
+
+@inject UserManager<ApplicationUser> _userManager;
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService _authorizationService
+
+@{
+    GlobalUI.PageTitle = "Student Fee Allocation";
+    var canEditAllocation = (await _authorizationService.AuthorizeAsync(User, "EditStudentFeeAllocationsPolicy")).Succeeded;
+    var canDeleteAllocation = (await _authorizationService.AuthorizeAsync(User, "DeleteStudentFeeAllocationsPolicy")).Succeeded;
+
+}
+
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.1.8/css/dataTables.bootstrap5.css" />
+    <style>
+        #studentFeeAllocationTable thead th {
+            background-color: #1e3a8a;
+            color: white;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 12px 15px !important;
+            border: none !important;
+        }
+        #studentFeeAllocationTable tbody td {
+            padding: 12px 15px !important;
+            vertical-align: middle;
+            font-size: 0.9rem;
+        }
+        #studentFeeAllocationTable tbody tr:hover {
+            background-color: rgba(30, 58, 138, 0.05);
+        }
+        .dataTables_wrapper .form-control {
+            border-radius: 6px;
+            padding: 8px 12px;
+        }
+        .dataTables_wrapper .form-control:focus {
+            border-color: #1e3a8a;
+            box-shadow: 0 0 0 0.2rem rgba(30, 58, 138, 0.15);
+        }
+        .dataTables_length select,
+        .dataTables_filter input {
+            border-radius: 6px;
+            padding: 8px 12px;
+        }
+        .dataTables_length select:focus,
+        .dataTables_filter input:focus {
+            border-color: #1e3a8a;
+            box-shadow: 0 0 0 0.2rem rgba(30, 58, 138, 0.15);
+        }
+        .page-item.active .page-link {
+            background-color: #1e3a8a;
+            border-color: #1e3a8a;
+        }
+        .page-link {
+            color: #1e3a8a;
+        }
+        .page-link:hover {
+            color: #1e3a8a;
+        }
+        .dataTables_info {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        .dataTables_filter input {
+            border: 1px solid #dee2e6;
+        }
+        .dataTables_length select {
+            border: 1px solid #dee2e6;
+        }
+    </style>
+}
+
+<div class="row">
+    <div class="col-md-8" style="overflow:scroll">
+        <table class="table table-striped table-bordered rounded table-responsive-sm table" id="studentFeeAllocationTable">
+            <thead class="table-primary">
+                <tr>
+                    <td>#</td>
+                    <td>Class Roll</td>
+                    <td width="35%">Student</td>
+                    <td width="30%">Fee Type</td>
+                    <td width="10%">Session</td>
+                    <td width="5%" class="text-right">Amount</td>
+                    <td width="5%" class="text-center">Documents</td>
+                    <td width="3%" class="text-center">Status</td>
+                    <td width="5%" class="text-center">Action</td>
+                    <td width="10%" class="text-center">Last updated</td>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+            <tfoot>
+            </tfoot>
+        </table>
+    </div>
+    
+    <div class="col-md-4 p-2" style=" position:relative" id="studentFeeAllocationCreatePortion">
+        <fieldset class="border-primary p-2 border" id="createFieldSetId" style="background-color:antiquewhite;position:sticky;top:50px;right:5px">
+            <legend class="float-none w-auto text-primary px-2"
+                    style="font-size: 1.1rem; position: relative;" id="create_update_title_id">
+                Create New Allocation
+            </legend>
+            <form asp-action="Create" method="post" id="createUpdateForm">
+                <input type="hidden" asp-for="SFAllocation.Id" />
+
+                <div class="form-group row">
+                    <label class="col-md-4 col-form-label text-end">Academic Class</label>
+                    <div class="col-md-8">
+                        <select class="form-control" id="academicClassListId" onchange="academicClassIdChange()">
+                            <option selected disabled>-Select Class-</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-md-4 col-form-label text-end">Student</label>
+                    <div class="col-md-8">
+                        <select class="form-control" asp-for="SFAllocation.StudentId" onchange="handleStudentIdChange()">
+                            <option selected disabled>-Select student-</option>
+                        </select>
+                        <input type="hidden" asp-for="SFAllocation.UniqueId" />
+                    </div>
+                </div>
+                <hr style="border: 1px solid #0d6efd; margin: 10px 0;" />
+
+                <div class="form-group row">
+                    <label class="col-md-4 col-form-label text-end">Academic Session</label>
+                    <div class="col-md-8">
+                        <select class="form-control" id="academicSessionListId" onchange="academicSessionIdChange()">
+                            <option selected disabled>-Select Session-</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-md-4 col-form-label text-end">Fee Name</label>
+                    <div class="col-md-8">
+                        <select class="form-control" asp-for="SFAllocation.StudentFeeHeadId"  onchange="handleFeeHeadIdChange()">
+                            <option selected disabled>-Select type-</option>
+                        </select>
+                        <input type="hidden" asp-for="SFAllocation.ClassFeeListId" />
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-md-4 col-form-label text-end">Allocate Amount</label>
+                    <div class="col-md-8">
+                        <input class="form-control" asp-for="SFAllocation.AllocatedAmount" type="number" min="0" step="any" placeholder="0 = free" />
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-md-4 col-form-label text-end">Reference Docs</label>
+                    <div class="col-md-8">
+                        <input class="" type="file" asp-for="SFAllocation.FeeAllocationApplication" />
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-md-4 col-form-label text-end" asp-for="SFAllocation.IsActive">Is Active</label>
+                    <div class="col-md-2 text-left col-form-label">
+                        <input class="" asp-for="SFAllocation.IsActive" />
+                    </div>
+                    <div class="offset-md-4 col-md-2">
+                        <input id="submitId" type="submit" value="Submit" class="btn btn-info btn-sm" />
+                    </div>
+                </div>
+            </form>
+        </fieldset>
+    </div>
+</div>
+
+
+<!-- Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger" id="exampleModalLabel">Do you want to delete this item?</h5>
+                <button type="button" class="close" data-bs-dismiss="modal" aria-label="Close">
+                    X
+                </button>
+            </div>
+            <div class="modal-body">
+                <table class="table card">
+
+                    <tr>
+                        <td width="20%">Student</td>
+                        <td width="10%">:</td>
+                        <td width="70%" id="deleteStudentName" class="font-weight-bold"></td>
+                    </tr>
+                    <tr>
+                        <td>Class Roll </td>
+                        <td>:</td>
+                        <td id="deleteClassRoll" class="font-weight-bold"></td>
+                    </tr>
+                    <tr>
+                        <td>Payment Type</td>
+                        <td>:</td>
+                        <td id="deletePaymentType" class="font-weight-bold"></td>
+                    </tr>
+                    <tr>
+                        <td>Amount </td>
+                        <td>:</td>
+                        <td id="deleteAmount" class="font-weight-bold"></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="alert alert-warning mx-3 mb-0 d-none" id="deleteBlockedMessage" role="alert"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary col-form-label" data-bs-dismiss="modal">Cancel</button>
+                <form asp-action="delete" method="post">
+                    <input type="hidden" name="StudentFeeAllocationId" id="StudentFeeAllocationId" />
+                    <button type="submit" class="btn btn-danger col-form-label" id="deleteConfirmBtn">Delete Confirm</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script>
+        $(function () {
+            var messages = {
+                created: @Html.Raw(Json.Serialize(TempData["created"]?.ToString() ?? "")),
+                updated: @Html.Raw(Json.Serialize(TempData["updated"]?.ToString() ?? "")),
+                failed: @Html.Raw(Json.Serialize(TempData["failed"]?.ToString() ?? "")),
+                error: @Html.Raw(Json.Serialize(TempData["error"]?.ToString() ?? "")),
+                deleted: @Html.Raw(Json.Serialize(TempData["deleted"]?.ToString() ?? ""))
+            };
+            if (messages.created) alertify.success(messages.created);
+            if (messages.updated) alertify.message(messages.updated);
+            if (messages.failed) alertify.error(messages.failed);
+            if (messages.error) alertify.error(messages.error);
+            if (messages.deleted) alertify.error(messages.deleted);
+        });
+    </script>
+    <script src="https://cdn.datatables.net/2.1.8/js/dataTables.bootstrap5.js"></script>
+
+    <script>
+        var canEditAllocation = @(canEditAllocation ? "true" : "false");
+        var canDeleteAllocation = @(canDeleteAllocation ? "true" : "false");
+
+        $(document).ready(async function () {
+            await loadAcademicSessions();
+            await loadAcademicClasses();
+            initializeDataTable();
+
+            $(document).on('click', '.updateBtn', async function () {
+                formUIChange();
+                var classId = $(this).data("classid");
+                var studentId = $(this).data("studentid");
+                var feeType = $(this).data("feetype");
+                var amount = $(this).data("amount");
+                var refDoc = $(this).data("refdoc");
+                var isActive = $(this).data("isactive");
+                var id = $(this).data("id");
+
+                $("#academicClassListId").val(classId);
+
+                try {
+                    await academicClassIdChange();
+                    $("#SFAllocation_StudentId").val(studentId);
+                    await handleStudentIdChange();
+                    $("#SFAllocation_StudentFeeHeadId").val(feeType);
+                } catch (error) {
+                    console.error("An error occurred:", error);
+                }
+
+                $('#SFAllocation_AllocatedAmount').val(amount);
+                $('#SFAllocation_Id').val(id);
+
+                if (isActive == "True") {
+                    $('#SFAllocation_IsActive').prop('checked', true);
+                } else {
+                    $('#SFAllocation_IsActive').prop('checked', false);
+                }
+            });
+
+            $(document).on('click', '.deleteBtn', function () {
+                var stName = $(this).data('studentname');
+                var stClassRoll = $(this).data('classroll');
+                var feeTypeName = $(this).data('feetypename');
+                var studentId = $(this).data("studentid");
+                var classId = $(this).data("classid");
+                var feeType = $(this).data("feetype");
+                var amount = $(this).data("amount");
+                var refDoc = $(this).data("refdoc");
+                var isActive = $(this).data("isactive");
+                var id = $(this).data("id");
+
+                $('#StudentFeeAllocationId').val(id);
+                $('#deleteStudentName').html(stName);
+                $('#deleteClassRoll').html(stClassRoll);
+                $('#deletePaymentType').html(feeTypeName);
+                $('#deleteAmount').html(amount);
+
+                // Ask the server whether this allocation can be removed before enabling the button.
+                var $confirm = $('#deleteConfirmBtn');
+                var $blocked = $('#deleteBlockedMessage');
+                $confirm.prop('disabled', true).text('Checking...');
+                $blocked.addClass('d-none').text('');
+                $.ajax({
+                    url: '@Url.Action("CanDelete", "StudentFeeAllocations")',
+                    data: { id: id },
+                    cache: false,
+                    type: 'GET',
+                    dataType: 'json'
+                }).done(function (result) {
+                    if (result.canDelete) {
+                        $confirm.prop('disabled', false).text('Delete Confirm');
+                    } else {
+                        $confirm.prop('disabled', true).text('Delete Confirm');
+                        $blocked.removeClass('d-none').text(result.message);
+                        alertify.error(result.message);
+                    }
+                }).fail(function (xhr) {
+                    var message = xhr.status === 403
+                        ? 'You do not have permission to delete fee allocations.'
+                        : 'Could not check whether this allocation can be deleted. Please try again.';
+                    $confirm.prop('disabled', true).text('Delete Confirm');
+                    $blocked.removeClass('d-none').text(message);
+                    alertify.error(message);
+                });
+            });
+        });
+
+        async function loadAcademicSessions() {
+            var currentSessionId = @Model.CurrentSession.Id;
+            return $.ajax({
+                url: '/api/AcademicSessions/GetAllActive',
+                type: 'GET',
+                dataType: 'json',
+                success: function (data) {
+                    const $select = $('#academicSessionListId');
+                    $select.empty();
+                    $select.append('<option value="" selected disabled>-Select Session-</option>');
+
+                    $.each(data, function (i, obj) {
+                        $select.append(
+                            $('<option>', {
+                                value: obj.id,
+                                text: obj.name
+                            })
+                        );
+                    });
+
+                    // Set AFTER all options are appended
+                    $select.val(currentSessionId);
+
+                    // Optional: verify it matched
+                    if ($select.val() === null) {
+                        console.warn('No option matched currentSessionId:', currentSessionId);
+                    }
+                },
+                error: function (err) {
+                    console.error('Error loading sessions:', err);
+                }
+            });
+        }
+
+        async function loadAcademicClasses() {
+            return $.ajax({
+                url: '/api/AcademicClasses/GetAllActive',
+                type: 'GET',
+                dataType: 'json',
+                success: function (data) {
+                    $('#academicClassListId').empty();
+                    $('#academicClassListId').append('<option value="" selected disabled>-Select Class-</option>');
+                    $.each(data, function (i, obj) {
+                        $('#academicClassListId').append('<option value="' + obj.id + '">' + obj.name + '</option>');
+                    });
+                },
+                error: function (err) {
+                    console.error('Error loading classes:', err);
+                }
+            });
+        }
+
+        async function academicSessionIdChange() {
+            var sessionId = $('#academicSessionListId option:selected').val();
+            var classId = $('#academicClassListId option:selected').val();
+            var studentId = $('#SFAllocation_StudentId option:selected').val();
+            if (!sessionId || !classId || !studentId) {
+                if (!sessionId || !classId) return;
+                $('#SFAllocation_StudentFeeHeadId').empty().append('<option value="" selected disabled>-Select type-</option>');
+                return;
+            }
+
+            try {
+                await loadFeeHeadsBySessionClassAndStudent(sessionId, classId, studentId);
+            } catch (error) {
+                console.error("An error occurred:", error);
+            }
+        }
+
+        async function academicClassIdChange() {
+            var sessionId = $('#academicSessionListId option:selected').val() || @Model.CurrentSession.Id;
+            var classId = $('#academicClassListId option:selected').val();
+
+            if (sessionId && classId) {
+                await loadStudentsByClassAndSession(sessionId, classId);
+                $('#SFAllocation_StudentFeeHeadId').empty().append('<option value="" selected disabled>-Select type-</option>');
+            }
+        }
+
+        async function loadStudentsByClassAndSession(sessionId, classId) {
+
+            return $.ajax({
+                url: '/api/Students/getbyclasswithsessionId',
+                data: { academicSessionId: sessionId, academicClassId: classId },
+                type: 'POST',
+                dataType: 'json',
+                success: function (data) {
+
+                    $('#SFAllocation_StudentId').empty();
+                    $('#SFAllocation_StudentId').append('<option value="" selected disabled>-Select Student-</option>');
+                    $.each(data, function (i, obj) {
+                        $('#SFAllocation_StudentId').append('<option value="' + obj.id + '">' + obj.classRoll + '-' + obj.name + '</option>');
+                    });
+                },
+                error: function (err) {
+                    console.error('Error loading students:', err);
+                }
+            });
+        }
+
+        async function handleStudentIdChange() {
+            var studentId = $('#SFAllocation_StudentId option:selected').val();
+            var sessionId = $('#academicSessionListId option:selected').val() || @Model.CurrentSession.Id;
+            var classId = $('#academicClassListId option:selected').val();
+
+            var uniqueId = await getUniqueIdByStudentId(studentId);
+            if(uniqueId){
+                $('#SFAllocation_UniqueId').val(uniqueId);
+            }
+
+            if (!studentId || !sessionId || !classId) return;
+
+            try {
+
+                await loadFeeHeadsBySessionClassAndStudent(sessionId, classId, studentId);
+            } catch (error) {
+                console.error("An error occurred:", error);
+            }
+        }
+
+        async function loadFeeHeadsBySessionClassAndStudent(sessionId, classId, studentId) {
+            console.log('befor call ajax- studentId:',studentId,'; classId:',classId,'sessionId:',sessionId);
+            return $.ajax({
+                url: '/StudentFeeHeads/GetFeeHeadsBySessionIdClassIdStudentIdAsync',
+                type: 'GET',
+                dataType: 'json',
+                data: { sessionId, classId, studentId },
+                success: function (data) {
+                    const $select = $('#SFAllocation_StudentFeeHeadId');
+                    $select.empty().append('<option value="" selected disabled>-Select type-</option>');
+
+                    $.each(data, function (i, obj) {
+                        $select.append(
+                            $('<option>', {
+                                value: obj.id,
+                                text: obj.name
+                            })
+                        );
+                    });
+                },
+                error: function (err) {
+                    console.error('Error loading fee heads:', err);
+                }
+            });
+        }
+
+        function initializeDataTable() {
+            $('#studentFeeAllocationTable').DataTable({
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: '/api/StudentFeeAllocationApi/GetDataTableData',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: function (d) {
+                        return JSON.stringify({
+                            draw: d.draw,
+                            start: d.start,
+                            length: d.length,
+                            searchValue: d.search ? d.search.value : '',
+                            orderColumn: d.order && d.order.length > 0 ? d.columns[d.order[0].column].data : '',
+                            orderDirection: d.order && d.order.length > 0 ? d.order[0].dir : ''
+                        });
+                    },
+                    error: function (xhr, error, thrown) {
+                        console.error('Ajax Error:', xhr.status, xhr.responseText);
+                    }
+                },
+                columns: [
+                    { data: null, render: function(data, type, row, meta) { return meta.row + 1; }, orderable: false },
+                    { data: 'student.classRoll' },
+                    { data: 'student.name' },
+                    { data: 'studentFeeHead.name' },
+                    { data: 'classFeeList.academicSession.name' },
+                    { data: 'allocatedAmount' },
+                    { data: 'feeAllocationApplication' },
+                    { data: 'isActive' },
+                    { 
+                        data: null, 
+                        orderable: false,
+                        className: 'text-center',
+                        render: function(data, type, row, meta) {
+                            return `
+                                <div class="d-flex gap-1 justify-content-center">
+                                    ${canEditAllocation ? `<button class="btn btn-sm btn-outline-primary updateBtn py-1 px-2" 
+                                        data-classid="${row.classFeeList?.academicClassId || ''}"
+                                        data-studentid="${row.studentId}"
+                                        data-feetype="${row.studentFeeHeadId}"
+                                        data-amount="${row.allocatedAmount}"
+                                        data-refdoc="${row.feeAllocationApplication || ''}"
+                                        data-isactive="${row.isActive}"
+                                        data-id="${row.id}"
+                                        data-studentname="${row.student?.name || ''}"
+                                        data-classroll="${row.student?.classRoll || ''}"
+                                        data-feetypename="${row.studentFeeHead?.name || ''}"
+                                        title="Edit">
+                                        <i class="fa fa-pen"></i>
+                                    </button>` : ''}
+                                    ${canDeleteAllocation ? `<button class="btn btn-sm btn-outline-danger deleteBtn py-1 px-2" 
+                                        data-studentname="${row.student?.name || ''}"
+                                        data-classroll="${row.student?.classRoll || ''}"
+                                        data-feetypename="${row.studentFeeHead?.name || ''}"
+                                        data-studentid="${row.studentId}"
+                                        data-classid="${row.classFeeList?.academicClassId || ''}"
+                                        data-feetype="${row.studentFeeHeadId}"
+                                        data-amount="${row.allocatedAmount}"
+                                        data-refdoc="${row.feeAllocationApplication || ''}"
+                                        data-isactive="${row.isActive}"
+                                        data-id="${row.id}"
+                                        data-bs-toggle="modal" data-bs-target="#deleteModal"
+                                        title="Delete">
+                                        <i class="fa fa-trash"></i>
+                                    </button>` : ''}
+                                </div>
+                            `;
+                        }
+                    },
+                    { data: 'editedAt' }
+                ]
+            });
+        }
+
+        function formUIChange() {
+            let form = document.getElementById('createUpdateForm');
+            form.action = "/StudentFeeAllocations/Edit";
+            document.getElementById('studentFeeAllocationCreatePortion').style.backgroundColor = '#2A3F54';
+
+            var fieldSet = document.getElementById('createFieldSetId');
+            fieldSet.classList.remove('border-primary');
+
+            var legendData = document.getElementById('create_update_title_id');
+            legendData.innerText = "Update Student Allocation";
+            legendData.classList.remove('text-primary');
+
+            document.getElementById('create_update_title_id').style.color = "#fff";
+            document.getElementById('studentFeeAllocationCreatePortion').style.color = '#000';
+            document.getElementById('submitId').value = 'Update';
+        }
+
+        async function handleFeeHeadIdChange() {
+            let feeHeadId = $('#SFAllocation_StudentFeeHeadId option:selected').val();
+            let classId = $('#academicClassListId option:selected').val();
+            var sessionId = $('#academicSessionListId option:selected').val() || @Model.CurrentSession.Id;
+
+            var classFeeList = await GetClassFeeListBySessionIdFeeHeadIdAndClassId(sessionId,classId,feeHeadId);
+            if(classFeeList)
+            {
+                $('#SFAllocation_ClassFeeListId').val(classFeeList.id);
+            }
+        }
+
+        function getUniqueIdByStudentId(studentId) {
+            return $.ajax({
+                url: '/api/Students/GetUniqueIdByStudentId',
+                data: { id: studentId },
+                cache: false,
+                type: 'GET',
+                dataType: 'JSON',
+            });
+        }
+
+        function getClassListByUniqueId(uniqueId) {
+            return $.ajax({
+                url: '/ClassFeeLists/GetClassListByUniqueId',
+                data: { uniqueId: uniqueId },
+                cache: false,
+                type: 'GET',
+                dataType: 'JSON',
+            });
+        }
+
+        function GetClassFeeListBySessionIdFeeHeadIdAndClassId(sessionId,classId,feeHeadId){
+            return $.ajax({
+                url: '/ClassFeeLists/GetClassFeeListBySessionIdFeeHeadIdAndClassId',
+                data: { sessionId: sessionId, feeHeadId:feeHeadId, classId:classId},
+                cache: false,
+                type: 'GET',
+                dataType: 'JSON',
+            });
+        }
+    </script>
+}

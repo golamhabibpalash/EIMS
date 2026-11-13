@@ -1,0 +1,151 @@
+@{
+    Layout = "~/Views/Shared/_lockScreen.cshtml";
+}
+
+<div class="lockscreen-wrapper">
+    <div class="lockscreen-box">
+        <div class="lockscreen-user">
+            <img src="@ViewBag.UserImage" alt="User Image" class="rounded-circle lockscreen-img" onerror="this.src='/Images/Employee/maleEmployee.png'">
+            <div class="lockscreen-name">@ViewBag.UserName</div>
+            <div class="lockscreen-status">
+                <span class="badge bg-warning"><i class="fa fa-lock"></i> Locked</span>
+            </div>
+        </div>
+        
+        <div class="lockscreen-form">
+            <form id="unlockForm" method="post">
+                <div class="input-group mb-3">
+                    <input type="password" name="password" id="password" class="form-control" placeholder="Enter your password" required autocomplete="current-password">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa fa-arrow-right"></i>
+                    </button>
+                </div>
+                <div id="errorMessage" class="alert alert-danger d-none"></div>
+            </form>
+        </div>
+        
+        <div class="lockscreen-footer">
+            <a asp-action="Login" asp-controller="Accounts" class="btn btn-outline-secondary btn-sm">
+                <i class="fa fa-sign-out"></i> Sign in as different user
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .lockscreen-wrapper {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%);
+        padding: 20px;
+    }
+    
+    .lockscreen-box {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+        padding: 50px 40px;
+        width: 100%;
+        max-width: 400px;
+        text-align: center;
+    }
+    
+    .lockscreen-img {
+        width: 120px;
+        height: 120px;
+        object-fit: cover;
+        border: 5px solid white;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        margin-bottom: 20px;
+    }
+    
+    .lockscreen-name {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 10px;
+    }
+    
+    .lockscreen-status {
+        margin-bottom: 30px;
+    }
+    
+    .lockscreen-status .badge {
+        font-size: 0.85rem;
+        padding: 8px 16px;
+    }
+    
+    .lockscreen-form .form-control {
+        border-radius: 10px;
+        padding: 12px 15px;
+        height: 48px;
+        border: 2px solid #e2e8f0;
+        transition: all 0.3s;
+    }
+    
+    .lockscreen-form .form-control:focus {
+        border-color: #1e3a8a;
+        box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.1);
+    }
+    
+    .lockscreen-form .btn {
+        border-radius: 10px;
+        padding: 12px 20px;
+    }
+    
+    .lockscreen-footer {
+        margin-top: 25px;
+        padding-top: 25px;
+        border-top: 1px solid #e2e8f0;
+    }
+    
+    .input-group .btn {
+        margin-left: -5px;
+        border-top-left-radius: 0;
+        border-bottom-left-radius: 0;
+    }
+</style>
+
+<script>
+    $(document).ready(function () {
+        $('#unlockForm').on('submit', function (e) {
+            e.preventDefault();
+            
+            var password = $('#password').val();
+            var errorMsg = $('#errorMessage');
+            
+            if (!password) {
+                errorMsg.text('Please enter your password').removeClass('d-none');
+                return;
+            }
+            
+            errorMsg.addClass('d-none');
+            $('#unlockForm button').prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i>');
+            
+            $.ajax({
+                url: '/Accounts/UnLock',
+                type: 'POST',
+                data: { password: password },
+                success: function (response) {
+                    if (response.success) {
+                        window.location.href = response.redirectUrl || '/Home';
+                    } else {
+                        errorMsg.text(response.message || 'Invalid password').removeClass('d-none');
+                        $('#unlockForm button').prop('disabled', false).html('<i class="fa fa-arrow-right"></i>');
+                        $('#password').val('').focus();
+                    }
+                },
+                error: function (xhr) {
+                    var msg = 'An error occurred. Please try again.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        msg = xhr.responseJSON.message;
+                    }
+                    errorMsg.text(msg).removeClass('d-none');
+                    $('#unlockForm button').prop('disabled', false).html('<i class="fa fa-arrow-right"></i>');
+                }
+            });
+        });
+    });
+</script>

@@ -1,0 +1,396 @@
+﻿@model IEnumerable<ExamResult>
+
+@{
+    int sl = 0;
+    string trColor = string.Empty;
+    List<string> subjectNames = new List<string>();
+    if (Model != null)
+    {
+        subjectNames = Model
+                    .SelectMany(result => result.ExamResultDetails.Select(detail => detail.AcademicSubject.SubjectName))
+                    .Distinct()
+                    .ToList();
+    }
+
+    int totalSubject = subjectNames.Count;
+    var heading = ViewBag.ResultHeading as SMS_App.ViewModels.ExamResult.ResultHeadingVM;
+}
+@section Styles{
+    <link href="~/lib/DataTable/css/cdn.datatables.net_buttons_2.0.0_css_buttons.dataTables.min.css" rel="stylesheet" />
+    <link href="~/lib/DataTable/css/cdn.datatables.net_1.11.5_css_jquery.dataTables.min.css" rel="stylesheet" />
+    <style>
+        .dataTables_length, .dataTables_filter
+        {
+            margin-left: 10px;
+            float: right;
+        }
+
+        .dt-buttons
+        {
+            float: right;
+        }
+
+        .loading-container
+        {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            min-height: 700px;
+            background-color: rgba(255, 255, 255, 0.8);
+            z-index: 9999;
+            display: none;
+        }
+
+        .loadingimage img
+        {
+            max-width: 50%;
+            max-height: 50%;
+        }
+    </style>
+
+}
+<div class="row">
+    <div class="col-md-12">
+        <form asp-action="ClassWiseResultAfterProcess" asp-controller="ExamResults" method="post" id="myForm">
+            <div class="form-row">
+                <div class="col-md-2">
+                    <select class="form-control" asp-items="ViewBag.ExamGroupList" name="examGroupId" id="examGroupId">
+                        <option selected disabled>Select Exam Group</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-control" asp-items="ViewBag.AcademicClassList" name="classId" id="AcademicClassId">
+                        <option selected disabled>Select Academic Class</option>
+                    </select>
+                </div>
+                <div>
+                    <input type="submit" class="btn btn-info btn-sm" value="Search" onclick="reloadData()">
+                </div>
+                @if (Model != null)
+                {
+                    <div>
+                        <input type="submit" class="btn btn-danger btn-sm" value="Delete" onclick="deleteBtnClicked()">
+                    </div>
+                }
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<div id="loadingContainer" class="loading-container" @(ViewBag.IsLoading ? "style='display:block;'" : "style='display:none;'")>
+    <div id="loadingImage" class="loadingImage text-center" style="display: none; margin-top:20%; text-align:center;vertical-align:central">
+        <img style="width:25%;" src="~/Images/loading1.gif" alt="Loading..." />
+    </div>
+</div>
+
+
+@if (Model != null)
+{
+    @if (heading != null)
+    {
+        <div class="text-center my-3" id="resultHeading">
+            <h4 class="mb-0">@heading.InstituteName</h4>
+            @if (!string.IsNullOrWhiteSpace(heading.InstituteAddress))
+            {
+                <div class="small text-muted">@heading.InstituteAddress</div>
+            }
+            <h5 class="mt-2 mb-1">Class-Wise Result</h5>
+            <div class="fw-semibold">@heading.DetailsLine</div>
+        </div>
+    }
+    <div class="table-responsive">
+        <table class="table table-responsive table-bordered" id="myTable">
+            <thead>
+                <tr>
+                    <th class="no-sort" rowspan="2">#</th>
+                    <th rowspan="2">Class Roll</th>
+                    <th rowspan="2">Name</th>
+                    @foreach (var item in subjectNames)
+                    {
+                        <th colspan="3" class="text-nowrap text-center">@item <br /></th>
+                    }
+                    <th rowspan="2">Total Marks</th>
+                    <th rowspan="2">CGPA</th>
+                    <th rowspan="2">Grade</th>
+                    <th rowspan="2">Status</th>
+                    <th rowspan="2">Total Fail</th>
+                    <th rowspan="2">Attendance</th>
+                    <th rowspan="2">Rank</th>
+                    <th rowspan="2">Previous Rank</th>
+                    <th rowspan="2">Gender</th>
+                    <th rowspan="2">Section</th>
+                    <th class="no-sort" rowspan="2">Phone 1</th>
+                    <th class="no-sort" rowspan="2">Phone 2</th>
+                </tr>
+                <tr>
+                    @foreach (var item in subjectNames)
+                    {
+                        <th>Mark</th>
+                        <th>GPA</th>
+                        <th>Grade</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var exam in Model)
+                {
+                    @if (exam.CGPA==0)
+                    {
+                        trColor = "antiquewhite";
+                    }
+                    else
+                    {
+                        trColor = string.Empty;
+                    }
+                <tr style="background-color:@trColor">
+                    <td>@(++sl)</td>
+                    <td>@exam.Student.ClassRoll</td>
+                    <td class="text-nowrap">@exam.Student.Name</td>
+                    @if (exam.ExamResultDetails != null)
+                    {
+                        foreach (var eDetail in exam.ExamResultDetails)
+                        {
+                            <td>@eDetail.ObtainMark</td>
+                            if (@eDetail.GPA == 0)
+                            {
+                                <td style="background-color:salmon">@eDetail.GPA</td>
+                            }
+                            else
+                            {
+                                <td>@eDetail.GPA</td>
+                            }
+                            <td>@eDetail.Grade</td>
+                        }
+                    }
+                    <td>@exam.TotalObtainMarks</td>
+                    <td style="background-color:@trColor">@exam.CGPA</td>
+                    <td>@exam.FinalGrade</td>
+                    <td>@exam.GradeComments</td>
+                    <td>@exam.TotalFails</td>
+                    <td>@(exam.AttendancePercentage+"%")</td>
+                    <td>@(exam.Rank)</td>
+                    <td></td>
+                    <td>@exam.Student.Gender.Name</td>
+                    <td>@exam.Student.AcademicSection?.Name</td>
+                    <td>
+                        @(exam.Student.GuardianPhone != null && exam.Student.GuardianPhone.Trim() != string.Empty
+    ? exam.Student.GuardianPhone.ToString().PadLeft(11, '0')
+    : "N/A")
+                    </td>
+                    <td>@exam.Student.PhoneNo.ToString().PadLeft(11, '0')</td>
+                </tr>
+                        }
+                    </tbody>
+
+        </table>
+
+    </div>
+}
+@section Scripts{
+    <script src="~/lib/DataTable/js/jquery-3.7.0.js"></script>
+    <script src="~/lib/DataTable/js/jquery.dataTables.min.js"></script>
+    <script src="~/lib/DataTable/js/dataTables.buttons.min.js"></script>
+    <script src="~/lib/DataTable/js/jszip.min.js"></script>
+    <script src="~/lib/DataTable/js/pdfmake.min.js"></script>
+    <script src="~/lib/DataTable/js/vfs_fonts.js"></script>
+    <script src="~/lib/DataTable/js/buttons.html5.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            // The table has a two-row header (subject name spanning Mark/GPA/Grade). Exports only
+            // read the bottom header row, so the subject name is prefixed back on here.
+            const subjectNames = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(subjectNames));
+            const fixedLeadingColumns = 3; // #, Class Roll, Name
+
+            // School / exam / class / session heading, repeated at the top of every export.
+            const heading = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                institute = heading?.InstituteName ?? string.Empty,
+                address = heading?.InstituteAddress ?? string.Empty,
+                details = heading?.DetailsLine ?? string.Empty,
+                exam = heading?.ExamName ?? string.Empty,
+                className = heading?.ClassName ?? string.Empty
+            }));
+            const reportTitle = 'Class-Wise Result';
+            const exportFileName = ['Result', heading.exam, heading.className].filter(Boolean).join('_').replace(/[^A-Za-z0-9_\-]+/g, '_');
+            const exportMessage = [reportTitle, heading.details].filter(Boolean).join('  -  ');
+            const exportOptions = {
+                columns: ':not(.action)',
+                format: {
+                    header: function (data, columnIdx) {
+                        const subjectIdx = Math.floor((columnIdx - fixedLeadingColumns) / 3);
+                        if (columnIdx < fixedLeadingColumns || subjectIdx >= subjectNames.length) {
+                            return data;
+                        }
+                        return subjectNames[subjectIdx] + ' - ' + data;
+                    }
+                }
+            };
+
+            // Three columns per subject plus ~15 fixed ones: A3 once there are many subjects.
+            const pdfPageSize = (subjectNames.length > 5) ? 'A3' : 'A4';
+            const pdfPageWidth = (pdfPageSize === 'A3' ? 1190.55 : 841.89) - 20; // minus the 10pt margins
+
+            // The buttons must be configured here: a separate `new $.fn.dataTable.Buttons(...)` creates
+            // a second, never-displayed button set, and the visible buttons fall back to the defaults.
+            $('#myTable').dataTable({
+                "lengthMenu": [[25, 50, 100, -1], [25, 50, 100, "All"]],
+                "dom": 'lBfrtip',
+                'columnDefs': [{
+                    'targets': '.no-sort', // column index (start from 0)
+                    'orderable': false, // set orderable false for selected columns
+                }],
+                buttons: [
+                    { extend: 'copy', exportOptions: exportOptions, title: heading.institute, messageTop: exportMessage },
+                    { extend: 'excel', exportOptions: exportOptions, title: heading.institute, messageTop: exportMessage, filename: exportFileName },
+                    { extend: 'csv', exportOptions: exportOptions, filename: exportFileName },
+                    {
+                        extend: 'pdf',
+                        // The default title is the browser tab title (school name only); the full heading
+                        // is built in customize() instead.
+                        title: '',
+                        filename: exportFileName,
+                        // Default header (Mark/GPA/Grade only): customize() rebuilds it as two rows so the
+                        // subject name spans its three columns instead of being repeated in every one.
+                        exportOptions: { columns: ':not(.action)' },
+                        orientation: 'landscape',
+                        pageSize: pdfPageSize,
+                        customize: function (doc) {
+                            const tableNode = doc.content.find(function (c) { return c.table; });
+                            const table = tableNode.table;
+                            const bottom = table.body[0];
+                            const isSubjectColumn = function (i) {
+                                return i >= fixedLeadingColumns && Math.floor((i - fixedLeadingColumns) / 3) < subjectNames.length;
+                            };
+                            const top = bottom.map(function (cell, i) {
+                                if (!isSubjectColumn(i)) return { text: cell.text, style: 'tableHeader', rowSpan: 2 };
+                                if ((i - fixedLeadingColumns) % 3 === 0) {
+                                    return { text: subjectNames[Math.floor((i - fixedLeadingColumns) / 3)], style: 'tableHeader', colSpan: 3 };
+                                }
+                                return {};
+                            });
+                            const second = bottom.map(function (cell, i) { return isSubjectColumn(i) ? cell : {}; });
+                            table.body.splice(0, 1, top, second);
+                            table.headerRows = 2;
+
+                            // Explicit widths: pdfmake sizes every '*' column to the widest unbreakable cell
+                            // (an 11-digit phone number), which pushes the table off the page. Give each column
+                            // a width in font-size units and pick the largest font that still fits the page.
+                            const columnCount = bottom.length;
+                            const columnEm = function (i) {
+                                if (i === 0) return 2.2;                          // #
+                                if (i === 1) return 4;                            // class roll
+                                if (i === 2) return 11;                           // student name
+                                if (isSubjectColumn(i)) return 3.2;               // mark / GPA / grade
+                                return (i >= columnCount - 2) ? 6.6 : 6;          // phone numbers : other summary columns
+                            };
+                            const cellOverhead = 2.5; // pdfmake adds padding (1+1) + border on top of each width
+                            let totalEm = 0;
+                            for (let i = 0; i < columnCount; i++) totalEm += columnEm(i);
+                            const fontSize = Math.min(7, (pdfPageWidth - columnCount * cellOverhead - 4) / totalEm);
+                            table.widths = bottom.map(function (cell, i) { return columnEm(i) * fontSize; });
+
+                            tableNode.layout = {
+                                hLineWidth: function () { return 0.25; }, vLineWidth: function () { return 0.25; },
+                                hLineColor: function () { return '#cccccc'; }, vLineColor: function () { return '#cccccc'; },
+                                paddingLeft: function () { return 1; }, paddingRight: function () { return 1; },
+                                paddingTop: function () { return 1; }, paddingBottom: function () { return 1; }
+                            };
+                            doc.pageMargins = [10, 10, 10, 18];
+                            doc.defaultStyle.fontSize = fontSize;
+                            doc.styles.tableHeader.fontSize = doc.defaultStyle.fontSize;
+
+                            // Heading: school, address, report title, exam / class / session.
+                            const headerBlocks = [{ text: heading.institute, alignment: 'center', bold: true, fontSize: 14 }];
+                            if (heading.address) headerBlocks.push({ text: heading.address, alignment: 'center', fontSize: 8 });
+                            headerBlocks.push({ text: reportTitle, alignment: 'center', bold: true, fontSize: 11, margin: [0, 4, 0, 0] });
+                            if (heading.details) headerBlocks.push({ text: heading.details, alignment: 'center', fontSize: 9, margin: [0, 2, 0, 6] });
+                            doc.content.unshift.apply(doc.content, headerBlocks);
+
+                            const generated = new Date().toLocaleString();
+                            doc.footer = function (currentPage, pageCount) {
+                                return {
+                                    columns: [
+                                        { text: heading.details, fontSize: 6, margin: [10, 4, 0, 0] },
+                                        { text: 'Page ' + currentPage + ' of ' + pageCount, alignment: 'center', fontSize: 6, margin: [0, 4, 0, 0] },
+                                        { text: 'Generated: ' + generated, alignment: 'right', fontSize: 6, margin: [0, 4, 10, 0] }
+                                    ]
+                                };
+                            };
+                        }
+                    }
+                ]
+            });
+        });
+
+        let dataLoaded = false;
+        $(document).on("dataLoaded", function () {
+            // Set the flag variable to true.
+            dataLoaded = true;
+        });
+
+        function deleteBtnClicked() {
+
+            var formElement = document.getElementById('myForm');
+
+            // Check if the form element exists
+            if (formElement) {
+                // Change the asp-action attribute value to "name2"
+                formElement.setAttribute('asp-action', 'DeleteResult');
+            }
+
+        }
+
+        function showLoadingImage() {
+            document.getElementById("loadingImage").style.display = "block";
+            $("#loadingContainer").fadeIn(200);
+            document.getElementById("myTable").style.display = "none";
+
+        }
+
+        function hideLoadingImage() {
+            document.getElementById("loadingImage").style.display = "none";
+            $("#loadingContainer").fadeOut(200);
+            document.getElementById("myTable").style.display = "block";
+        }
+
+        // Example function to simulate data reloading
+        function reloadData() {
+            showLoadingImage();
+            // Perform your data reloading here
+            if (dataLoaded) {
+                hideLoadingImage();
+            }
+        }
+
+        $(document).ready(function () {
+            $('#examGroupId').change(function () {
+                let id = $('#examGroupId option:selected').val();
+                $.ajax({
+                    url: "/AcademicExams/GetAcademicClassByExamGrId?examGroupId=" + id,
+                    dataType: "JSON",
+                    type: "POST",
+                    cache: false,
+                    success: function (data) {
+                        $('#AcademicClassId').empty();
+                        var o = '<option disabled selected>Select Class</option>';
+                        $('#AcademicClassId').append(o);
+                        $.each(data, function (i, obj) {
+                            console.log(obj.name);
+                            var op = '<option value="' + obj.id + '">' + obj.name + '</option>';
+                            $('#AcademicClassId').append(op);
+                        });
+                    },
+                    error: function (err) {
+                        console.log(err);
+                    }
+                });
+            });
+        });
+    </script>
+}

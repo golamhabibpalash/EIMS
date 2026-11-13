@@ -1,0 +1,92 @@
+@model AdmissionDashboardVM
+@{
+    ViewData["Title"] = "Admission Dashboard";
+    GlobalUI.PageTitle = "Admission Dashboard";
+    int submittedEver = Model.StatusCounts.Where(k => k.Key != AdmissionApplicationStatus.Draft).Sum(k => k.Value);
+    int approvedEver = Model.Count(AdmissionApplicationStatus.Approved, AdmissionApplicationStatus.PaymentPending, AdmissionApplicationStatus.PaymentVerificationPending, AdmissionApplicationStatus.Enrolled, AdmissionApplicationStatus.Expired);
+    int enrolled = Model.Count(AdmissionApplicationStatus.Enrolled);
+    int started = Model.StatusCounts.Sum(k => k.Value);
+    var verified = Model.Payments.Where(p => p.Status == AdmissionPaymentStatus.Verified).ToList();
+    var pending = Model.Payments.Where(p => p.Status == AdmissionPaymentStatus.PendingVerification).ToList();
+    int paidApps = verified.Select(p => p.AdmissionApplicationId).Distinct().Count();
+}
+<form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-4">
+        <label class="form-label small mb-1">Admission session</label>
+        <select name="sessionId" asp-items="Model.SessionList" class="form-select form-select-sm" onchange="this.form.submit()"></select>
+    </div>
+    <div class="col-md-8 text-end">
+        <a asp-action="Index" asp-route-Filter.AdmissionSessionId="@Model.AdmissionSessionId" class="btn btn-sm btn-primary">Open application queue</a>
+        <a asp-controller="AdmissionPayments" asp-action="Index" class="btn btn-sm btn-outline-primary">Payments to verify (@pending.Count)</a>
+    </div>
+</form>
+
+@if (!Model.AdmissionSessionId.HasValue)
+{
+    <div class="alert alert-info">No admission sessions yet. <a asp-controller="AdmissionSetup" asp-action="Create">Create one</a>.</div>
+}
+else
+{
+    <h6>Pipeline</h6>
+    <div class="row g-2 mb-3">
+        @foreach (var item in new (string Label, int Count, AdmissionApplicationStatus Status, string Css)[] {
+            ("New", Model.Count(AdmissionApplicationStatus.Submitted, AdmissionApplicationStatus.Resubmitted), AdmissionApplicationStatus.Submitted, "text-primary"),
+            ("Under review", Model.Count(AdmissionApplicationStatus.UnderReview), AdmissionApplicationStatus.UnderReview, "text-info"),
+            ("Correction required", Model.Count(AdmissionApplicationStatus.CorrectionRequired), AdmissionApplicationStatus.CorrectionRequired, "text-warning"),
+            ("Approved / awaiting payment", Model.Count(AdmissionApplicationStatus.PaymentPending, AdmissionApplicationStatus.PaymentVerificationPending), AdmissionApplicationStatus.PaymentPending, "text-warning"),
+            ("Ready to enrol", Model.Count(AdmissionApplicationStatus.Approved), AdmissionApplicationStatus.Approved, "text-success"),
+            ("Enrolled", enrolled, AdmissionApplicationStatus.Enrolled, "text-success"),
+            ("Waitlisted", Model.Count(AdmissionApplicationStatus.Waitlisted), AdmissionApplicationStatus.Waitlisted, "text-dark"),
+            ("Rejected", Model.Count(AdmissionApplicationStatus.Rejected), AdmissionApplicationStatus.Rejected, "text-danger") })
+        {
+            <div class="col-6 col-md-3">
+                <a class="card shadow-sm border-0 text-decoration-none" asp-action="Index" asp-route-Filter.AdmissionSessionId="@Model.AdmissionSessionId" asp-route-Filter.Status="@item.Status">
+                    <div class="card-body py-2"><div class="text-muted small">@item.Label</div><div class="h4 mb-0 @item.Css">@item.Count</div></div>
+                </a>
+            </div>
+        }
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card shadow-sm"><div class="card-body">
+                <h6>Seats by class</h6>
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Class</th><th>Seats</th><th>Taken</th><th>Enrolled</th><th>Remaining</th><th>Pending</th><th>Waitlist</th></tr></thead>
+                    <tbody>
+                        @foreach (var p in Model.Programs)
+                        {
+                            Model.SeatUsage.TryGetValue(p.Id, out var u);
+                            <tr>
+                                <td>@p.AcademicClass?.Name</td>
+                                <td>@(p.SeatCapacity > 0 ? p.SeatCapacity.ToString() : "∞")</td>
+                                <td>@(u?.SeatsHeld ?? 0)</td>
+                                <td>@(u?.Enrolled ?? 0)</td>
+                                <td>@(p.SeatCapacity > 0 ? Math.Max(0, p.SeatCapacity - (u?.SeatsHeld ?? 0)).ToString() : "-")</td>
+                                <td>@(u?.Pending ?? 0)</td>
+                                <td>@(u?.Waitlisted ?? 0)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div></div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card shadow-sm mb-3"><div class="card-body">
+                <h6>Conversion funnel</h6>
+                @foreach (var step in new (string, int)[] { ("Started", started), ("Submitted", submittedEver), ("Approved", approvedEver), ("Paid", paidApps), ("Enrolled", enrolled) })
+                {
+                    var pct = started == 0 ? 0 : (int)Math.Round(100.0 * step.Item2 / started);
+                    <div class="small d-flex justify-content-between"><span>@step.Item1</span><span>@step.Item2</span></div>
+                    <div class="progress mb-2" style="height:8px"><div class="progress-bar" style="width:@pct%"></div></div>
+                }
+            </div></div>
+            <div class="card shadow-sm"><div class="card-body small">
+                <h6>Payments</h6>
+                <div>Verified: <strong>BDT @verified.Sum(p => p.VerifiedAmount ?? p.Amount).ToString("0.00")</strong> (@verified.Count) - offline @verified.Count(p => p.Method == AdmissionPaymentMethod.Offline), cash @verified.Count(p => p.Method == AdmissionPaymentMethod.Cash)</div>
+                <div>Waiting for verification: <strong>BDT @pending.Sum(p => p.Amount).ToString("0.00")</strong> (@pending.Count)</div>
+                <div>Rejected / needs correction: @Model.Payments.Count(p => p.Status == AdmissionPaymentStatus.Rejected || p.Status == AdmissionPaymentStatus.NeedsCorrection)</div>
+            </div></div>
+        </div>
+    </div>
+}

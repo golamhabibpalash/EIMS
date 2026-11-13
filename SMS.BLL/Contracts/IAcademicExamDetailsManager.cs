@@ -12,5 +12,6 @@ namespace SMS.BLL.Contracts
     {
         Task<List<AcademicExamDetail>> GetByExamIdAsync(int examId);
         Task<List<AcademicExamDetail>> GetAllByExamGroupAndStudentId(int examGroupId, int studentId);
+        Task<AcademicExamDetail> GetLastDataFromExamByStudentId(int studentId);
     }
 }

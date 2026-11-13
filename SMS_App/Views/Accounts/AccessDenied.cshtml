@@ -1,0 +1,46 @@
+﻿@using Microsoft.AspNetCore.Identity
+
+@inject UserManager<ApplicationUser> _userManager;
+@inject SignInManager<ApplicationUser> _singnInManager;
+
+@{
+    string action = "";
+    string controller = "";
+    string routeId = "";
+
+    var user = await _userManager.GetUserAsync(User);
+    if (_singnInManager.IsSignedIn(User))
+    {
+
+        if (user.UserType == 's')
+        {
+            action = "Profile";
+            controller = "Students";
+            routeId = user.ReferenceId.ToString();
+            Layout = "~/Views/Shared/_StudentLayout.cshtml";
+        }
+        else if (user.UserType == 'e')
+        {
+            action = "Index";
+            controller = "Home";
+            //Layout = "~/Views/Shared/_TeacherLayout.cshtml";
+        }
+    }
+}
+
+
+<div class="col-md-6 offset-md-3">
+    <div class="jumbotron">
+        <span class="h3 text-danger"><i class="fa fa-hand-paper-o" aria-hidden="true"></i> Access Denied! <br />You are not eligible to access this page.</span><br /><br />
+        <div class="text-md-center">
+            @if (user.UserType == 's')
+            {
+                <a class="btn btn-info" asp-action="@action" asp-controller="@controller" asp-route-id="@routeId">Go to Home</a>
+            }
+            else if (user.UserType == 'e')
+            {
+                <a class="btn btn-info" asp-action="@action" asp-controller="@controller">Go to Home</a>
+            }
+        </div>
+    </div>
+</div>

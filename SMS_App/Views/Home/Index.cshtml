@@ -1,0 +1,881 @@
+@model SMS_App.ViewModels.Students.DashboardIndexVM
+@{
+    ViewData["Title"] = "Dashboard";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+}
+
+@if (ViewBag.Warning != null)
+{
+    <div class="alert alert-warning alert-dismissible fade show mb-4" role="alert">
+        <i class="fa fa-exclamation-triangle me-2"></i>@ViewBag.Warning
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<style>
+    :root {
+        --primary-blue: #1e3a8a;
+        --secondary-blue: #3b82f6;
+        --accent-teal: #0d9488;
+        --accent-purple: #7c3aed;
+        --accent-rose: #e11d48;
+        --accent-amber: #d97706;
+        --success-green: #059669;
+        --dark-bg: #0f172a;
+        --card-bg: #ffffff;
+        --border-color: #e2e8f0;
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+    }
+
+    body {
+        background: #f8f9fa;
+    }
+
+    .dashboard-header {
+        background: linear-gradient(135deg, var(--primary-blue) 0%, #1e40af 50%, #3730a3 100%);
+        padding: 35px 40px;
+        border-radius: 16px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 40px rgba(30, 58, 138, 0.25);
+    }
+
+    .dashboard-header::before {
+        content: '';
+        position: absolute;
+        top: -100px;
+        right: -100px;
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+        border-radius: 50%;
+    }
+
+    .dashboard-header::after {
+        content: '';
+        position: absolute;
+        bottom: -150px;
+        left: -100px;
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+        border-radius: 50%;
+    }
+
+    .header-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    .header-title {
+        font-weight: 800;
+        font-size: 2rem;
+        margin-bottom: 5px;
+    }
+
+    .header-subtitle {
+        opacity: 0.85;
+        font-size: 1rem;
+    }
+
+    .session-pill {
+        background: rgba(255,255,255,0.2);
+        backdrop-filter: blur(10px);
+        padding: 10px 20px;
+        border-radius: 50px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+
+    .stat-card {
+        border-radius: 20px;
+        border: none;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 5px;
+        background: var(--card-gradient);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-10px) scale(1.02);
+        box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+    }
+
+    .stat-icon-wrap {
+        width: 70px;
+        height: 70px;
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+    }
+
+    .stat-number {
+        font-size: 2.5rem;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--text-secondary);
+        margin-top: 5px;
+    }
+
+    .stat-footer-link {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 25px;
+        background: #f8fafc;
+        border-top: 1px solid var(--border-color);
+        font-weight: 600;
+        color: var(--text-primary);
+        transition: all 0.3s;
+    }
+
+    .stat-card:hover .stat-footer-link {
+        background: #f1f5f9;
+    }
+
+    .stat-footer-link:hover {
+        color: var(--secondary-blue);
+    }
+
+    .presence-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .presence-present {
+        background: #d1fae5;
+        color: #059669;
+    }
+
+    .presence-absent {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    .custom-card {
+        border-radius: 20px;
+        border: none;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        overflow: hidden;
+    }
+
+    .custom-card .card-header {
+        background: white;
+        border-bottom: 1px solid var(--border-color);
+        padding: 22px 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .custom-card .card-header h5 {
+        font-weight: 700;
+        font-size: 1.1rem;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .custom-card .card-body {
+        padding: 0;
+    }
+
+    .data-table {
+        margin: 0;
+    }
+
+    .data-table thead th {
+        background: #f8fafc;
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-secondary);
+        border: none;
+        padding: 16px 24px;
+    }
+
+    .data-table tbody tr {
+        transition: all 0.2s;
+    }
+
+    .data-table tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .data-table tbody td {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--border-color);
+        vertical-align: middle;
+    }
+
+    .data-table tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .badge-pill {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.75rem;
+    }
+
+    .student-chip {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .student-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: white;
+        flex-shrink: 0;
+    }
+
+    .student-info strong {
+        display: block;
+        color: var(--text-primary);
+    }
+
+    .student-info small {
+        color: var(--text-secondary);
+        font-size: 0.8rem;
+    }
+
+    .progress-wrap {
+        height: 10px;
+        background: #e2e8f0;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 10px;
+        transition: width 1.5s ease-out;
+    }
+
+    .empty-state {
+        padding: 60px 20px;
+        text-align: center;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        color: #cbd5e1;
+    }
+
+    .empty-state p {
+        color: var(--text-secondary);
+        margin-top: 15px;
+    }
+
+    .icon-box {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .all-present-state {
+        padding: 60px 20px;
+        text-align: center;
+    }
+
+    .all-present-state i {
+        font-size: 5rem;
+        background: linear-gradient(135deg, #059669 0%, #34d399 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .all-present-state p {
+        color: var(--success-green);
+        font-weight: 700;
+        font-size: 1.1rem;
+        margin-top: 15px;
+    }
+
+    .animate-1 { animation: fadeSlide 0.5s ease-out 0.1s both; }
+    .animate-2 { animation: fadeSlide 0.5s ease-out 0.2s both; }
+    .animate-3 { animation: fadeSlide 0.5s ease-out 0.3s both; }
+    .animate-4 { animation: fadeSlide 0.5s ease-out 0.4s both; }
+
+    @@keyframes fadeSlide {
+        from {
+            opacity: 0;
+            transform: translateY(40px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .detail-row {
+        display: flex;
+        gap: 25px;
+        padding-top: 15px;
+        margin-top: 15px;
+        border-top: 1px solid rgba(0,0,0,0.1);
+    }
+
+    .detail-item label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-secondary);
+        display: block;
+        margin-bottom: 3px;
+    }
+
+    .detail-item strong {
+        font-size: 1.1rem;
+        color: var(--text-primary);
+    }
+
+    .total-amount {
+        font-size: 1.3rem;
+        font-weight: 800;
+        color: var(--success-green);
+    }
+</style>
+
+<div class="container-fluid px-4 py-4">
+    <div class="dashboard-header mb-5">
+        <div class="header-content">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h1 class="header-title">
+                        <i class="fas fa-chart-line me-3"></i>Dashboard
+                    </h1>
+                    <p class="header-subtitle">Your institute overview at a glance</p>
+                </div>
+                <div class="text-end">
+                    <div class="session-pill mb-2">
+                        <i class="fa fa-calendar-check"></i>
+                        @Model.CurrentSessionName
+                    </div>
+                    <div class="opacity-75">
+                        <i class="fa fa-calendar-alt me-2"></i>@DateTime.Now.ToString("dddd, dd MMMM yyyy")
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-xl-3 col-lg-6 col-md-6 mb-4 animate-1">
+            <div class="card stat-card h-100" style="--card-gradient: linear-gradient(135deg, #007c03, #015902);">
+                <div class="card-body" style="background: linear-gradient(135deg, #e8f5e9, #c8e6c9);">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="stat-label text-success">Total Students</p>
+                            <h2 class="stat-number" style="color: #007c03;" data-target="@Model.TotalStudents">0</h2>
+                        </div>
+                        <div class="stat-icon-wrap" style="background: linear-gradient(135deg, #007c03, #015902); color: white;">
+                            <i class="fa fa-users"></i>
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <label>Present Today</label>
+                            <strong>
+                                <span class="presence-pill presence-present">
+                                    <i class="fa fa-check"></i> @Model.TodayPresentStudents
+                                </span>
+                            </strong>
+                        </div>
+                        <div class="detail-item">
+                            <label>Absent</label>
+                            <strong>
+                                <span class="presence-pill presence-absent">
+                                    <i class="fa fa-times"></i> @Model.TodayAbsentStudents
+                                </span>
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+                <a asp-controller="Students" asp-action="Index" class="stat-footer-link text-decoration-none">
+                    <span><i class="fa fa-arrow-right me-2"></i>View All Students</span>
+                    <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-lg-6 col-md-6 mb-4 animate-2">
+            <div class="card stat-card h-100" style="--card-gradient: linear-gradient(135deg, #d6336c, #a82658);">
+                <div class="card-body" style="background: linear-gradient(135deg, #fce4ec, #f8bbd9);">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="stat-label" style="color: #d6336c;">Total Employees</p>
+                            <h2 class="stat-number" style="color: #d6336c;" data-target="@Model.TotalEmployees">0</h2>
+                        </div>
+                        <div class="stat-icon-wrap" style="background: linear-gradient(135deg, #d6336c, #a82658); color: white;">
+                            <i class="fa fa-user-tie"></i>
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <label>Present Today</label>
+                            <strong>
+                                <span class="presence-pill presence-present">
+                                    <i class="fa fa-check"></i> @Model.TodayPresentEmployees
+                                </span>
+                            </strong>
+                        </div>
+                        <div class="detail-item">
+                            <label>Absent</label>
+                            <strong>
+                                <span class="presence-pill presence-absent">
+                                    <i class="fa fa-times"></i> @Model.TodayAbsentEmployees
+                                </span>
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+                <a asp-controller="Employees" asp-action="Index" class="stat-footer-link text-decoration-none">
+                    <span><i class="fa fa-arrow-right me-2"></i>View All Employees</span>
+                    <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+        </div>
+
+        @if (ViewBag.CanSeeFinance == true)
+        {
+        <div class="col-xl-3 col-lg-6 col-md-6 mb-4 animate-3">
+            <div class="card stat-card h-100" style="--card-gradient: linear-gradient(135deg, #0d6efd, #0a58ca);">
+                <div class="card-body" style="background: linear-gradient(135deg, #e7f1ff, #bbd4f8);">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="stat-label text-primary">Today's Collection</p>
+                            <h2 class="stat-number text-primary" data-prefix="৳ " data-target="@Model.TodayCollection">0</h2>
+                        </div>
+                        <div class="stat-icon-wrap" style="background: linear-gradient(135deg, #0d6efd, #0a58ca); color: white;">
+                            <i class="fa fa-money-bill-wave"></i>
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <label>Monthly Total</label>
+                            <strong class="total-amount">৳ @Model.MonthlyCollection.ToString("N0")</strong>
+                        </div>
+                    </div>
+                </div>
+                <a asp-controller="StudentPayments" asp-action="Index" class="stat-footer-link text-decoration-none">
+                    <span><i class="fa fa-arrow-right me-2"></i>View All Payments</span>
+                    <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+        </div>
+        }
+
+        <div class="col-xl-3 col-lg-6 col-md-6 mb-4 animate-4">
+            <div class="card stat-card h-100" style="--card-gradient: linear-gradient(135deg, #fd7e14, #d63384);">
+                <div class="card-body" style="background: linear-gradient(135deg, #fff3e0, #ffe0b2);">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <p class="stat-label" style="color: #fd7e14;">Classes</p>
+                            <h2 class="stat-number" style="color: #fd7e14;" data-target="@Model.TotalClasses">0</h2>
+                        </div>
+                        <div class="stat-icon-wrap" style="background: linear-gradient(135deg, #fd7e14, #d63384); color: white;">
+                            <i class="fa fa-school"></i>
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-item">
+                            <label>Total Sections</label>
+                            <strong>@Model.TotalSections</strong>
+                        </div>
+                    </div>
+                </div>
+                <a asp-controller="AcademicClasses" asp-action="Index" class="stat-footer-link text-decoration-none">
+                    <span><i class="fa fa-arrow-right me-2"></i>Manage Classes</span>
+                    <i class="fa fa-chevron-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-2">
+        <div class="col-lg-6 mb-4">
+            <div class="card custom-card">
+                <div class="card-header">
+                    <h5 class="text-primary">
+                        <span class="icon-box bg-primary-subtle text-primary">
+                            <i class="fa fa-chart-pie"></i>
+                        </span>
+                        Class-wise Student Distribution
+                    </h5>
+                    <span class="badge bg-primary text-white badge-pill">@Model.TotalStudents Students</span>
+                </div>
+                <div class="card-body">
+                    @if (Model.ClassWiseStudentCounts.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Class</th>
+                                        <th class="text-center">Students</th>
+                                        <th class="text-center">%</th>
+                                        <th>Distribution</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model.ClassWiseStudentCounts)
+                                    {
+                                        var pct = Model.TotalStudents > 0 ? (item.StudentCount * 100.0 / Model.TotalStudents) : 0;
+                                        <tr>
+                                            <td><strong>@item.ClassName</strong></td>
+                                            <td class="text-center">@item.StudentCount</td>
+                                            <td class="text-center">@pct.ToString("N1")%</td>
+                                            <td>
+                                                <div class="progress-wrap">
+                                                    <div class="progress-bar-fill bg-primary" style="width: 0%" data-width="@pct%"></div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="empty-state">
+                            <i class="fa fa-user-graduate"></i>
+                            <p>No student data available</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @if (ViewBag.CanSeeFinance == true)
+        {
+        <div class="col-lg-6 mb-4">
+            <div class="card custom-card">
+                <div class="card-header">
+                    <h5 class="text-success">
+                        <span class="icon-box bg-success-subtle text-success">
+                            <i class="fa fa-coins"></i>
+                        </span>
+                        Today's Collection by Class
+                    </h5>
+                    <span class="badge bg-success text-white badge-pill">৳ @Model.TodayCollection.ToString("N0")</span>
+                </div>
+                <div class="card-body">
+                    @if (Model.ClassWiseCollections.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Class</th>
+                                        <th class="text-right">Amount</th>
+                                        <th>Collection</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in Model.ClassWiseCollections)
+                                    {
+                                        var pct = Model.TodayCollection > 0 ? (double)((item.Amount * 100) / Model.TodayCollection) : 0;
+                                        <tr>
+                                            <td><strong>@item.ClassName</strong></td>
+                                            <td class="text-right text-success"><strong>৳ @item.Amount.ToString("N0")</strong></td>
+                                            <td>
+                                                <div class="progress-wrap">
+                                                    <div class="progress-bar-fill bg-success" style="width: 0%" data-width="@pct%"></div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr class="bg-light">
+                                        <td><strong>Total</strong></td>
+                                        <td class="text-right"><strong class="total-amount">৳ @Model.TodayCollection.ToString("N0")</strong></td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="empty-state">
+                            <i class="fa fa-money-bill-wave"></i>
+                            <p>No collection data today</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        }
+    </div>
+
+    <div class="row mt-2">
+        <div class="col-lg-6 mb-4">
+            <div class="card custom-card">
+                <div class="card-header">
+                    <h5 class="text-info">
+                        <span class="icon-box bg-info-subtle text-info">
+                            <i class="fa fa-user-plus"></i>
+                        </span>
+                        Recently Added Students
+                    </h5>
+                    <span class="badge bg-info text-white badge-pill">New Admissions</span>
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.RecentStudents.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table data-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Roll</th>
+                                        <th>Name</th>
+                                        <th>Class</th>
+                                        <th>Section</th>
+                                        <th>Type</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var student in Model.RecentStudents)
+                                    {
+                                        string[] gradients = {
+                                            "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                                            "linear-gradient(135deg, #7c3aed, #5b21b6)",
+                                            "linear-gradient(135deg, #0d9488, #0f766e)",
+                                            "linear-gradient(135deg, #d97706, #b45309)",
+                                            "linear-gradient(135deg, #e11d48, #be123c)"
+                                        };
+                                        var colorIdx = @Model.RecentStudents.ToList().IndexOf(student) % gradients.Length;
+                                        <tr>
+                                            <td><span class="badge bg-secondary">@student.ClassRoll</span></td>
+                                            <td>
+                                                <div class="student-chip">
+                                                    <div class="student-avatar" style="background: @gradients[colorIdx];">
+                                                        @{
+                                                            var names = (string.IsNullOrEmpty(student.Name) ? new string[0] : student.Name.Split(' '));
+                                                            var initials = names.Length > 0 ? names[0].Length > 0 ? names[0][0].ToString() : "" : "";
+                                                            if (names.Length > 1 && !string.IsNullOrEmpty(names.Last()) && names.Last().Length > 0)
+                                                            {
+                                                                initials += names.Last()[0];
+                                                            }
+                                                        }
+                                                        @initials
+                                                    </div>
+                                                    <div class="student-info">
+                                                        <strong>@student.Name</strong>
+                                                        <small>@student.UniqueId</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>@student.AcademicClass?.Name</td>
+                                            <td>@student.AcademicSection?.Name</td>
+                                            <td>
+                                                @if (student.IsResidential)
+                                                {
+                                                    <span class="badge bg-success badge-pill"><i class="fa fa-home me-1"></i>Residential</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-info badge-pill"><i class="fa fa-sun me-1"></i>Day</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="empty-state">
+                            <i class="fa fa-user-slash"></i>
+                            <p>No recent students</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <div class="card custom-card">
+                <div class="card-header" style="background: linear-gradient(135deg, #fef2f2, #fee2e2);">
+                    <h5 class="text-danger">
+                        <span class="icon-box bg-danger-subtle text-danger">
+                            <i class="fa fa-user-times"></i>
+                        </span>
+                        Today's Absent Students
+                    </h5>
+                    @if (Model.TodayAbsentStudents > 0)
+                    {
+                        <span class="badge bg-danger text-white badge-pill">@Model.TodayAbsentStudents Absent</span>
+                    }
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.TodayAbsentStudentList.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table data-table mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Roll</th>
+                                        <th>Name</th>
+                                        <th>Class</th>
+                                        <th>Section</th>
+                                        <th class="text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var student in Model.TodayAbsentStudentList)
+                                    {
+                                        <tr>
+                                            <td><span class="badge bg-danger">@student.ClassRoll</span></td>
+                                            <td>
+                                                <div class="student-chip">
+                                                    <div class="student-avatar" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+                                                        @{
+                                                            var absentNames = (string.IsNullOrEmpty(student.Name) ? new string[0] : student.Name.Split(' '));
+                                                            var absentInitials = absentNames.Length > 0 && !string.IsNullOrEmpty(absentNames[0]) ? absentNames[0][0].ToString() : "";
+                                                            if (absentNames.Length > 1 && !string.IsNullOrEmpty(absentNames.Last()) && absentNames.Last().Length > 0)
+                                                            {
+                                                                absentInitials += absentNames.Last()[0];
+                                                            }
+                                                        }
+                                                        @absentInitials
+                                                    </div>
+                                                    <div class="student-info">
+                                                        <strong>@student.Name</strong>
+                                                        <small>@student.UniqueId</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td>@student.AcademicClass?.Name</td>
+                                            <td>@student.AcademicSection?.Name</td>
+                                            <td class="text-center">
+                                                <a asp-controller="Students" asp-action="Details" asp-route-id="@student.Id" class="btn btn-sm btn-outline-danger">
+                                                    <i class="fa fa-eye"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        @if (Model.TodayAbsentStudents > 10)
+                        {
+                            <div class="text-center py-3 bg-light border-top">
+                                <small class="text-muted">Showing 10 of @Model.TodayAbsentStudents absent students</small>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="all-present-state">
+                            <i class="fa fa-check-circle"></i>
+                            <p>All students are present today!</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            // Animate counter numbers
+            $('.stat-number').each(function () {
+                var $this = $(this);
+                var target = parseInt($this.data('target')) || 0;
+                var prefix = $this.data('prefix') || '';
+                
+                if (target > 0) {
+                    var duration = 1500;
+                    var startTime = Date.now();
+                    
+                    function animateCounter() {
+                        var now = Date.now();
+                        var elapsed = now - startTime;
+                        var progress = Math.min(elapsed / duration, 1);
+                        var easeProgress = 1 - Math.pow(1 - progress, 3);
+                        var current = Math.floor(easeProgress * target);
+                        
+                        if (prefix) {
+                            $this.text(prefix + current.toLocaleString('en-IN'));
+                        } else {
+                            $this.text(current.toLocaleString('en-IN'));
+                        }
+                        
+                        if (progress < 1) {
+                            requestAnimationFrame(animateCounter);
+                        }
+                    }
+                    
+                    requestAnimationFrame(animateCounter);
+                } else {
+                    if (prefix) {
+                        $this.text(prefix + '0');
+                    } else {
+                        $this.text('0');
+                    }
+                }
+            });
+
+            // Animate progress bars
+            $('.progress-bar-fill').each(function () {
+                var $this = $(this);
+                var width = $this.data('width');
+                setTimeout(function () {
+                    $this.animate({ width: width + '%' }, {
+                        duration: 1000
+                    });
+                }, 500);
+            });
+        });
+    </script>
+}

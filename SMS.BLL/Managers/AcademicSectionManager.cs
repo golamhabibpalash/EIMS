@@ -1,4 +1,4 @@
-﻿using BLL.Managers.Base;
+using BLL.Managers.Base;
 using SMS.BLL.Contracts;
 using SMS.DAL.Contracts;
 using SMS.Entities;
@@ -31,6 +31,11 @@ namespace SMS.BLL.Managers
         public async Task<IReadOnlyCollection<AcademicSection>> GetAllByClassWithSessionId(int classId, int sessionId)
         {
             return await _academicSectinRepository.GetAllByClassWithSessionId(classId, sessionId);
+        }
+
+        public async Task<IReadOnlyCollection<AcademicSection>> GetAllByExamGroupIdClassIdSessionId(int examGroupId, int classId, int sessionId)
+        {
+            return await _academicSectinRepository.GetAllByExamGroupId(examGroupId, classId, sessionId);
         }
 
 

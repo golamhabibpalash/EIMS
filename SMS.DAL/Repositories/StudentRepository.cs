@@ -1,16 +1,14 @@
-﻿using SMS.DB;
-using SMS.Entities;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
-using SMS.DAL.Repositories.Base;
+﻿using Microsoft.EntityFrameworkCore;
 using SMS.DAL.Contracts;
-using System.Linq;
-using Microsoft.Data.SqlClient;
-using System;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using SMS.DAL.Repositories.Base;
+using SMS.DB;
+using SMS.Entities;
 using SMS.Entities.AdditionalModels;
-using SMS.Entities.RptModels;
+using SMS.Entities.Utilities;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace SMS.DAL.Repositories
 {
@@ -55,19 +53,43 @@ namespace SMS.DAL.Repositories
 
         public async Task<List<StudentListVM>> GetCurrentStudentListAsync(int? AcademicClassId, int? AcademicSectionId)
         {
-            var pAcademicClassId = new SqlParameter("@academicClassId", (object)AcademicClassId ?? DBNull.Value);
-            var pAcademicSectionId = new SqlParameter("@academicSectionId", (object)AcademicSectionId ?? DBNull.Value);
-            List<StudentListVM> studentListVMs = null;
-            try
-            {
-                studentListVMs = await _context.StudentListVMs
-                    .FromSqlInterpolated($"EXECUTE sp_Get_Current_Student_List {pAcademicClassId}, {pAcademicSectionId}")
-                    .ToListAsync();
-            }
-            catch (Exception)
-            {
-                throw;
-            }
+            var query = _context.Student
+                .Include(s => s.AcademicClass)
+                .Include(s => s.AcademicSection)
+                .Include(s => s.AcademicSession)
+                .Include(s => s.Gender)
+                .AsQueryable();
+
+            if (AcademicClassId.HasValue)
+                query = query.Where(s => s.AcademicClassId == AcademicClassId.Value);
+
+            if (AcademicSectionId.HasValue)
+                query = query.Where(s => s.AcademicSectionId == AcademicSectionId.Value);
+
+            var studentListVMs = await query
+                .Select(s => new StudentListVM
+                {
+                    Id = s.Id,
+                    ClassRoll = s.ClassRoll,
+                    Photo = s.Photo,
+                    StudentName = s.Name,
+                    NameBangla = s.NameBangla,
+                    ClassName = s.AcademicClass.Name,
+                    SectionName = s.AcademicSection.Name,
+                    PhoneNo = s.PhoneNo,
+                    SessionName = s.AcademicSession.Name,
+                    Gender = s.Gender.Name,
+                    Status = s.Status,
+                    ClassSerial = s.AcademicClass.ClassSerial,
+                    IsResidential = s.IsResidential,
+                    UniqueId = s.UniqueId,
+                    GuardianPhone = s.GuardianPhone,
+                    AcademicSessionId = s.AcademicSessionId
+                })
+                .OrderBy(s => s.ClassSerial)
+                .ThenBy(s => s.ClassRoll)
+                .ToListAsync();
+
             return studentListVMs;
         }
 
@@ -80,20 +102,62 @@ namespace SMS.DAL.Repositories
                 .FirstOrDefaultAsync(s => s.ClassRoll == classRoll);
             return student;
         }
+        public async Task<Student> GetStudentByAttendancePinAsync(string pin)
+        {
+            if (string.IsNullOrWhiteSpace(pin))
+            {
+                return null;
+            }
+
+            var keys = AttendancePinMatcher.KeyVariants(pin);
+            var byMachineId = await _context.Student
+                .Include(s => s.AcademicClass)
+                .Include(s => s.AcademicSession)
+                .Include(s => s.AcademicSection)
+                .Where(s => s.MachineUserId != null && keys.Contains(s.MachineUserId.Trim()))
+                .OrderByDescending(s => s.Status)
+                .FirstOrDefaultAsync();
+
+            return byMachineId ?? await GetStudentByUniqueIdAsync(pin);
+        }
+
         public async Task<Student> GetStudentByUniqueIdAsync(string uniqueId)
         {
+            // UniqueIds are inconsistently zero-padded across instances - and even
+            // across rows ("027826618" vs "27826618") - while callers pass raw
+            // machine CardNos, ReferenceIds and roll-derived strings. Exact match
+            // first (preserves today's behavior for clean data), then the padded
+            // variants, so a formatting difference can never silently drop a student
+            // (empty payment history, missed SMS, blank dashboard) again.
+            if (string.IsNullOrWhiteSpace(uniqueId))
+            {
+                return null;
+            }
+            var trimmed = uniqueId.Trim();
+
             var student = await _context.Student
                 .Include(s => s.AcademicClass)
                 .Include(s => s.AcademicSession)
                 .Include(s => s.AcademicSection)
-                .FirstOrDefaultAsync(s => Convert.ToInt32(s.UniqueId.Trim()).ToString() == uniqueId.Trim());
+                .FirstOrDefaultAsync(s => s.UniqueId == trimmed);
+            if (student != null)
+            {
+                return student;
+            }
+
+            var keys = AttendancePinMatcher.KeyVariants(trimmed);
+            student = await _context.Student
+                .Include(s => s.AcademicClass)
+                .Include(s => s.AcademicSession)
+                .Include(s => s.AcademicSection)
+                .FirstOrDefaultAsync(s => s.UniqueId != null && keys.Contains(s.UniqueId.Trim()));
             return student;
         }
 
         public async Task<Student> GetStudentByClassRollAsync(int id, int classRoll)
         {
             return await _context.Student
-                .FirstOrDefaultAsync(s => s.Id != id 
+                .FirstOrDefaultAsync(s => s.Id != id
                 && s.ClassRoll == classRoll);
         }
 
@@ -102,7 +166,7 @@ namespace SMS.DAL.Repositories
             List<Student> students = await _context.Student
                 .Include(s => s.AcademicSection)
                 .Include(s => s.Gender)
-                .Where(s => s.AcademicSessionId == sessionId 
+                .Where(s => s.AcademicSessionId == sessionId
                 && s.AcademicClassId == classId)
                 .ToListAsync();
             return students;
@@ -116,9 +180,18 @@ namespace SMS.DAL.Repositories
                 .Include(s => s.AcademicSection)
                 .Include(s => s.AcademicSession)
                 .Include(s => s.AcademicClass)
+                .Include(s => s.Gender)
+                .Include(s => s.PresentDivision)
+                .Include(s => s.PresentDistrict)
+                .Include(s => s.PresentUpazila)
+                .Include(s => s.PermanentDivision)
+                .Include(s => s.PermanentDistrict)
+                .Include(s => s.PermanentUpazila)
+                .Include(s => s.Religion)
+                .Include(s => s.BloodGroup)
                 .ToListAsync();
 
-            if (classId!=0)
+            if (classId != 0)
             {
                 students = students.Where(s => s.AcademicClassId == classId).ToList();
             }
@@ -132,6 +205,66 @@ namespace SMS.DAL.Repositories
                 students = (List<Student>)students.Where(s => s.AcademicSessionId == sessionId).ToList();
             }
             return students;
+        }
+
+        public async Task<List<Student>> GetStudentsForExportAsync(int sessionId, int classId, int sectionId)
+        {
+            var query = _context.Student
+                .Include(s => s.AcademicClass)
+                .Include(s => s.AcademicSection)
+                .Include(s => s.AcademicSession)
+                .Include(s => s.Gender)
+                .Include(s => s.Religion)
+                .Include(s => s.BloodGroup)
+                .Include(s => s.Nationality)
+                .Include(s => s.PresentDivision)
+                .Include(s => s.PresentDistrict)
+                .Include(s => s.PresentUpazila)
+                .Include(s => s.PermanentDivision)
+                .Include(s => s.PermanentDistrict)
+                .Include(s => s.PermanentUpazila)
+                .AsQueryable();
+
+            if (sessionId != 0)
+                query = query.Where(s => s.AcademicSessionId == sessionId);
+            if (classId != 0)
+                query = query.Where(s => s.AcademicClassId == classId);
+            if (sectionId != 0)
+                query = query.Where(s => s.AcademicSectionId == sectionId);
+
+            return await query
+                .OrderBy(s => s.AcademicClass.ClassSerial)
+                .ThenBy(s => s.ClassRoll)
+                .ToListAsync();
+        }
+
+        public async Task<List<Student>> GetStudentsWithSectionBySectionIdAsync(int academicSectionId, int? classId = null, int? sessionId = null, bool? isResidential = null)
+        {
+            var students = _context.Student
+                .Include(s => s.AcademicSection)
+                .Where(s => s.AcademicSectionId == academicSectionId);
+
+            if (classId.HasValue)
+                students = students.Where(s => s.AcademicClassId == classId.Value);
+
+            if (sessionId.HasValue)
+                students = students.Where(s => s.AcademicSessionId == sessionId.Value);
+
+            if (isResidential.HasValue)
+                students = students.Where(s => s.IsResidential == isResidential.Value);
+
+            return await students.OrderBy(s => s.ClassRoll).ToListAsync();
+        }
+
+        public async Task<List<Student>> GetStudentsWithSectionByClassSessionResidentialAsync(int classId, int sessionId, bool isResidential)
+        {
+            return await _context.Student
+                .Include(s => s.AcademicSection)
+                .Where(s => s.AcademicClassId == classId
+                    && s.AcademicSessionId == sessionId
+                    && s.IsResidential == isResidential)
+                .OrderBy(s => s.ClassRoll)
+                .ToListAsync();
         }
     }
 }

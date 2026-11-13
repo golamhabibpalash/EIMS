@@ -1,0 +1,67 @@
+﻿@model SMS_App.ViewModels.StudentPaymentVM
+@{
+    string studentPhoto = !string.IsNullOrEmpty(Model.StudentPayment.Student.Photo) ? Model.StudentPayment.Student.Photo : "noimage.jpg";
+    string studentType = "Residential";
+}
+<div class="panel bg-navy-blue" style="min-height:300px;">
+    <div class="row p-4">
+        <div class="col-md-4 text-center p-3">
+            <img src="~/Images/Student/@studentPhoto"
+                 alt="Student Photo"
+                 class="rounded-circle"
+                 style="width:50%;"
+                 onerror="this.onerror=null;this.src='/Images/Student/noimage.jpg';" />
+            <h4 class="text-light">@Model.StudentPayment.Student.Name</h4>
+        </div>
+
+        <div class="col-md-8">
+            <table class="table text-light">
+
+                <tr>
+                    <td>Academic Class</td>
+                    <td>:</td>
+                    <td>@Model.StudentPayment.Student.AcademicClass.Name</td>
+                </tr>
+                @if (Model.StudentPayment.Student.AcademicSection != null)
+                {
+                    <tr>
+                        <td>Academic Section</td>
+                        <td>:</td>
+                        <td>@Model.StudentPayment.Student.AcademicSection.Name</td>
+                    </tr>
+                }
+                <tr>
+                    <td>Unique Id</td>
+                    <td>:</td>
+                    <td>@Model.StudentPayment.Student.UniqueId</td>
+                </tr>
+                <tr>
+                    <td>Class Roll</td>
+                    <td>:</td>
+                    <td>@Model.StudentPayment.Student.ClassRoll</td>
+                </tr>
+                <tr>
+                    <td>Academic Session</td>
+                    <td>:</td>
+                    <td>@Model.StudentPayment.Student.AcademicSession.Name</td>
+                </tr>
+                <tr>
+                    <td>Admission Date</td>
+                    <td>:</td>
+                    <td>@Model.StudentPayment.Student.AdmissionDate.ToString("dd MMM yyyy")</td>
+                </tr>
+                <tr>
+                    <td>Type</td>
+                    <td>:</td>
+                    <td>
+                        
+                        @{
+                            studentType = Model.StudentPayment.Student.IsResidential==true? studentType:"Non-Residential";
+                        }
+                        @studentType
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+</div>

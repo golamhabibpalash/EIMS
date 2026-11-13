@@ -1,0 +1,94 @@
+﻿@model SMS.Entities.AdditionalModels.StudentVM.ProfileResult
+
+@{
+    double maxTotalMark = 0;
+
+}
+
+<div class="tab-pane fade " id="results" role="tabpanel" aria-labelledby="results-tab">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0">Academic Results</h5>
+        </div>
+        <div class="card-body">
+            <div class="row text-center mb-4">
+                <div class="col-md-3">
+                    <div class="border rounded p-3 bg-light">
+                        <h3 class="text-success mb-1">@Model.CurrentCGPA</h3>
+                        <p class="text-muted mb-0 small">Current CGPA</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="border rounded p-3 bg-light">
+                        <h3 class="text-info mb-1">@Model.CurrentClassRank</h3>
+                        <p class="text-muted mb-0 small">Current Class Rank</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="border rounded p-3 bg-light">
+                        <h3 class="text-danger mb-1">@Model.CurrentTotalFail</h3>
+                        <p class="text-muted mb-0 small">Total Fail</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="border rounded p-3 bg-light">
+                        <h3 class="text-primary mb-1">@Model.LastSemesterCGPA</h3>
+                        <p class="text-muted mb-0 small">Last Semester CGPA</p>
+                    </div>
+                </div>
+            </div>
+
+            <h6 class="mb-3">@Model.CurrentExamName</h6><hr />
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Subject Code</th>
+                            <th>Subject Name</th>
+                            <th>Full Mark</th>
+                            <th>Scored Mark</th>
+                            <th>Grade</th>
+                            <th>GPA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.CurrentExamDetails != null && Model.CurrentExamDetails.Count() > 0)
+                        {
+                            foreach (var item in Model.CurrentExamDetails)
+                            {
+                                maxTotalMark += item.TotalMark;
+                                <tr class="@(item.GPA == 0 ? "table-danger" : "")">
+                                    <td>@item.SubjectCode</td>
+                                    <td>@item.SubjectName</td>
+                                    <td>@item.TotalMark</td>
+                                    <td>@item.TotalObtainMark</td>
+                                    <td>@item.Grade</td>
+                                    <td>@item.GPA</td>
+                                </tr>
+                            }
+                        }
+
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <td colspan="2"><strong>Semester GPA</strong></td>
+                            <td><strong>@maxTotalMark</strong></td>
+                            <td><strong>@Model.CurrentObtainMarks</strong></td>
+                            <td><strong>@Model.CurrentGrade</strong></td>
+                            <td><strong>@Model.CurrentCGPA</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+           @*  <div class="mt-4">
+
+                <button class="btn btn-outline-primary">
+                    <i class="bi bi-download me-2"></i>Download Transcript
+                </button>
+            </div> *@
+        </div>
+    </div>
+</div>
+
+

@@ -21,15 +21,35 @@ namespace SMS.BLL.Managers.Reports
             _reportRepository = reportRepository;
         }
 
-        public async Task<List<RptAdmitCardVM>> GetAdmitCard(int monthId, int academicClassId, int academicSectionId)
+        public async Task<List<RptAdmitCardVM>> GetAdmitCard(int monthId, int academicClassId, int academicSectionId, int examTypeId, int examGroupId = 0)
         {
-            var admitCards = await _reportRepository.GetAdmitCard(monthId, academicClassId, academicSectionId);
-            return admitCards.OrderBy(s => s.ClassRoll).ToList();
+            var admitCards = await _reportRepository.GetAdmitCard(monthId, academicClassId, academicSectionId, examTypeId, examGroupId);
+
+            List<RptAdmitCardVM> filteredAdmitCards = new List<RptAdmitCardVM>();
+            foreach (var admitCard in admitCards)
+            {
+                var isExist = filteredAdmitCards.Any(s => s.SubjectCode == admitCard.SubjectCode && s.ClassRoll == admitCard.ClassRoll);
+                if (isExist)
+                {
+                    continue;
+                }
+                if (admitCard.StudentStauts)
+                {
+                    filteredAdmitCards.Add(admitCard);
+                }
+            }
+
+            return filteredAdmitCards.OrderBy(s => s.ClassRoll).ToList();
         }
 
         public async Task<List<RptDailyAttendaceVM>> GetDailyAttendanceReport(string fromDate, string academicClassId, string academicSectionId,string attendanceType, string aSessionId, string attendanceFor)
         {
             return await _reportRepository.GetDailyAttendanceReport(fromDate, academicClassId, academicSectionId, attendanceType, aSessionId, attendanceFor);
+        }
+
+        public async Task<List<RptDailyAttendaceVM>> GetDailyAttendanceReportCheckOut(string fromDate, string academicClassId, string academicSectionId, string attendanceType, string aSessionId, string attendanceFor)
+        {
+            return await _reportRepository.GetDailyAttendanceReportCheckOut(fromDate, academicClassId, academicSectionId, attendanceType, aSessionId, attendanceFor);
         }
 
         public async Task<List<RptStudentsPaymentVM>> GetStudentPayment(string fromDate, string ToDate, string AcademicClassId, string AcademicSectionId)
@@ -69,5 +89,6 @@ namespace SMS.BLL.Managers.Reports
             var result = await _reportRepository.GetStudentWiseMarkSheet(examGroupId, classId);
             return result;
         }
+
     }
 }

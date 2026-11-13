@@ -1,0 +1,179 @@
+﻿@model SMS_App.ViewModels.ExamVM.AcademicExamVM
+
+@using System.Globalization
+
+@{
+    ViewData["Title"] = "Edit Adcademic Exam";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+}
+
+<div class="row">
+    <div class="col-xs-12 col-sm-12 col-md-6 ">
+        <fieldset class="border border-info p-2">
+            <legend class="w-auto text-primary">Exam Information</legend>
+            <form asp-action="Edit" method="post">
+                @*<input type="hidden" asp-for="" value="" />*@
+                <div class="form-group row">
+                    <label class="col-form-label col-sm-4 col-md-3" asp-for="ExamName"></label>
+                    <div class=" col-sm-8 col-md-9 ">
+                        <input asp-for="ExamName" class="form-control" readonly />
+                        <span asp-validation-for="ExamName" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-form-label col-md-3" asp-for="AcademicExamTypeId"></label>
+                    <div class="col-md-9">
+                        <select asp-for="AcademicExamTypeId" asp-items="Model.AcademicExamTypeList" class="form-control" onchange="createExamName()"></select>
+                        <span asp-validation-for="AcademicExamTypeId" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-form-label col-md-3" asp-for="AcademicSessionId"></label>
+                    <div class="col-md-9">
+                        <select asp-for="AcademicSessionId" asp-items="Model.AcademicSessionList" class="form-control" onchange="createExamName()"></select>
+                        <span asp-validation-for="AcademicSessionId" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-form-label col-md-3" asp-for="AcademicClassId"></label>
+                    <div class="col-md-9">
+                        <select asp-for="AcademicClassId" asp-items="Model.AcademicClassList" class="form-control" onchange="createExamName()"></select>
+                        <span asp-validation-for="AcademicClassId" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-form-label col-md-3" asp-for="AcademicSectionId"></label>
+                    <div class="col-md-9">
+                        <select asp-for="AcademicSectionId" asp-items="Model.AcademicSectionList" class="form-control" onchange="createExamName()">
+                            <option disabled selected>Select Class First</option>
+                        </select>
+                        <span asp-validation-for="AcademicSectionId" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-form-label col-md-3" asp-for="AcademicSubjectId"></label>
+                    <div class="col-md-9">
+                        <select asp-for="AcademicSubjectId" asp-items="Model.AcademicSubjectList" class="form-control" onchange="createExamName()">
+                            <option disabled selected>Select Subject</option>
+                        </select>
+                        <span asp-validation-for="AcademicSubjectId" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-form-label col-md-3" asp-for="MonthId"></label>
+                    <div class="col-md-9">
+                        <select asp-for="MonthId" class="form-control" onchange="createExamName()">
+                            <option disabled>--Select Month--</option>
+                            @for (int i = 1; i <= 12; i++)
+                            {
+                                <option value="@i">@DateTimeFormatInfo.CurrentInfo.GetMonthName(i)</option>
+                            }
+                        </select>
+                        <span asp-validation-for="MonthId" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-form-label col-md-3" asp-for="EmployeeId"></label>
+                    <div class="col-md-9">
+                        <select asp-for="EmployeeId" asp-items="Model.TeacherList" class="form-control" onchange="createExamName()">
+                            <option selected disabled>Select Exam Teacher</option>
+                        </select>
+                        <span asp-validation-for="EmployeeId" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-form-label col-md-3" asp-for="TotalMarks"></label>
+                    <div class="col-md-9">
+                        <input asp-for="TotalMarks" class="form-control" min="10" max="100" />
+                        <span asp-validation-for="TotalMarks" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <div class="col-md-12 text-right">
+                        <input type="submit" value="Update" class="btn-info btn" />
+                    </div>
+                </div>
+            </form>
+        </fieldset>
+    </div>
+</div>
+
+@section Scripts{
+    <script>
+
+        $('#AcademicClassId').change(function () {
+            let id = $('#AcademicClassId option:selected').val();
+
+            $.ajax({
+                url: "/AcademicSubjects/GetSubjectsByClassId?classId=" + id,
+                dataType: "JSON",
+                type: "POST",
+                cache: false,
+                success: function (data) {
+                    $('#AcademicSubjectId').empty();
+
+                    if (data != null || data != '') {
+                        var o = '<option disabled selected>Select Subject</option>';
+                        $('#AcademicSubjectId').append(o);
+                        $.each(data, function (i, obj) {
+                            console.log(obj.subjectName);
+                            var op = '<option value="' + obj.id + '">' + obj.subjectName + '</option>';
+                            $('#AcademicSubjectId').append(op);
+                        });
+                    }
+                    else {
+                        var o = '<option disabled selected>Subject Not Found</option>';
+                        $('#AcademicSubjectId').append(o);
+                    }
+                },
+                error: function (err) {
+                    console.log(err);
+                }
+            });
+
+
+            let sessionId = $('#AcademicSessionId option:selected').val();
+
+            $.ajax({
+                url: "/api/academicsections/getbyclasswithsessionId?classId=" + id + "&sessionId=" + sessionId,
+                dataType: "JSON",
+                type: "POST",
+                cache: false,
+                success: function (data) {
+                    $('#AcademicSectionId').empty();
+
+                    if (data != null || data != '') {
+                        var o = '<option disabled selected>Select Section Name</option>';
+                        var o2 = '<option value="0">No Section</option>';
+                        $('#AcademicSectionId').append(o);
+                        $('#AcademicSectionId').append(o2);
+                        $.each(data, function (i, obj) {
+                            console.log(obj.name);
+                            var op = '<option value="' + obj.id + '">' + obj.name + '</option>';
+                            $('#AcademicSectionId').append(op);
+                        });
+                    }
+                    else {
+                        var o = '<option disabled selected>Section Not Found</option>';
+                        $('#AcademicSectionId').append(o);
+                    }
+                },
+                error: function (err) {
+                    console.log(err);
+                }
+            });
+
+        });
+        function createExamName() {
+            $('#ExamName').val("");
+            let subjectName = $("#AcademicSubjectId option:selected").text();
+            let className = $("#AcademicClassId option:selected").text();
+            let examType = $("#AcademicExamTypeId option:selected").text();
+            let sessionName = $("#AcademicSessionId option:selected").text();
+            let monthName = $("#MonthId option:selected").text();
+            let examName = subjectName + " (" + className + ") " + examType + " " + monthName + " " + sessionName.substr(-4);
+            $('#ExamName').val(examName);
+        }
+
+    </script>
+}

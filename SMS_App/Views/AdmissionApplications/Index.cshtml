@@ -1,0 +1,64 @@
+@model AdmissionApplicationListVM
+@{
+    ViewData["Title"] = "Admission Applications";
+    GlobalUI.PageTitle = "Admission Applications";
+}
+<partial name="_AdmissionStaffAlerts" />
+<form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-3">
+        <label class="form-label small mb-1">Session</label>
+        <select name="Filter.AdmissionSessionId" asp-items="Model.SessionList" class="form-select form-select-sm"></select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small mb-1">Class</label>
+        <select name="Filter.AdmissionProgramId" asp-items="Model.ProgramList" class="form-select form-select-sm"><option value="">All</option></select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small mb-1">Status</label>
+        <select name="Filter.Status" asp-items="Model.StatusList" class="form-select form-select-sm"><option value="">All</option></select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small mb-1">Search</label>
+        <input name="Filter.Search" value="@Model.Filter.Search" class="form-control form-control-sm" placeholder="App no, name, mobile, birth reg." />
+    </div>
+    <div class="col-6 col-md-1">
+        <label class="form-label small mb-1">From</label>
+        <input type="date" name="Filter.SubmittedFrom" value="@Model.Filter.SubmittedFrom?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+    </div>
+    <div class="col-6 col-md-1">
+        <label class="form-label small mb-1">To</label>
+        <input type="date" name="Filter.SubmittedTo" value="@Model.Filter.SubmittedTo?.ToString("yyyy-MM-dd")" class="form-control form-control-sm" />
+    </div>
+    <div class="col-md-1"><button class="btn btn-sm btn-primary w-100">Filter</button></div>
+</form>
+
+<form asp-action="BulkStartReview" method="post">
+    <input type="hidden" name="sessionId" value="@Model.Filter.AdmissionSessionId" />
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="small text-muted">@Model.Applications.Count application(s)@(Model.Applications.Count >= Model.Filter.Take ? $" (first {Model.Filter.Take} shown - narrow the filter)" : "")</div>
+        <button type="submit" class="btn btn-sm btn-outline-primary" onclick="return confirm('Move the selected new applications to Under review?')">Start review for selected</button>
+    </div>
+    <table class="table table-responsive-sm table-striped shadow">
+        <thead class="table-info">
+            <tr><th><input type="checkbox" onclick="document.querySelectorAll('.js-pick').forEach(c => c.checked = this.checked)" aria-label="Select all" /></th>
+                <th>Application no.</th><th>Applicant</th><th>Class</th><th>Guardian mobile</th><th>Submitted</th><th>Eligibility</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+            @if (!Model.Applications.Any()) { <tr><td colspan="9" class="text-center text-muted">No applications match.</td></tr> }
+            @foreach (var a in Model.Applications)
+            {
+                <tr>
+                    <td>@if (a.Status == AdmissionApplicationStatus.Submitted || a.Status == AdmissionApplicationStatus.Resubmitted) { <input type="checkbox" class="js-pick" name="selectedIds" value="@a.Id" aria-label="Select @a.ApplicationNo" /> }</td>
+                    <td><a asp-action="Details" asp-route-id="@a.Id">@a.ApplicationNo</a></td>
+                    <td>@a.Name</td>
+                    <td>@a.AdmissionProgram?.AcademicClass?.Name</td>
+                    <td>@(a.GuardianPhone ?? a.GuardianAccount?.MobileNumber)</td>
+                    <td>@a.SubmittedAt?.ToString("dd MMM yyyy")</td>
+                    <td>@if (!string.IsNullOrEmpty(a.EligibilityWarnings)) { <span class="badge @(a.EligibilityExceptionApproved ? "bg-secondary" : "bg-warning text-dark")">@(a.EligibilityExceptionApproved ? "Exception" : "Warning")</span> } else { <span class="text-success small">OK</span> }</td>
+                    <td><span class="badge @AdmissionDisplay.StatusBadge(a.Status)">@AdmissionDisplay.Name(a.Status)</span></td>
+                    <td><a asp-action="Details" asp-route-id="@a.Id" class="btn btn-sm btn-outline-primary">Open</a></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</form>

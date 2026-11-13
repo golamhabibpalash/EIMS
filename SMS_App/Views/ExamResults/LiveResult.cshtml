@@ -1,0 +1,255 @@
+﻿@using SMS.Entities.AdditionalModels
+@model LiveResultVM
+
+@{
+    bool isPassed = true;
+}
+
+<style>
+    .student-name-col {
+        width: 1%; /* shrink as much as possible */
+        white-space: nowrap; /* prevent line breaks */
+    }
+
+    .bangla {
+        background-color: #ffebcc; /* your color */
+        border: 2px solid #ffa500; /* outer border for the column */
+    }
+
+    .class-roll-col {
+        background-color: #ffebcc; /* your color */
+        border: 2px solid #ffa500; /* outer border for the column */
+    }
+
+    th.vertical {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+    }
+</style>
+
+<div class="col-md-12">
+    <form class="form-inline" asp-action="LiveResult" asp-controller="ExamResults" method="get">
+        <div class="form-row">
+            <div class="row">
+                <div class="col-md-2">
+                    <select class="form-control form-control-sm" asp-items="Model.AcademicSessionList" asp-for="AcademicSessionId" onchange="sessionChanged()">
+                        <option selected disabled>Select Session</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-control form-control-sm" asp-items="Model.AcademicExamGroupList" asp-for="ExamGroupId" onchange="examGroupChanged()">
+                        <option selected disabled>Select Exam Group</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-control form-control-sm" asp-for="AcademicClassId" asp-items="Model.AcademicClassList" onchange="academicClassDropDownChanged()">
+                        <option selected disabled>Select Academic Class</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-control form-control-sm" asp-for="AcademicSectionId" asp-items="Model.AcademicSectionList">
+                        <option selected disabled>Select Academic Section</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <input type="submit" class="btn btn-info btn-sm" value="Search" onclick="reloadData()">
+                </div>
+            </div>
+            <div>
+                @if (ViewBag.IsLoading == true)
+                {
+                    <a style="display:none" class="btn btn-sm btn-success processResultBtn" asp-controller="ExamResults" asp-action="ProcessResult" asp-route-classId="ViewBag.classId" data-classId="ViewBag.classId" asp-route-groupId="ViewBag.examGroupId" data-groupId="ViewBag.examGroupId" onclick="reloadData()">Process Result</a>
+
+                    <a style="display:none" class="btn btn-sm btn-danger deleteResultBtn" asp-controller="ExamResults" asp-action="DeleteResult" asp-route-classId="ViewBag.classId" data-classId="ViewBag.classId" asp-route-groupId="ViewBag.examGroupId" data-groupId="ViewBag.examGroupId" onclick="reloadData()">Delete Result</a>
+                }
+            </div>
+        </div>
+    </form>
+</div>
+@if (Model.ResultDetails.Count>0)
+{ 
+    <div class="">
+        <table class="table table-bordered table-responsive table-auto table-striped">
+            <thead class="table-info sticky-top" style="top:5% !important">
+                <tr>
+                    <th colspan="@Model.TotalColumn" class="text-center">@Model.ExamTitle</th>
+                </tr>
+                <tr>
+                    <th rowspan="2" class="text-center">Class Roll</th>
+                    <th rowspan="2" class="text-center text-nowrapl">Student Name</th>
+                    @foreach (var sub in Model.Subjects)
+                    {
+                        int colCount = 2 + sub.ExamTypes.Count;
+                        <th colspan="@colCount" class="text-center">
+                            @sub.SubjectName
+
+                            <p><small>(Highest @sub.HighestMark from @sub.TotalMarks)</small></p>
+                        </th>
+                    }
+                    <th rowspan="2" class="vertical">cGPA</th>
+                    <th rowspan="2" class="vertical">Final Grade</th>
+                    <th rowspan="2" class="vertical">Total Marks</th>
+                    <th rowspan="2" class="vertical">Attendance(%)</th>
+                    <th rowspan="2" class="">Status</th>
+                    <th rowspan="2" class="vertical">Fail/s</th>
+                    <th rowspan="2" class="vertical">Rank</th>
+                    <th rowspan="2" class="vertical">Previous Rank</th>
+                </tr>
+                <tr>
+                    @foreach (var item in Model.Subjects)
+                    {
+                        foreach (var type in item.ExamTypes)
+                        {
+                            <th class="vertical">@type.ExamType (@type.TotalMarks)</th>
+                        }
+                        <th class="vertical">marks</th>
+                        <th class="vertical">Grade Point</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var studentResult in Model.ResultDetails.OrderBy(s => s.ClassRoll))
+                {
+                    <tr>
+                        <td>@studentResult.ClassRoll</td>
+                        <td>@studentResult.StudentName </td>
+                        @foreach (var item in studentResult.LiveResultSubjectWises)
+                        {
+                            if (item.SubjectTypes.Count > 0)
+                            {
+                                foreach (var types in item.SubjectTypes)
+                                {
+                                    isPassed = types.GetMarks >= types.PassMark?true:false;
+                                    <td class="@(isPassed ? "" : "text-danger")">@types.GetMarks</td>
+                                }
+                            }
+                            <td>@item.ObtainMarks</td>
+                            <td>@item.GPA</td>
+                        }
+                        <td>@studentResult.FinalGPA.ToString("F1")</td>
+                        <td class="@(studentResult.FinalGrade == "F" ? "text-danger" : "")" >@studentResult.FinalGrade</td>
+                        <td>@studentResult.TotalMarks</td>
+                        <td>@studentResult.Attendance</td>
+                        <td>@studentResult.Status</td>
+                        <td>@studentResult.Fails</td>
+                        <td>@studentResult.Rank</td>
+                        <td>@studentResult.PreviousRank</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+    </div>
+}
+
+@section Scripts{
+    <script>
+        $(document).ready(function () {
+            
+        });
+
+
+        var examList;
+        function sessionChanged() {
+            var sessionId = $("#AcademicSessionId").val();
+
+            if (!sessionId) return;
+
+            $.ajax({
+                url: '/AcademicExamGroup/GetExamGroupsBySession',
+                type: 'GET',
+                data: { sessionId: sessionId },
+                success: function (data) {
+                    if (data.error) {
+                        console.error("Server error:", data.error);
+                        alert("Error: " + data.error);
+                        return;
+                    }
+                    var examGroupDropdown = $("#ExamGroupId");
+                    examGroupDropdown.empty();
+                    examGroupDropdown.append('<option selected disabled>Select Exam Group</option>');
+
+                    $.each(data, function (i, item) {
+                        examGroupDropdown.append($('<option>', {
+                            value: item.id,
+                            text: item.examGroupName
+                        }));
+                    });
+
+                    // Clear class and section dropdowns
+                    $("#AcademicClassId").empty().append('<option selected disabled>Select Academic Class</option>');
+                    $("#AcademicSectionId").empty().append('<option selected disabled>Select Academic Section</option>');
+                },
+                error: function (xhr, status, error) {
+                    console.error("Error loading exam groups:", error);
+                    console.error("Response:", xhr.responseText);
+                }
+            });
+        }
+
+        function examGroupChanged() {
+            var examGroupId = $("#ExamGroupId").val();
+
+            if (!examGroupId) return;
+
+            $.ajax({
+                url: '/api/GetAcademicClassByExamGrId',
+                type: 'GET',
+                data: { examGroupId: examGroupId },
+                dataType: "JSON",
+                type: "get",
+                cache: false,
+                success: function (data) {
+                    var classDropdown = $("#AcademicClassId");
+                    classDropdown.empty();
+                    classDropdown.append('<option selected disabled>Select Academic Class</option>');
+
+                    $.each(data, function (i, item) {
+                        classDropdown.append($('<option>', {
+                            value: item.id,
+                            text: item.name
+                        }));
+                    });
+
+                    // Clear section dropdown
+                    $("#AcademicSectionId").empty().append('<option selected disabled>Select Academic Section</option>');
+                },
+                error: function (xhr, status, error) {
+                    console.error("Error loading academic classes:", error);
+                }
+            });
+        }
+
+        function academicClassDropDownChanged(){
+            var academicClassId = $("#AcademicClassId").val();
+            var examGroupId = $("#ExamGroupId").val();
+            var sessionId = $("#AcademicSessionId").val();
+            if(!academicClassId) return;
+            $.ajax({
+                url: '/Reports/GetSectionsByExamGroup',
+                type: 'GET',
+                data: { examGroupId: examGroupId,classId:academicClassId,sessionId:sessionId },
+                success: function (data) {
+                    
+                    var sectionDropdown = $("#AcademicSectionId");
+                    sectionDropdown.empty();
+                    sectionDropdown.append('<option selected disabled>Select Academic Section</option>');
+
+                    $.each(data, function (i, item) {
+                        sectionDropdown.append($('<option>', {
+                            value: item.id,
+                            text: item.name
+                        }));
+                    });
+                },
+                error: function (xhr, status, error) {
+                    console.error("Error loading academic sections:", error);
+                }
+            });
+        }
+            
+
+    </script>
+}
+
+

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DIAGNOSTIC web.config. Upload as httpdocs/web.config, hit the site once,
+     then read httpdocs/logs/ancm.log and httpdocs/logs/app_*.log for the real
+     startup exception. Revert to the normal web.config afterwards. -->
+<configuration>
+  <location path="." inheritInChildApplications="false">
+    <system.webServer>
+      <handlers>
+        <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
+      </handlers>
+      <aspNetCore processPath="dotnet"
+                  arguments=".\SMS_App.dll"
+                  stdoutLogEnabled="true"
+                  stdoutLogFile=".\logs\app"
+                  hostingModel="outofprocess">
+        <environmentVariables>
+          <environmentVariable name="ASPNETCORE_ENVIRONMENT" value="Production" />
+          <environmentVariable name="ASPNETCORE_DETAILEDERRORS" value="true" />
+        </environmentVariables>
+        <handlerSettings>
+          <handlerSetting name="debugLevel" value="FILE,TRACE" />
+          <handlerSetting name="debugFile" value=".\logs\ancm.log" />
+        </handlerSettings>
+      </aspNetCore>
+    </system.webServer>
+  </location>
+</configuration>

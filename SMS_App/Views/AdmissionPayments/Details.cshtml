@@ -1,0 +1,58 @@
+@model AdmissionPayment
+@{
+    ViewData["Title"] = "Admission Payment";
+    GlobalUI.PageTitle = "Admission Payment";
+    var a = Model.AdmissionApplication;
+    decimal outstanding = ViewBag.Outstanding ?? 0m;
+}
+<partial name="_AdmissionStaffAlerts" />
+<div class="row g-3" style="max-width:1000px">
+    <div class="col-md-6">
+        <div class="card shadow-sm"><div class="card-body small">
+            <div class="d-flex justify-content-between"><h6>Payment</h6><span class="badge @AdmissionDisplay.PaymentBadge(Model.Status)">@AdmissionDisplay.Name(Model.Status)</span></div>
+            <div><strong>Application:</strong> <a asp-controller="AdmissionApplications" asp-action="Details" asp-route-id="@a.Id">@a.ApplicationNo</a> · @a.Name · @a.AdmissionProgram?.AcademicClass?.Name</div>
+            <div><strong>Method:</strong> @AdmissionDisplay.Name(Model.Method) @Model.Channel</div>
+            <div><strong>Amount reported:</strong> BDT @Model.Amount.ToString("0.00") on @Model.PaidOn.ToString("dd MMM yyyy")</div>
+            <div><strong>Reference:</strong> @Model.TransactionReference</div>
+            <div><strong>Submitted:</strong> @Model.CreatedAt.ToString("dd MMM yyyy HH:mm")</div>
+            <div><strong>Application outstanding:</strong> BDT @outstanding.ToString("0.00")</div>
+            @if (!string.IsNullOrEmpty(Model.ProofFileName)) { <div class="mt-2"><a asp-action="Proof" asp-route-id="@Model.Id" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="fa fa-paperclip"></i> View proof</a></div> }
+            @if (Model.VerifiedAt.HasValue)
+            {
+                <hr />
+                <div><strong>Reviewed by</strong> @ViewBag.VerifiedByName on @Model.VerifiedAt.Value.ToString("dd MMM yyyy HH:mm")</div>
+                @if (Model.VerifiedAmount.HasValue) { <div><strong>Verified amount:</strong> BDT @Model.VerifiedAmount.Value.ToString("0.00") · receipt @Model.ReceiptNo</div> }
+                @if (!string.IsNullOrEmpty(Model.ReviewRemarks)) { <div><strong>Remarks:</strong> @Model.ReviewRemarks</div> }
+                @if (Model.Status == AdmissionPaymentStatus.Verified) { <a asp-action="Receipt" asp-route-id="@Model.Id" class="btn btn-sm btn-outline-primary mt-2">Receipt</a> }
+            }
+        </div></div>
+    </div>
+    @if (Model.Status == AdmissionPaymentStatus.PendingVerification)
+    {
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-3 border-success"><div class="card-body">
+                <h6>Verify</h6>
+                <p class="small text-muted">Check the bank statement / merchant account before verifying. Enter the amount actually received.</p>
+                <form asp-action="Verify" asp-route-id="@Model.Id" method="post">
+                    <div class="d-flex gap-2 mb-2">
+                        <input type="number" step="0.01" min="0.01" max="@outstanding" name="verifiedAmount" value="@Math.Min(Model.Amount, outstanding).ToString("0.00")" class="form-control form-control-sm" aria-label="Amount received" required />
+                        <input name="reference" value="@Model.TransactionReference" class="form-control form-control-sm" aria-label="Reference" maxlength="100" />
+                    </div>
+                    <input name="remarks" class="form-control form-control-sm mb-2" placeholder="Remarks (optional)" maxlength="1000" />
+                    <button class="btn btn-sm btn-success w-100">Verify &amp; issue receipt</button>
+                </form>
+            </div></div>
+            <div class="card shadow-sm"><div class="card-body">
+                <h6>Reject / ask to correct</h6>
+                <form asp-action="Reject" asp-route-id="@Model.Id" method="post">
+                    <textarea name="reason" rows="2" class="form-control form-control-sm mb-2" placeholder="Reason (shown to the guardian), e.g. reference not found, amount does not match" required maxlength="1000"></textarea>
+                    <div class="d-flex gap-2">
+                        <button name="needsCorrection" value="true" class="btn btn-sm btn-outline-warning w-50">Needs correction</button>
+                        <button name="needsCorrection" value="false" class="btn btn-sm btn-outline-danger w-50">Reject</button>
+                    </div>
+                </form>
+            </div></div>
+        </div>
+    }
+</div>
+<a asp-action="Index" class="btn btn-sm btn-outline-secondary mt-3">Back to payments</a>

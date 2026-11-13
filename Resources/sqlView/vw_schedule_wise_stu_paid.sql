@@ -1,12 +1,13 @@
 USE [SMSDB]
 GO
 
-/****** Object:  View [dbo].[vw_schedule_wise_stu_paid]    Script Date: 16-Feb-24 11:35:24 PM ******/
+/****** Object:  View [dbo].[vw_schedule_wise_stu_paid]    Script Date: 28-Jan-25 11:44:16 PM ******/
 SET ANSI_NULLS ON
 GO
 
 SET QUOTED_IDENTIFIER ON
 GO
+
 
 
 
@@ -17,7 +18,8 @@ from StudentPaymentDetails d
 inner join StudentPayment p on d.StudentPaymentId = p.Id 
 left join student s on p.StudentId = s.Id
 left join AcademicClass c on s.AcademicClassId = c.Id
-left join StudentFeeHead f on d.StudentFeeHeadId=f.Id;
+left join StudentFeeHead f on d.StudentFeeHeadId=f.Id
+where p.AcademicSessionId = (select t.Id from AcademicSession t where t.CurrentSession = 1);
 GO
 
 

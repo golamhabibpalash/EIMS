@@ -11,5 +11,6 @@ namespace SMS.Entities.AdditionalModels
         public string PaymentType { get; set; }
         public int PaymentCount { get; set; }
         public double PaidAmount { get; set; }
+        public int FeeHeadSL { get; set; }
     }
 }

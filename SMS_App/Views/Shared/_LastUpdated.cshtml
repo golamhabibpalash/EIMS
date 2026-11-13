@@ -1,0 +1,28 @@
+﻿@inject UserManager<ApplicationUser> _userManager;
+@{
+    string createdBy = string.Empty;
+}
+
+<div class="row" style="position:absolute;bottom:20px;">
+    <div class="col-md-3">
+        <table class="table table-sm table-responsive table-responsive-sm">
+            <tr>
+                <td>Last Updated By</td>
+                <td>:</td>
+                <td>
+                    @if (ViewBag.LastUpdatedBy != null)
+                    {
+                        ApplicationUser aUser = await _userManager.FindByIdAsync(ViewBag.LastUpdatedBy);
+                        createdBy = aUser?.UserName ?? "N/F";
+                    }
+                    @createdBy
+                </td>
+            </tr>
+            <tr>
+                <td>Last Updated At</td>
+                <td>:</td>
+                <td> @ViewBag.LastUpdatedAt</td>
+            </tr>
+        </table>
+    </div>
+</div>

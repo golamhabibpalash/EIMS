@@ -1,0 +1,47 @@
+﻿@using Microsoft.AspNetCore.Identity
+
+@model IEnumerable<SMS_App.ViewModels.AdministrationVM.RoleListWIthUserVM>
+
+@{ 
+    int sl = 0;
+}
+<div>
+    <table class="table table-responsive-sm">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Role Name</th>
+                <th>
+                    <a class="p-2 btn-sm btn-info rounded-pill" asp-action="CreateRole" asp-controller="Accounts"><i class="fa fa-plus"></i> Add</a>
+                </th>
+                <th>Total User</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model != null)
+            {
+                @foreach (var role in Model)
+                {
+                    <tr>
+                        <td>@(++sl)</td>
+                        <td>@role.IdentityRole.Name</td>
+                        <td>
+                            <a class="p-2 btn-sm btn-info rounded-pill" asp-action="EditRole" asp-controller="Accounts" asp-route-id="@role.IdentityRole.Id"> Edit</a>
+                             | Delete
+                        </td>
+                        @if (role.Users != null)
+                        {
+                            <td>@role.Users.Count</td>
+                        }
+                        else
+                        {
+                            <td>None <a class="btn-sm btn-info btn" asp-controller="Accounts" asp-action="AddOrRemoveUser" asp-route-id="@role.IdentityRole.Id">Add user</a></td>
+                        }
+                    </tr>
+                }
+            }
+        </tbody>
+        
+    </table>
+</div>
+

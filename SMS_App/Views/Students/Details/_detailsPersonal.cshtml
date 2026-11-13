@@ -1,0 +1,97 @@
+﻿@model SMS_App.ViewModels.Students.PersonalDetails
+
+<div class="card">
+    <form>
+
+    </form>
+</div>
+<table class="table border-0 table-borderless table-responsive" style="height:100%;">
+    <thead>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="text-end">Student Name</td>
+            <td>:</td>
+            <td class="text-start">@Model.StudentName</td>
+        </tr>
+        <tr>
+            <td class="text-end">Gender</td>
+            <td>:</td>
+            <td class="text-start">@Model.Gender</td>
+        </tr>
+        <tr>
+            <td class="text-end">Date of Birth</td>
+            <td>:</td>
+            <td class="text-start">@Model.DateOfBirth.ToString("dd MMM yyyy") (@Model.Age years)</td>
+        </tr>
+        <tr>
+            <td class="text-end">Nationality</td>
+            <td>:</td>
+            <td class="text-start">@Model.Nationality</td>
+        </tr>
+        <tr>
+            <td class="text-end">Religion</td>
+            <td>:</td>
+            <td class="text-start">@Model.Religion</td>
+        </tr>
+        <tr>
+            <td class="text-end">Blood Group</td>
+            <td>:</td>
+            <td class="text-start">@Model.BloodGroup</td>
+        </tr>
+        <tr class="bg-blue">
+            <td class="p-1" colspan="3">
+                <span class="font-weight-bold p-2">Contact Information</span>
+            </td>
+        </tr>
+
+        <tr>
+            <td class="text-end">Phone</td>
+            <td>:</td>
+            <td class="text-start">@Model.Phone</td>
+        </tr>
+        <tr>
+            <td class="text-end">Email</td>
+            <td>:</td>
+            <td class="text-start">@Model.Email</td>
+        </tr>
+        <tr class="bg-blue">
+            <td colspan="3" class="p-1">
+                <span class="font-weight-bold p-2">Guardians Information</span>
+            </td>
+        </tr>
+
+        <tr>
+            <td class="text-end">Father's Name</td>
+            <td>:</td>
+            <td class="text-start">@Model.FatherName</td>
+        </tr>
+        <tr>
+            <td class="text-end">Mother's Name</td>
+            <td>:</td>
+            <td class="text-start">@Model.MotherName</td>
+        </tr>
+        <tr>
+            <td class="text-end">Guardian's Phone</td>
+            <td>:</td>
+            <td class="text-start"@Model.GuardianPhone</td>
+        </tr>
+        <tr class="bg-blue">
+            <td colspan="3" class="p-1">
+                <span class="font-weight-bold p-2">Address Information</span>
+            </td>
+        </tr>
+
+        <tr>
+            <td class="text-end">Present Address</td>
+            <td>:</td>
+            <td class="text-start">@Model.PresentAddress</td>
+        </tr>
+        <tr>
+            <td class="text-end">Permanent Address</td>
+            <td>:</td>
+            <td class="text-start">@Model.PermanentAddress</td>
+        </tr>
+    </tbody>
+    <tfoot></tfoot>
+</table>

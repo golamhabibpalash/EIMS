@@ -1,0 +1,92 @@
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Http
+@using SMS_App.ViewModels.Layout
+
+@inject SignInManager<ApplicationUser> _signInManager
+@inject UserManager<ApplicationUser> _userManager
+@inject IInstituteManager _instituteManager
+@inject IEmployeeManager _employeeManager
+@inject IStudentManager _studentManager
+
+@{
+#nullable enable
+    var infoTask = _instituteManager.GetAllAsync();
+    var info = await infoTask;
+    ApplicationUser? user = null;
+    
+    if (_signInManager.IsSignedIn(User))
+    {
+        user = await _userManager.GetUserAsync(User);
+    }
+
+    if (info != null && info.Any())
+    {
+        var firstInstitute = info.First();
+        GlobalUI.InstituteName = firstInstitute.Name;
+        GlobalUI.Logo = firstInstitute.Logo;
+    }
+    string instituteName = GlobalUI.InstituteName ?? "Institute Name";
+
+    string userImage = "/Images/Employee/maleEmployee.png";
+    string userName = "User";
+    string userGender = "male";
+    
+    if (user != null)
+    {
+        userName = user.UserName ?? "User";
+        try
+        {
+            if (user.UserType == 's')
+            {
+                var stu = await _studentManager.GetByIdAsync(user.ReferenceId);
+                if (stu != null)
+                {
+                    if (!string.IsNullOrEmpty(stu.Photo))
+                        userImage = $"/Images/Student/Photo/{stu.Photo}";
+                }
+            }
+            else if (user.UserType == 'e')
+            {
+                var emp = await _employeeManager.GetByIdAsync(user.ReferenceId);
+                if (emp != null)
+                {
+                    if (!string.IsNullOrEmpty(emp.Image))
+                        userImage = $"/Images/Employee/Photo/{emp.Image}";
+                    else if (emp.GenderId == 2)
+                        userImage = "/Images/Employee/femaleEmployee.png";
+                }
+            }
+        }
+        catch { }
+    }
+
+    ViewBag.UserImage = userImage;
+    ViewBag.UserName = userName;
+    ViewBag.UserGender = userGender;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Locked - @instituteName</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link href="~/lib/fontawesome/css/all.min.css" rel="stylesheet" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%);
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    @RenderBody()
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

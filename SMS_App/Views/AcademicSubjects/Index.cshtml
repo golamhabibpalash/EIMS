@@ -1,0 +1,118 @@
+﻿@model IEnumerable<SMS.Entities.AcademicSubject>
+@inject UserManager<ApplicationUser> _userManager;
+
+@{
+    ViewData["Title"] = "Academic Subjects";
+    GlobalUI.PageTitle = ViewBag.Title;
+    int sl = 0;
+    string createdBy = string.Empty;
+    string updateBy = string.Empty;
+}
+@section Styles{
+    <style>
+        .errors
+        {
+            color: red;
+        }
+    </style>
+}
+
+<table class="table table-responsive-sm" >
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>
+                @Html.DisplayNameFor(model => model.SubjectName)
+            </th>
+            @*<th>
+                    Class
+                </th>*@
+            <th>
+                @Html.DisplayNameFor(model => model.SubjectCode)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.AcademicSubjectTypeId)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SubjectFor)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.TotalMarks)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Status)
+            </th>
+            <th>
+                Created By
+            </th>
+            <th>
+                <partial name="_Create" />
+            </th>
+        </tr>
+    </thead>
+    <tbody>        
+        @foreach (var item in Model.OrderBy(m => m.AcademicClassId).ThenBy(s => s.SubjectCode))
+        {
+            ApplicationUser aUser = await _userManager.FindByIdAsync(item.CreatedBy);
+            if (aUser != null)
+            {
+                createdBy = aUser?.UserName ?? "N/F";
+            }
+            if (item.EditedBy != null)
+            {
+                aUser = await _userManager.FindByIdAsync(item.EditedBy);
+                updateBy = aUser?.UserName ?? "N/F";
+            }
+            <tr>
+                <td>
+                    @(++sl)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.SubjectName)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.SubjectCode)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.AcademicSubjectType.SubjectTypeName)
+                </td>
+                <td>
+                    @if (item.SubjectFor == 'S' || item.SubjectFor == 's')
+                    {
+                        <span>School</span>
+                    }
+                    else
+                    {
+                        <span>College</span>
+                    }
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.TotalMarks)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Status)
+                </td>
+                <td>
+                    @createdBy
+                </td>
+                <td>
+                    <partial name="_Edit_Details_Delete" model="@item.Id" />
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+
+
+
+@section Scripts{
+    <script>
+        let deleted = '@TempData["deleted"]';
+        let created = '@TempData["created"]';
+        let updated = '@TempData["updated"]';
+        let failed = '@TempData["error"]';
+    </script>
+    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
+}

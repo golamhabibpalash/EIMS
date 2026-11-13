@@ -1,0 +1,46 @@
+@model AdmissionPaymentListVM
+@{
+    ViewData["Title"] = "Admission Payments";
+    GlobalUI.PageTitle = "Admission Payment Verification";
+}
+<partial name="_AdmissionStaffAlerts" />
+<form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-3">
+        <label class="form-label small mb-1">Status</label>
+        <select name="status" class="form-select form-select-sm">
+            @foreach (var st in Enum.GetValues<AdmissionPaymentStatus>())
+            {
+                <option value="@st" selected="@(Model.Status == st)">@AdmissionDisplay.Name(st)</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label small mb-1">Session</label>
+        <select name="sessionId" asp-items="Model.SessionList" class="form-select form-select-sm"><option value="">All</option></select>
+    </div>
+    <div class="col-md-6">
+        <button class="btn btn-sm btn-primary">Filter</button>
+        <a asp-action="Index" asp-route-all="true" class="btn btn-sm btn-outline-secondary">All statuses</a>
+        <a asp-action="Index" class="btn btn-sm btn-outline-warning">Waiting for verification</a>
+    </div>
+</form>
+<table class="table table-responsive-sm table-striped shadow">
+    <thead class="table-info"><tr><th>Submitted</th><th>Application</th><th>Applicant</th><th>Class</th><th>Method</th><th>Reference</th><th class="text-end">Amount</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+        @if (!Model.Payments.Any()) { <tr><td colspan="9" class="text-center text-muted">No payments.</td></tr> }
+        @foreach (var p in Model.Payments)
+        {
+            <tr>
+                <td>@p.CreatedAt.ToString("dd MMM yyyy HH:mm")</td>
+                <td><a asp-controller="AdmissionApplications" asp-action="Details" asp-route-id="@p.AdmissionApplicationId">@p.AdmissionApplication?.ApplicationNo</a></td>
+                <td>@p.AdmissionApplication?.Name</td>
+                <td>@p.AdmissionApplication?.AdmissionProgram?.AcademicClass?.Name</td>
+                <td>@AdmissionDisplay.Name(p.Method) @p.Channel</td>
+                <td>@p.TransactionReference</td>
+                <td class="text-end">@((p.VerifiedAmount ?? p.Amount).ToString("0.00"))</td>
+                <td><span class="badge @AdmissionDisplay.PaymentBadge(p.Status)">@AdmissionDisplay.Name(p.Status)</span></td>
+                <td><a asp-action="Details" asp-route-id="@p.Id" class="btn btn-sm btn-outline-primary">Open</a></td>
+            </tr>
+        }
+    </tbody>
+</table>

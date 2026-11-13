@@ -1,0 +1,528 @@
+﻿@model SMS_App.ViewModels.ExamVM.AcademicExamDetailVM
+@inject UserManager<ApplicationUser> _userManager;
+
+@{
+    ViewData["Title"] = "Exam Details";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+
+    int i = 0;
+    int detailId = 0;
+    string examLocked = Model.Status == true ? "(Exam is Locked)" : string.Empty;
+    int tabIndex = 1;
+    string updatedBy = string.Empty;
+}
+@section Styles{
+    <link href="~/css/switch.css" rel="stylesheet" />
+    <style>
+        .error
+        {
+            border: 1px solid red !important;
+            color: red;
+        }
+    </style>
+}
+
+<div class="row" style="color:#000">
+    <div class="col-md-4">
+        <fieldset class="border border-info p-2 m-2">
+            <legend style="width:fit-content;padding:5px">@Model.AcademicExamGroup.ExamGroupName</legend>
+            <table class="table table-sm table-responsive-sm">
+                <thead>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Subject</td>
+                        <td>:</td>
+                        <td>@Model.AcademicSubject.SubjectName (@Model.AcademicSubject.SubjectCode)</td>
+                    </tr>
+                    <tr>
+                        <td>Exam Category</td>
+                        <td>:</td>
+                        <td>@Model.ExamCategory</td>
+                    </tr>
+                    <tr>
+                        <td>Class</td>
+                        <td>:</td>
+                        <td>
+                            @Model.AcademicClass.Name
+                            (
+                            @if (Model.AcademicSection == null)
+                            {
+                                <span>All Section</span>
+                            }
+                            else
+                            {
+                                @Model.AcademicSection.Name
+                            }
+                            )
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Session</td>
+                        <td>:</td>
+                        <td>@Model.AcademicExamGroup.AcademicSession.Name</td>
+                    </tr>
+                    <tr>
+                        <td>Month</td>
+                        <td>:</td>
+                        <td>@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(@Model.AcademicExamGroup.ExamMonthId)</td>
+                    </tr>
+                    <tr>
+                        <td>Students</td>
+                        <td>:</td>
+                        <td>@Model.AcademicExamDetails.Count()</td>
+                    </tr>
+                    <tr>
+                        <td>Teacher</td>
+                        <td>:</td>
+                        <td>@Model.Employee.EmployeeName</td>
+                    </tr>
+                    <tr>
+                        <td>Total Marks</td>
+                        <td>:</td>
+                        <td>@Model.TotalMarks</td>
+                    </tr>
+                </tbody>
+            </table>
+        </fieldset>
+        <div class="row">
+            <span class="wall text-center">
+                <button class="btn btn-block btn-info" data-bs-toggle="modal" data-bs-target=".addStudentModal">Add Student</button>
+            </span>
+        </div>
+        <div class="row mt-1">
+            <span class="wall text-center">
+                <a class="btn btn-block btn-success" asp-action="ExportMarkEntrySheet" asp-route-id="@Model.Id" target="_blank">
+                    <i class="fa fa-download"></i> Export Mark Entry Sheet
+                </a>
+            </span>
+        </div>
+        <div class="row">
+            <div class="col-md-12 text-center">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title h4">Question Image</span>
+                    </div>
+                    <div class="card-body">
+                        @*<img src="~/Images/Question/q_1_21__37_0.jpg" class="img-fluid" alt="Alternate Text" />*@
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12 text-center mh-100">
+                <a class="btn btn-info btn-sm" asp-action="Index" asp-controller="AcademicExams">Back to Exam List</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8 p-2">
+        <div class="row">
+            <div class="col-md-12 text-center">
+                <h3 class="well well-sm bg-info text-light">Mark Distribution <span class="text-danger">@examLocked</span></h3>
+            </div>
+        </div>
+        
+        <div class="row mb-2">
+            <div class="col-md-12">
+                <div class="custom-control custom-switch">
+                    <input type="checkbox" class="custom-control-input" id="mergeModeToggle" onchange="toggleMergeMode()" />
+                    <label class="custom-control-label" for="mergeModeToggle">
+                        <strong>Merge Mode</strong> - Show all sections together (same Session, Class, Subject, Exam Type)
+                    </label>
+                </div>
+                <small class="text-muted">Enable to input marks for all sections of the same exam at once</small>
+            </div>
+        </div>
+        
+        <div class="row mb-2">
+            <div class="col-md-12">
+                <div class="card bg-light">
+                    <div class="card-body p-2">
+                        <h5 class="card-title">OCR Mark Import</h5>
+                        <p class="card-text small mb-2">Upload an image of handwritten marksheet to auto-fill marks. Expected format: ClassRoll | CQ | MCQ | Prac columns</p>
+                        <div class="row align-items-center">
+                            <div class="col-md-4">
+                                <input type="file" class="form-control form-control-sm" id="ocrImageInput" accept="image/*" />
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select form-select-sm" id="ocrExamType">
+                                    <option value="CQ">CQ (Written)</option>
+                                    <option value="MCQ">MCQ</option>
+                                    <option value="Prac">Practical</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <button type="button" class="btn btn-primary btn-sm" id="processOcrBtn" onclick="processOCRImage()">Process OCR</button>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-12">
+                                <div class="progress" id="ocrProgress" style="display: none;">
+                                    <div class="progress-bar" role="progressbar" style="width: 0%" id="ocrProgressBar">0%</div>
+                                </div>
+                                <small id="ocrStatus" class="text-muted"></small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <form asp-action="ExmaMarkSubmit" asp-controller="AcademicExams" method="post" id="myForm">
+            <input asp-for="Id" type="hidden" />
+            <table class="table table-sm table-responsive-sm table-striped table-bordered">
+                <thead class="table-info font-weight-bolder">
+                    <tr>
+                        <td>#</td>
+                        <td>Class Roll</td>
+                        <td>Student Name</td>
+                        <td>Marks</td>
+                        <td>Is Present</td>
+                        <td>Remarks</td>
+                        <td>Updated by</td>
+                        <td>
+                            <i class="fa fa-edit"></i>
+                        </td>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.AcademicExamDetails.OrderBy(c => c.Student?.ClassRoll).Where(s => s.Student.Status == true))
+                    {
+                        if (item.EditedBy != null)
+                        {
+                            ApplicationUser aUser = await _userManager.FindByIdAsync(item.EditedBy);
+                            updatedBy = aUser?.UserName ?? "N/F";
+                        }
+                        <tr>
+                            <td>@(++i) <input type="hidden" asp-for="AcademicExamDetails[detailId].AcademicExamId" value="@Model.Id" /> </td>
+                            <td>@item.Student.ClassRoll <input type="hidden" asp-for="AcademicExamDetails[detailId].StudentId" /></td>
+                            <td>@item.Student.Name <input type="hidden" asp-for="AcademicExamDetails[detailId].Id" /></td>
+                            <td style="width:50px;padding:0px;">
+                                @if (Model.Status)
+                                {
+                                    <input disabled asp-for="AcademicExamDetails[detailId].ObtainMark" max="@Model.TotalMarks" min="0" style="width:60px;height:35px;text-align:center;border:none" />
+                                }
+                                else
+                                {
+                                    <input class="markInput" tabindex="@tabIndex" asp-for="AcademicExamDetails[detailId].ObtainMark" max="@Model.TotalMarks" inputmode="numeric" pattern="[0-9]*" placeholder="0" style="width:60px;height:35px;text-align:center;border:none" onchange="handleInputChange(this)" data-academicExamId="@item.AcademicExamId" data-Id="@item.Id" data-StudentId="@item.StudentId" />
+                                }
+                            </td>
+                            <td class="flex-wrap justify-content-center">
+                                <label class="switch m-0">
+                                    @if (Model.Status)
+                                    {
+                                        <input disabled asp-for="AcademicExamDetails[detailId].Status" title="Is Present" />
+                                    }
+                                    else
+                                    {
+                                        <input asp-for="AcademicExamDetails[detailId].Status" title="Is Present" />
+                                    }
+                                    <span class="slider round"></span>
+                                </label>
+                            </td>
+                            <td style="padding:0px">
+                                @if (Model.Status)
+                                {
+                                    <input disabled asp-for="AcademicExamDetails[detailId].Remarks" placeholder="write here if any comment" style="width:100%;height:30px;text-align:left;border:none" />
+                                }
+                                else
+                                {
+                                    <input asp-for="AcademicExamDetails[detailId].Remarks" placeholder="write here if any comment" style="width:100%;height:30px;text-align:left;border:none" />
+                                }
+                            </td>
+                            <td>
+                                @updatedBy
+                            </td>
+                            <td>
+                                <i class="fa fa-trash text-danger btn-sm btn p-0 m-0" data-bs-toggle="tooltip" data-bs-placement="top" title="Delete From this exam list" data-examDetailId="@Model.AcademicExamDetails[detailId].Id" onclick="confirmDelete(this)"></i>
+                            </td>
+                        </tr>
+                        detailId++;
+                        tabIndex++;
+                    }
+                </tbody>
+            </table>
+            <div class="row">
+                <div class="col-md-12 text-center">
+                    @if (Model.Status)
+                    {
+                        <input disabled class="btn btn-info" type="submit" value="Submit" />
+                    }
+                    else
+                    {
+                        <input class="btn btn-info" type="submit" value="Submit" onclick="submitForm()" />
+                    }
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<div class="modal fade addStudentModal" tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel" aria-hidden="true">
+    <div class="modal-dialog ">
+        <div class="modal-content">
+            <div class="card">
+                <div class="card-header text-center">
+                    <span class="card-title">Add Student in the <span class="h6"> @Model.AcademicSubject.SubjectName (@Model.AcademicSubject.SubjectCode)</span></span>
+                </div>
+                <div class="card-body">
+                    <form  asp-action="AddStudentToExistingExam" asp-controller="AcademicExams" method="post">
+                        <input type="hidden" name="AcademicExamId" value="@Model.Id" />
+                        <div class="form-group row">
+                            <label for="" class="col-sm-3 col-form-label text-right">Student</label>
+                            <div class="col-sm-9">
+                                <select class="form-control select2" name="StudentId">
+                                    <option value="">-Select Student-</option>
+                                    @if (Model.MissingStudentList?.Count > 0)
+                                    {
+                                        foreach (var item in Model.MissingStudentList)
+                                        {
+                                            <option value="@item.Value">@item.Text</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label class="col-form-label col-sm-3 text-right">Marks</label>
+                            <div class="col-sm-9">
+                                <input type="number" class="form-control"  name="ObtainMarks" max="@Model.TotalMarks" inputmode="numeric" pattern="[0-9]*" placeholder="0"/>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label class="col-form-label col-sm-3 text-right">Remarks</label>
+                            <div class="col-sm-9">
+                                <input type="text" class="form-control" name="Remarks"/>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-sm-12 text-right">
+                                <button type="submit" class="btn btn-primary">Submit</button>
+                                <button type="button" class="btn btn-success" onclick="addAllStudents(this)">Add All Students</button>
+                            </div>
+                        </div>
+                        <div id="bulkResult" class="mt-2" style="display:none;"></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts{
+    <script>
+        $(document).ready(function () {
+            var inputFields = document.getElementsByClassName("markInput");
+            // Loop through all input fields with class "markInput"
+            for (var i = 0; i < inputFields.length; i++) {
+                var inputValue = inputFields[i].value.trim();
+                if (inputValue === "0") {
+                    inputFields[i].value = "";
+                }
+            }
+            
+            // Setup tab navigation for mark inputs
+            setupTabNavigation();
+        });
+
+        function setupTabNavigation() {
+            var markInputs = document.querySelectorAll('.markInput:not([disabled])');
+            
+            // Set tabindex on mark inputs
+            markInputs.forEach(function(input, index) {
+                input.setAttribute('tabindex', index + 1);
+            });
+            
+            // Make other inputs (checkbox, remarks, delete icons) not focusable via Tab
+            var statusCheckboxes = document.querySelectorAll('input[type="checkbox"][name*="Status"]');
+            statusCheckboxes.forEach(function(cb) {
+                cb.setAttribute('tabindex', '-1');
+            });
+            
+            var remarksInputs = document.querySelectorAll('input[name*="Remarks"]:not([disabled])');
+            remarksInputs.forEach(function(input) {
+                input.setAttribute('tabindex', '-1');
+            });
+            
+            // Remove tabindex from delete buttons
+            var deleteBtns = document.querySelectorAll('i[data-examDetailId]');
+            deleteBtns.forEach(function(btn) {
+                btn.setAttribute('tabindex', '-1');
+            });
+            
+            // Handle Enter key to move to next mark input
+            markInputs.forEach(function(input, index) {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleInputChange(this);
+                        
+                        var nextInput = markInputs[index + 1];
+                        if (nextInput) {
+                            nextInput.focus();
+                            nextInput.select();
+                        }
+                    }
+                });
+                
+                // Handle arrow keys for quick navigation
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        var nextInput = markInputs[index + 1];
+                        if (nextInput) {
+                            nextInput.focus();
+                            nextInput.select();
+                        }
+                    }
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        var prevInput = markInputs[index - 1];
+                        if (prevInput) {
+                            prevInput.focus();
+                            prevInput.select();
+                        }
+                    }
+                });
+            });
+        }
+
+        function toggleMergeMode() {
+            var isChecked = document.getElementById("mergeModeToggle").checked;
+            var examId = document.querySelector('input[name="Id"]').value;
+            
+            if (isChecked) {
+                window.location.href = '/AcademicExams/Details/' + examId + '?mergeMode=true';
+            } else {
+                window.location.href = '/AcademicExams/Details/' + examId + '?mergeMode=false';
+            }
+        }
+
+        function handleInputChange(inputElement) {
+            var maxAttributeValue = inputElement.getAttribute("max");
+            var academicexamid = inputElement.getAttribute("data-academicexamid");
+            var studentid = inputElement.getAttribute("data-studentid");
+            var id = inputElement.getAttribute("data-id");
+            var obtainMark = inputElement.value;
+
+            if (Number(obtainMark) > Number(maxAttributeValue)) {
+                inputElement.classList.add("error");
+                alert(`Mark should not exceed from Total Mark(${Number (maxAttributeValue)}).`);
+            } else {
+                inputElement.classList.remove("error");
+
+                var examDetail = JSON.stringify({
+                    AcademicExamId: academicexamid,
+                    ObtainMark: obtainMark,
+                    StudentId: studentid,
+                    Id: id,
+                    Status: true,
+                    Remarks: "",
+                });
+
+                $.ajax({
+                    type: "POST",
+                    url: "/AcademicExams/ExamMarkSubmitAjax",
+                    data: examDetail,
+                    contentType: "application/json",
+                    dataType: "json",
+                    success: function (data) {
+                        // Handle the response from the server
+                        console.log(data);
+                    },
+                    error: function (error) {
+                        console.log("Error:", error);
+                    },
+                });
+            }
+        }
+
+        function submitForm() {
+            var inputFields = document.getElementsByClassName("markInput");
+            var inputFieldNumber = 0;
+            var maxNumber = 0;
+            // Loop through all input fields with class "markInput"
+            for (var i = 0; i < inputFields.length; i++) {
+                inputFieldNumber = inputFields[i].value.trim();
+                if (inputFieldNumber === "" || inputFieldNumber === null) {
+                    inputFields[i].value = "0";
+                }
+                maxNumber = inputFields[i].max;
+                if (Number(inputFieldNumber) > Number(maxNumber)) {
+                    inputFields[i].classList.add("error");
+                    alert("Mark should not exceed from Total Mark.");
+                    return; // Stop form submission
+                }
+                else {
+                    inputFields[i].classList.remove("error");
+                }
+            }
+
+            // Now, you can submit the form
+            document.getElementById("myForm").submit();
+        }
+
+        function addAllStudents(btn) {
+            if (!confirm('Are you sure you want to add all remaining students to this exam?')) return;
+
+            var examId = document.querySelector('input[name="AcademicExamId"]').value;
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+
+            $.ajax({
+                type: 'POST',
+                url: '/AcademicExams/AddAllStudentsToExam',
+                data: { academicExamId: examId },
+                success: function (response) {
+                    if (response.success) {
+                        var msg = 'Successfully added ' + response.addedCount + ' students.';
+                        if (response.skippedCount > 0) {
+                            msg += ' ' + response.skippedCount + ' students were skipped because they were already added to the exam.';
+                        }
+                        $('#bulkResult').removeClass('alert alert-danger').addClass('alert alert-success').text(msg).show();
+                        setTimeout(function () { location.reload(); }, 2000);
+                    } else {
+                        $('#bulkResult').removeClass('alert alert-success').addClass('alert alert-danger').text(response.message).show();
+                    }
+                },
+                error: function () {
+                    $('#bulkResult').removeClass('alert alert-success').addClass('alert alert-danger').text('An error occurred.').show();
+                },
+                complete: function () {
+                    btn.disabled = false;
+                    btn.textContent = 'Add All Students';
+                }
+            });
+        }
+
+        function confirmDelete(element) { 
+            // Read attributes from the clicked icon 
+            var examDetailId = element.getAttribute("data-examDetailId"); 
+            
+            // Show confirmation alert 
+            if (confirm("Are you sure you want to delete this exam?")) { 
+                // Call your custom function with parameters
+                deleteExam(element, examDetailId);
+            } 
+        }
+
+        // Example function that receives the parameters
+        function deleteExam(element, examDetailId) {
+            $.ajax({ url: '/AcademicExams/RemoveExamDetailsFromExam', 
+            type: 'POST', 
+            data: { examDetailId: examDetailId }, 
+            success: function (response) {
+                if (response === true) {
+                    alert("Exam detail deleted successfully!");
+                    $(element).closest('tr').remove(); 
+                } else { 
+                        alert("Failed to delete exam detail."); 
+                    } 
+                }, 
+                error: function (xhr, status, error) { 
+                    console.error("Error deleting exam detail:", error); alert("An error occurred while deleting."); } 
+                    });
+        }
+    </script>
+}

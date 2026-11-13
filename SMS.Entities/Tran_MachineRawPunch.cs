@@ -11,7 +11,7 @@ namespace SMS.Entities
     {
         [Key]
         public int Tran_MachineRawPunchId { get; set; }
-        [StringLength(10)]
+        [StringLength(20)]
         public string CardNo { get; set; }
 
         [Display(Name ="Punch Date Time")]
@@ -22,7 +22,17 @@ namespace SMS.Entities
         [StringLength(50)]
         public string PayCode { get; set; }
 
-        [StringLength(5)]
+        [StringLength(50)]
         public string MachineNo { get; set; }
+
+        [Display(Name = "Verify Mode")]
+        public int? VerifyMode { get; set; }
+
+        [Display(Name = "Machine Serial No")]
+        [StringLength(50)]
+        public string MachineSerialNo { get; set; }
+
+        [Display(Name = "Is Synced")]
+        public bool IsSynced { get; set; } = false;
     }
 }

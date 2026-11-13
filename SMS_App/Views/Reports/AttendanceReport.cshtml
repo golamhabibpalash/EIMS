@@ -1,0 +1,170 @@
+﻿@model SMS_App.ViewModels.AttendanceVM.MonthlyAttendanceFullClass
+
+@using System.Globalization
+@{
+    ViewData["Title"] = "Attendance Report";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+    DateTime myDate = DateTime.Today;
+    if (ViewBag.startDate != null)
+    {
+        myDate = Convert.ToDateTime(ViewBag.StartDate);
+    }
+}
+<div class="row">
+    <div class="col-md-4 m-3">
+        <fieldset style="border: 1px solid" class="p-3">
+            <legend  class="float-none w-auto text-primary px-2"
+                        style="font-size: 1.1rem; position: relative;" style="width:fit-content">Select month and class</legend>
+            <form asp-action="attendanceReport" method="post">
+                <div class="form-group row">
+                    <label class="col-md-3">Select Month</label>
+                    <div class="col-md-9">
+                        <select asp-items="ViewBag.Monthlist" name="monthId" class="form-control" required>
+                            <option selected disabled>Select a month</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-md-3">Academic Class</label>
+                    <div class="col-md-9">
+                        <select asp-items="ViewBag.AcademicClasslist" name="classId" class="form-control" required>
+                            <option selected disabled>Select a Class</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <div class="col-md-2 offset-9 offset-sm-6">
+                        <input class="btn btn-info" type="submit" value="Get Report" />
+                    </div>
+                </div>
+            </form>
+        </fieldset>
+    </div>
+    @if (Context.Request.Method == "POST")
+    {
+        <div class="col-md-6 m-3">
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item text-danger"># All of the Red Column are holiday</li>
+                <li class="list-group-item text-danger"># Percentage are applied only when opened the school</li>
+                <li class="list-group-item text-danger"># You can export table as pdf/excel format by clicking the related icon</li>
+                <li class="list-group-item text-danger"># This report is only for current year</li>
+            </ul>
+        </div>
+    }
+</div>
+@if (Context.Request.Method == "POST")
+{
+    <div class="row">
+        <div class="col-md-12 p-2">
+            <div class="row">
+                <div class="col-md-12">
+                    <table class="table table-bordered table-sm" id="capture">
+                        <thead>
+                            <tr>
+                                <td class="border-0" colspan="@(ViewBag.daysInMonth+4)">
+                                    <div class="col-md-8 offset-2 text-center">
+                                        @if (Model.MonthName != null)
+                                        {
+                                            <h3 class="text-center"> Monthly attendance for @Model.MonthName @DateTime.Now.Year</h3>
+                                        }
+                                        @if (Model.ClassName != null)
+                                        {
+                                            <h4 class="text-center">@Model.ClassName</h4>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="bg-blue-sky  table-borderless">
+                                <td>Roll</td>
+                                <td>Student Name</td>
+                                @if (ViewBag.daysInMonth != null)
+                                {                                    
+                                    for (int i = 1; i <= ViewBag.daysInMonth; i++)
+                                    {
+                                        DateTime mDate = myDate.AddDays(i - 1);
+                                        @if (ViewBag.monthlyHolidays != null)
+                                        {
+                                            List<DateTime> mHolidays = ViewBag.monthlyHolidays;
+                                            bool isHoliday = (from m in mHolidays
+                                                              where m.ToString("ddMMyyyy") == mDate.ToString("ddMMyyyy")
+                                                              select m).Any();
+                                            if (isHoliday)
+                                            {
+                                                <td class="bg-warning table-borderless" data-toggle="tooltip" data-placement="top" data-html="true" title="@mDate.ToString("dd MMM yyyy") <br /> @mDate.ToString("dddd")"> @i</td>
+                                            }
+                                            else
+                                            {
+                                                <td class="" data-toggle="tooltip" data-placement="top" data-html="true" title="@mDate.ToString("dd MMM yyyy") <br /> @mDate.ToString("dddd")"> @i</td>
+                                            }
+
+                                        }
+                                        else
+                                        {
+                                            <td class="" data-toggle="tooltip" data-placement="top" data-html="true" title="@mDate.ToString("dd MMM yyyy") <br /> @mDate.ToString("dddd")"> @i</td>
+
+                                        }
+                                    }
+                                }
+                                <td>Total</td>
+                                <td>%</td>
+                            </tr>
+                        </thead>
+                        <tbody class="">
+                            @if (Model != null)
+                            {
+                                if (Model.MothlyAttendanceFullClassDetailses != null)
+                                {
+                                    @foreach (var item in Model.MothlyAttendanceFullClassDetailses.OrderBy(s => s.Roll))
+                                    {
+                                        <tr class="">
+                                            <td class="table-primary">@item.Roll</td>
+                                            <td class="table-primary">@item.StudentName</td>
+                                            @if (item.isPresents != null)
+                                            {
+                                                foreach (KeyValuePair<int, bool> item1 in item.isPresents)
+                                                {
+                                                    @if (item1.Value == true)
+                                                    {
+                                                        <td class="text-center">P</td>
+                                                    }
+                                                    else
+                                                    {
+                                                        bool isOffDay = (from s in item.Holidays
+                                                                         where item1.Key == s.Day
+                                                                         select s).Any();
+                                                        if (isOffDay)
+                                                        {
+                                                            <td class="bg-warning border-0"></td>
+                                                        }
+                                                        else
+                                                        {
+                                                            <td class="text-center">.</td>
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            <td class="font-weight-bolder">@item.Total</td>
+                                            <td class="font-weight-bolder">@item.CountPercentage%</td>
+                                        </tr>
+                                    }
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-10 p-2">
+                    <p class="lead">
+                        <button id="csv" class="btn btn-info">TO CSV</button>
+                        <button id="pdf" class="btn btn-danger">TO PDF</button>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+}
+@section Scripts{
+   
+}

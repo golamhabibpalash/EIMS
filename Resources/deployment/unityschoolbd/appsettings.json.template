@@ -1,0 +1,34 @@
+{
+  "DatabaseProvider": "SqlServer",
+  "ConnectionStrings": {
+    "DefaultConnection": "PASTE_ENCRYPTED_CONNECTION_STRING_HERE"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Warning",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.EntityFrameworkCore": "Error"
+    }
+  },
+  "AllowedHosts": "*",
+  "PhoneSMSSetup": {
+    "PhoneSMSVendorAPILink": "http://api.greenweb.com.bd/api.php?",
+    "Token": "YOUR_GREENWEB_TOKEN"
+  },
+  "Hangfire": {
+    "DashboardPath": "/hangfire",
+    "WorkerCount": 2,
+    "IsEnabled": false
+  },
+  "SmtpSettings": {
+    "Email": "YOUR_SMTP_EMAIL",
+    "Password": "YOUR_SMTP_PASSWORD"
+  },
+  "Jwt": {
+    "Key": "GENERATE_A_RANDOM_KEY_OF_AT_LEAST_32_CHARACTERS",
+    "Issuer": "EIMS",
+    "Audience": "EIMS.Mobile",
+    "AccessTokenMinutes": 60,
+    "RefreshTokenDays": 30
+  }
+}

@@ -1,0 +1,67 @@
+﻿@model SMS_App.ViewModels.PaymentVM.SinglePaymentVM
+@{
+    int sl = 1;
+    double total = 0;
+    double paid = 0;
+    double balance = 0;
+}
+
+<div class="card text-center">
+    <div class="card-header">
+        <h3>
+            @Model.PaymentsTitle (@Model.AcademicSession)
+        </h3>
+    </div>
+    <div class="card-body">
+            <table class="table table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th width="10">#</th>
+                        <th width="40" class="text-left">Paid For</th>
+                        <th width="10" class="text-right">Amount</th>
+                        <th width="10" class="text-right">Paid Amount</th>
+                        <th width="10" class="text-right">Balance/Due</th>
+                        <th width="20">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.SessionWisePaymentVMs)
+                    {
+                        <tr>
+                            <td>@sl</td>
+                            <td class="text-left">@item.FeeHeadName</td>
+                            <td class="text-right">@item.Amount</td>
+                            <td class="text-right">@item.PaidAmount</td>
+                            <td class="text-right">
+                                @if (item.Balance>=0)
+                                {
+                                    <span>@item.Balance</span>
+                                }
+                                else
+                                {
+                            <span class="text-danger">@item.Balance</span>
+                                }
+                            </td>
+                            <td>@item.Status</td>
+                        </tr>
+                        sl++;
+                        total += item.Amount;
+                        paid += item.PaidAmount;
+                        balance += item.Balance;
+                    }
+                    <tr></tr>
+                </tbody>
+                <tfoot>
+                    <tr class="table-secondary">
+                        <td colspan="2" class="text-right font-weight-bolder">Total Balance</td>
+                        <td class="text-right font-weight-bolder">@total</td>
+                        <td class="text-right font-weight-bolder">@paid</td>
+                        <td class="text-right font-weight-bolder">@balance</td>
+                        <td class="font-weight-bolder">Partial Paid</td>
+                    </tr>
+                </tfoot>
+            </table>
+        }
+    </div>
+</div>
+<br>

@@ -15,6 +15,11 @@ namespace SMS.BLL.Managers
             _employeeRepository = employeeRepository;
         }
 
+        public async Task<Employee> GetByMachineUserIdAsync(string machineUserId)
+        {
+            return await _employeeRepository.GetByMachineUserIdAsync(machineUserId);
+        }
+
         public async Task<Employee> GetByPhoneAttendance(string phoneLast9Digit)
         {
             return await _employeeRepository.GetByPhoneAttendance(phoneLast9Digit);

@@ -31,6 +31,7 @@ namespace SMS.DAL.Repositories
                     .Include(s => s.Student)
                         .ThenInclude(s => s.AcademicClass)
                      .Include(s => s.Student.Gender)
+                     .Include(s => s.Student.AcademicSection)
                     .Where(s => s.AcademicExamGroupId == examGroupId && s.AcademicClassId == classId)
                     .ToListAsync();
             }
@@ -46,6 +47,40 @@ namespace SMS.DAL.Repositories
         {
             bool isExist = _dbContext.ExamResults.Any(s => s.AcademicExamGroupId == examGroupId && s.AcademicClassId == classId);
             return isExist;
+        }
+
+        public async Task<bool> DeleteByGroupAndClassAsync(int groupId, int classId)
+        {
+            var results = await _dbContext.ExamResults
+                .Include(r => r.ExamResultDetails)
+                .Where(r => r.AcademicExamGroupId == groupId && r.AcademicClassId == classId)
+                .ToListAsync();
+
+            if (!results.Any()) return false;
+
+            var details = results.SelectMany(r => r.ExamResultDetails).ToList();
+            if (details.Any())
+            {
+                _dbContext.ExamResultDetails.RemoveRange(details);
+            }
+            _dbContext.ExamResults.RemoveRange(results);
+            return await _dbContext.SaveChangesAsync() > 0;
+        }
+
+        public async Task<Dictionary<(int ExamGroupId, int ClassId), bool>> GetResultProcessedStatusBulkAsync(IEnumerable<(int ExamGroupId, int ClassId)> examGroupAndClassPairs)
+        {
+            var pairs = examGroupAndClassPairs.ToList();
+            if (!pairs.Any()) return new Dictionary<(int, int), bool>();
+
+            var existingPairs = await _dbContext.ExamResults
+                .Select(s => new { s.AcademicExamGroupId, s.AcademicClassId })
+                .ToListAsync();
+
+            var existingSet = existingPairs
+                .Select(s => (s.AcademicExamGroupId, s.AcademicClassId))
+                .ToHashSet();
+
+            return pairs.ToDictionary(p => p, p => existingSet.Contains(p));
         }
 
     }

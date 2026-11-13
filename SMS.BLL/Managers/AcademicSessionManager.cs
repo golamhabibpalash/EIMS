@@ -20,12 +20,12 @@ namespace SMS.BLL.Managers
             _academicSessionRepository = academicSessionRepository;
         }
 
-        public async Task<AcademicSession> GetCurrentAcademicSession()
+        public async Task<AcademicSession> GetCurrentAcademicSessionAsync()
         {
             return await _academicSessionRepository.GetCurrentAcademicSession();
         }
 
-        public Task<bool> IsExistByName(string name)
+        public Task<bool> IsExistByNameAsync(string name)
         {
            return _academicSessionRepository.Table.AnyAsync(s => s.Name .Equals(name));
         }

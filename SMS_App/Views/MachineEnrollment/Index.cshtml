@@ -1,0 +1,134 @@
+@model SMS_App.ViewModels.MachineVM.MachineEnrollmentIndexVM
+
+@{
+    ViewData["Title"] = "Machine User Enrollment";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+    int sl = 0;
+}
+
+@if (TempData["success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["success"]
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    </div>
+}
+
+<div class="row mb-2" id="searching_div">
+    <div class="col-md-12">
+        <form asp-action="Index" method="get" class="form-inline">
+            <select name="userType" class="form-control mr-2 mb-1" onchange="this.form.submit()">
+                <option value="all" selected="@(((string)ViewBag.UserType) == "all")">All</option>
+                <option value="employees" selected="@(((string)ViewBag.UserType) == "employees")">Employees Only</option>
+                <option value="students" selected="@(((string)ViewBag.UserType) == "students")">Students Only</option>
+            </select>
+            <input type="text" name="search" value="@ViewBag.Search" class="form-control mr-2 mb-1" placeholder="Search by name/roll..." />
+            <button type="submit" class="btn btn-info mb-1"><i class="fa fa-search"></i> Search</button>
+            <span class="ml-3 text-muted small">Assign the Machine User ID that matches the ID used on the fingerprint device, then use Device &gt; Sync Users to push them.</span>
+        </form>
+    </div>
+</div>
+
+<ul class="nav nav-tabs" id="enrollTabs" role="tablist">
+    <li class="nav-item">
+        <a class="nav-link active" id="emp-tab" data-bs-toggle="tab" href="#employees" role="tab">Employees (@Model.Employees.Count)</a>
+    </li>
+    @if (Model.Students.Count > 0)
+    {
+        <li class="nav-item">
+            <a class="nav-link" id="stu-tab" data-bs-toggle="tab" href="#students" role="tab">Students (@Model.Students.Count)</a>
+        </li>
+    }
+</ul>
+
+<div class="tab-content shadow-sm p-2" id="enrollTabsContent">
+    <div class="tab-pane fade show active" id="employees" role="tabpanel">
+        <table class="table table-striped table-hover table-sm">
+            <thead class="table-info">
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Designation</th>
+                    <th>Phone</th>
+                    <th width="25%">Machine User ID</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model.Employees)
+            {
+                <tr class="@(!item.Status ? "text-muted" : "")">
+                    <td>@(++sl).</td>
+                    <td>@item.EmployeeName @(item.Status ? "" : "(inactive)")</td>
+                    <td>@item.Designation</td>
+                    <td>@item.Phone</td>
+                    <td colspan="2">
+                        <form asp-action="UpdateEmployeeMachineId" method="post" class="form-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@item.Id" />
+                            <input type="text" name="machineUserId" value="@item.MachineUserId" class="form-control form-control-sm mr-1" style="width:130px" />
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Save</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model.Students.Count > 0)
+    {
+        <div class="tab-pane fade" id="students" role="tabpanel">
+            <table class="table table-striped table-hover table-sm">
+                <thead class="table-info">
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Class</th>
+                        <th>Roll</th>
+                        <th>Unique ID</th>
+                        <th width="25%">Machine User ID</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @{ int ssl = 0; }
+                @foreach (var item in Model.Students)
+                {
+                    <tr>
+                        <td>@(++ssl).</td>
+                        <td>@item.Name</td>
+                        <td>@item.ClassName</td>
+                        <td>@item.ClassRoll</td>
+                        <td><small>@item.UniqueId</small></td>
+                        <td colspan="2">
+                            <form asp-action="UpdateStudentMachineId" method="post" class="form-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <input type="text" name="machineUserId" value="@item.MachineUserId" class="form-control form-control-sm mr-1" style="width:130px" />
+                                <button type="submit" class="btn btn-outline-primary btn-sm">Save</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+<a asp-controller="AttendanceMachineDevices" asp-action="Index" class="btn btn-outline-info mt-2"><i class="fa fa-fingerprint"></i> Manage Devices</a>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            var hash = window.location.hash;
+            if (hash === '#students') {
+                var tabEl = document.getElementById('stu-tab');
+                if (tabEl && window.bootstrap) {
+                    bootstrap.Tab.getOrCreateInstance(tabEl).show();
+                }
+            }
+        });
+    </script>
+}

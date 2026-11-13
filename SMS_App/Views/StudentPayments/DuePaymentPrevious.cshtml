@@ -1,0 +1,263 @@
+﻿@using SMS.Entities.AdditionalModels.Finance;
+@model DuePaymentPreviousDto
+@{
+    int sl = 0;
+    string sectionName = string.Empty;
+    ViewBag.ClassName = string.Empty;
+}
+@section Styles{
+    <link href="~/lib/DataTable/css/cdn.datatables.net_buttons_2.0.0_css_buttons.dataTables.min.css" rel="stylesheet" />
+    <link href="~/lib/DataTable/css/cdn.datatables.net_1.11.5_css_jquery.dataTables.min.css" rel="stylesheet" />
+    <style>
+        .dataTables_length, .dataTables_filter
+        {
+            margin-left: 10px;
+            float: right;
+        }
+
+        .dt-buttons
+        {
+            float: right;
+        }
+    </style>
+}
+<div class="row">
+    <div class="col-md-3">
+        <div class="row">
+            <div class="col-md-12">
+                <fieldset class="border-primary p-2 border">
+                    <legend class="float-none w-auto text-primary px-2"
+                            style="font-size: 1.1rem; position: relative;">
+                        Select Criteria
+                    </legend>
+
+                    <form id="studentInfoForm" asp-action="DuePaymentPrevious">
+                        <div class="form-group row">
+                            <label asp-for="AcademicClassId" class="col-md-4 col-form-label"></label>
+                            <div class="col-md-8">
+                                <select class="form-control" asp-for="AcademicClassId" asp-items="Model.AcademicClassList">
+                                    <option selected disabled value="">Select Academic Class</option>
+                                    <option value="0">All Class</option>
+                                </select>
+                                <span asp-validation-for="AcademicClassId" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label asp-for="AcademicSectionId" class="col-md-4 col-form-label">Academic Section :</label>
+                            <div class="col-md-8">
+                                <select class="form-control" asp-for="AcademicSectionId" asp-items="Model.AcademicSectionList">
+                                    <option selected disabled value="">Select Academic Section</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label asp-for="StudentId" class="col-md-4 col-form-label"></label>
+                            <div class="col-md-8">
+                                <select class="form-control" asp-for="StudentId" asp-items="Model.StudentList">
+                                    <option selected disabled value="">Select Student</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label asp-for="Status" class="col-md-4 col-form-label"></label>
+                            <div class="col-md-8">
+                                <select class="form-control" asp-for="Status" >
+                                    <option value="-1">All</option>
+                                    <option value="1">Active</option>
+                                    <option value="0">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-md-3 offset-md-9 text-right">
+                                <button type="submit" id="LoadButton" class="btn btn-sm btn-info">Get List</button>
+                            </div>
+                        </div>
+                    </form>
+                </fieldset><br />
+                <div class="row" id="exportPortion" style="visibility:hidden">
+                    <div class="col-md-3 offset-md-9 text-md-end">
+                        <!-- Add a button to trigger the export -->
+                        @*<button id="exportPdfButton">Export to PDF</button>*@
+
+                        <!-- Add a button to trigger the export -->
+                        <button class=" btn btn-sm btn-success" id="exportExcelButton">Export <i class="fas fa-file-excel"></i></button>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12" id="InvalidForm" style="display:none">
+                <div><h2 class="text-danger"> Please Select all the field</h2></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-9" id="iframe-container" style="overflow:scroll;height:800px">
+        @if (Model.DuePayments != null && Model.DuePayments.Count() > 0)
+        {
+            <table class="table table-hover table-bordered table-striped display" id="myTable" style="width:100%;">
+                <thead>
+                    <tr>
+                        <td colspan="6" class="text-center pb-0 mb-0">
+
+                            <div class="row">
+                                <div class="col-md-5 text-md-end">
+                                    <img src="~/Images/Institute/@Model.Institute.Logo" alt="Alternate Text" style="width:100px" onerror="this.onerror=null;this.src='/images/institute/smslogo.png';" />
+                                </div>
+                                <div class="col-md-7 text-md-start">
+                                    <h2 class="text-info font-weight-bolder"> @Model.Institute.Name</h2>
+                                    <h5 class="h5">@Model.Institute.Address</h5>
+                                    <h6 class="font-italic" style="text-decoration:underline">Due Payment (All Session)</h6>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 text-md-start">
+                                    @if (Model.AcademicClass != null)
+                                    {
+                                        @Model.AcademicClass.Name
+                                        ViewBag.ClassName = @Model.AcademicClass.Name;
+                                    }
+                                    else
+                                    {
+                                        <span>All Class</span>
+                                        ViewBag.ClassName = "All Class";
+                                    }
+                                </div>
+                                <div class="col-md-6 text-md-end"><span>Date:@DateTime.Now.ToString("dd MMM yyyy")</span> </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th class="no-sort">#</th>
+                        <th>Class Roll</th>
+                        <th>Student Name</th>
+                        <th>Academic Section</th>
+                        <th class="text-right">Due Amount</th>
+                        <th class="text-center action no-sort" id="action">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.DuePayments.OrderBy(s => s.Student.ClassRoll))
+                    {
+                        <tr>
+                            <td>@(++sl)</td>
+                            <td>@item.Student.ClassRoll</td>
+                            <td>@item.Student.Name</td>
+                            @if (item.Student.AcademicSection == null)
+                            {
+                                <td>N/A</td>
+                            }
+                            else
+                            {
+                                <td>@item.Student.AcademicSection.Name</td>
+                            }
+                            <td class="text-right">@item.TotalDue</td>
+                            <td class="text-center action">
+                                <span class="btn-group-sm">
+                                    <a class=" btn-sm btn-group-sm btn-info btn p-1 m-1 rounded" asp-action="StudentPaymentInfoExport" asp-controller="Reports" asp-route-reportType="pdf" asp-route-fileName="payment_report_@item.Student.ClassRoll" asp-route-classRoll="@item.Student.ClassRoll" asp-route-fromDate="@item.Student.AdmissionDate.ToString("dd-MM-yyyy")" asp-route-toDate="@DateTime.Today.ToString("dd-MM-yyyy")" target="_blank" title="View">
+                                        <span class="fa fa-eye"></span> 
+                                    </a>
+                                    <a class=" btn-sm btn-group-sm btn-primary btn p-1 m-1 rounded" asp-action="Details" asp-controller="Students" asp-fragment="financials" asp-route-tabName="financials" asp-route-id="@item.Student.Id" title="Details">
+                                        <span class="fa fa-info"></span>
+                                    </a>
+                                    <a class=" btn-sm btn-group-sm btn-success btn p-1 m-1 rounded" asp-action="Payment" asp-controller="StudentPayments" asp-route-stRoll="@item.Student.ClassRoll" title="Pay">Pay</a>
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+        }
+        else
+        {
+            if (ViewBag.isFromPost)
+            {
+                <div class="well">
+                    <h3>Data not found</h3>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+
+
+@section Scripts{
+    <script>
+
+        $('#AcademicClassId').change(function () {
+            let id = $('#AcademicClassId option:selected').val();
+            let sessionId = $('#AcademicSessionId option:selected').val();
+
+            $.ajax({
+                url: "/api/academicsections/getbyclasswithsessionId?classId=" + id + "&sessionId=" + sessionId,
+                dataType: "JSON",
+                type: "POST",
+                cache: false,
+                success: function (data) {
+                    $('#AcademicSectionId').empty();
+
+                    if (data != null || data != '') {
+                        var o = '<option disabled selected>Select Section Name</option>';
+                        var o2 = '<option value="">No Section</option>';
+                        $('#AcademicSectionId').append(o);
+                        $('#AcademicSectionId').append(o2);
+                        $.each(data, function (i, obj) {
+                            console.log(obj.name);
+                            var op = '<option value="' + obj.id + '">' + obj.name + '</option>';
+                            $('#AcademicSectionId').append(op);
+                        });
+                    }
+                    else {
+                        var o = '<option disabled selected>Section Not Found</option>';
+                        $('#AcademicSectionId').append(o);
+                    }
+                },
+                error: function (err) {
+                    console.log(err);
+                }
+            });
+        });
+
+
+        $('#AcademicSectionId').change(function () {
+            let sessionId = $('#aAcademicSession option:selected').val();
+            let id = $('#AcademicClassId option:selected').val();
+            let sectionId = $('#AcademicSectionId option:selected').val();
+            loadStudentListDropdown(sessionId, id, sectionId);
+        });
+
+        function loadStudentListDropdown(sessionId, classId, sectionId)
+        {
+            $.ajax({
+                url: "/students/GetStudentsBySessionIdClassIdSectionId?academicSessionId=" + sessionId + "&academicClassId=" + classId + "&academicSectionId=" + sectionId,
+                dataType: "JSON",
+                type: "POST",
+                cache: false,
+                success: function (data) {
+                    $('#StudentId').empty();
+                    if (data != null || data != '') {
+                        var o = '<option disabled selected value="">Select Student</option>';
+                        var o2 = '<option value="">All Student</option>';
+                        $('#StudentId').append(o);
+                        $('#StudentId').append(o2);
+                        $.each(data, function (i, obj) {
+                            var op = '<option value="' + obj.id + '">' +obj.classRoll+"-"+ obj.name + '</option>';
+                            $('#StudentId').append(op);
+                        });
+                    }
+                    else {
+                        var o = '<option disabled selected>Student Not Found</option>';
+                        $('#StudentId').append(o);
+                    }
+                },
+                error: function (err) {
+                    console.log(err);
+                }
+            });
+        };
+
+    </script>
+}

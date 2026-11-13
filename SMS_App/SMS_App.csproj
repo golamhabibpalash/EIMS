@@ -1,0 +1,174 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<UserSecretsId>aspnet-SchoolManagementSystem-75AC8697-780A-4215-A7FE-E83F96B3C344</UserSecretsId>
+		<GenerateRuntimeConfigurationFiles>True</GenerateRuntimeConfigurationFiles>
+		<Configurations>Release;Debug</Configurations>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+		<DefineConstants>DEBUG;TRACE</DefineConstants>
+		<DebugType>full</DebugType>
+		<DebugSymbols>true</DebugSymbols>
+	</PropertyGroup>
+
+	<PropertyGroup Condition=" '$(RunConfiguration)' == 'SchoolManagementSystem' " />
+	<!-- Release notes shown in the Version dialog (ReleaseNotes.cs). Embedded so they always
+	     match the deployed DLL and need no extra file on the servers. -->
+	<ItemGroup>
+		<EmbeddedResource Include="..\CHANGELOG.md" LogicalName="CHANGELOG.md" Link="CHANGELOG.md" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Remove="FakesAssemblies\**" />
+		<Compile Remove="ViewModels\Students\NewFolder\**" />
+		<Compile Remove="Views\Reports\RPT\**" />
+		<Compile Remove="Views\Students\NewFolder\**" />
+		<Compile Remove="wwwroot\FA\**" />
+		<Compile Remove="wwwroot\Reports\NewFolder\**" />
+		<Compile Remove="wwwroot\Reports\ReportData\**" />
+		<Compile Remove="wwwroot\Reports\Versioning\**" />
+		<Content Remove="FakesAssemblies\**" />
+		<Content Remove="ViewModels\Students\NewFolder\**" />
+		<Content Remove="Views\Reports\RPT\**" />
+		<Content Remove="Views\Students\NewFolder\**" />
+		<Content Remove="wwwroot\FA\**" />
+		<Content Remove="wwwroot\Reports\NewFolder\**" />
+		<Content Remove="wwwroot\Reports\ReportData\**" />
+		<Content Remove="wwwroot\Reports\Versioning\**" />
+		<EmbeddedResource Remove="FakesAssemblies\**" />
+		<EmbeddedResource Remove="ViewModels\Students\NewFolder\**" />
+		<EmbeddedResource Remove="Views\Reports\RPT\**" />
+		<EmbeddedResource Remove="Views\Students\NewFolder\**" />
+		<EmbeddedResource Remove="wwwroot\FA\**" />
+		<EmbeddedResource Remove="wwwroot\Reports\NewFolder\**" />
+		<EmbeddedResource Remove="wwwroot\Reports\ReportData\**" />
+		<EmbeddedResource Remove="wwwroot\Reports\Versioning\**" />
+		<None Remove="FakesAssemblies\**" />
+		<None Remove="ViewModels\Students\NewFolder\**" />
+		<None Remove="Views\Reports\RPT\**" />
+		<None Remove="Views\Students\NewFolder\**" />
+		<None Remove="wwwroot\FA\**" />
+		<None Remove="wwwroot\Reports\NewFolder\**" />
+		<None Remove="wwwroot\Reports\ReportData\**" />
+		<None Remove="wwwroot\Reports\Versioning\**" />
+		<Content Remove="wwwroot\lib\Theme\src\html\.tsconfig.json" />
+		<Content Remove="wwwroot\lib\Theme\src\html\.prettierrc.js" />
+		<Content Remove="wwwroot\lib\Theme\src\html\.eslintrc.json" />
+		<None Remove="wwwroot\lib\MultiSelect\js\bootstrap-3.3.2.min.js" />
+		<None Remove="wwwroot\lib\MultiSelect\js\jquery-2.1.3.min.js" />
+		<None Remove="wwwroot\lib\MultiSelect\js\prettify.min.js" />
+		<None Remove="wwwroot\lib\MultiSelect\js\require-2.3.5.min.js" />
+		<Content Remove="wwwroot\lib\Select2\css\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Content Remove="Views\AcademicExamType\Delete.cshtml" />
+		<!-- <Content Remove="Views\Shared\_layout.cshtml" /> -->
+		<Content Remove="Views\Shared\_LayoutAdminLte.cshtml" />
+		<Content Remove="wwwroot\Reports\rptAnnualReport.rdlc" />
+		<Content Remove="wwwroot\Reports\rptStudent1.rdlc" />
+		<Content Remove="wwwroot\Reports\RptStudentDynamicReport.rdlc" />
+		<Content Remove="wwwroot\Reports\rptStudentPaymentFullInfo.rdlc" />
+		<Content Remove="wwwroot\Reports\Rpt_AdmitCard.rdlc" />
+		<Content Remove="wwwroot\Reports\Rpt_Daily_Attendance.rdlc" />
+		<Content Remove="wwwroot\Reports\Rpt_Daily_Attendance_CheckOut.rdlc" />
+		<Content Remove="wwwroot\Reports\Rpt_GradingTable.rdlc" />
+		<Content Remove="wwwroot\Reports\Rpt_MarkSheet.rdlc" />
+		<Content Remove="wwwroot\Reports\Rpt_MonthlyAttendance.rdlc" />
+		<Content Remove="wwwroot\Reports\Rpt_Monthly_Attendance_Report.rdlc" />
+		<Content Remove="wwwroot\Reports\Rpt_Payment_Receipt.rdlc" />
+		<Content Remove="wwwroot\Reports\Rpt_Student_Payment.rdlc" />
+		<Content Remove="wwwroot\Reports\Rpt_Student_Wise_MarkSheet.rdlc" />
+		<Content Remove="wwwroot\Reports\Rpt_Subject_Wise_MarkSheet.rdlc" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="AesEncryptionLibrary" Version="8.0.0" />
+		<PackageReference Include="AspNetCore.Reporting" Version="2.1.0" />
+		<PackageReference Include="AutoMapper" Version="15.1.1" />
+		<PackageReference Include="ClosedXML" Version="0.104.2" />
+		<PackageReference Include="Hangfire" Version="1.8.7" />
+		<PackageReference Include="Hangfire.PostgreSql" Version="1.20.10" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+		<PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="7.0.11" />
+		<PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="7.0.11" />
+		<!-- <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="7.0.11" /> -->
+		<PackageReference Include="Microsoft.CodeAnalysis.Compilers" Version="4.8.0" />
+		<PackageReference Include="Microsoft.Data.SqlClient" Version="6.0.2" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="7.0.11" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.11">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.QualityTools.Testing.Fakes" Version="16.11.230815" />
+		<PackageReference Include="NodaTime" Version="3.1.9" />
+
+		<PackageReference Include="Microsoft.AspNetCore.JsonPatch" Version="7.0.11" />
+
+		<PackageReference Include="QuestPDF" Version="2026.5.0" />
+
+		<PackageReference Include="QRCoder" Version="1.6.0" />
+
+		<PackageReference Include="RazorLight" Version="2.3.1" />
+
+		<PackageReference Include="ReportViewerCore.NETCore" Version="15.1.23" />
+		<PackageReference Include="Microsoft.CodeAnalysis.VisualBasic" Version="4.8.0" />
+		<PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
+
+		<PackageReference Include="System.Data.SqlClient" Version="4.8.6" />
+
+		<PackageReference Include="System.IO.Packaging" Version="8.0.1" />
+
+		<PackageReference Include="System.Text.Json" Version="8.0.5" />
+
+	</ItemGroup>
+
+	<ItemGroup>
+		<Folder Include="Areas\SMSAPP\Data\" />
+		<Folder Include="Areas\SMSAPP\Models\" />
+		<Folder Include="Areas\SMSAPP\Views\" />
+		<Folder Include="Areas\Student\Data\" />
+		<Folder Include="Areas\Student\Models\" />
+		<Folder Include="Areas\Student\Views\" />
+		<Folder Include="Areas\WebSite\Controllers\" />
+		<Folder Include="Areas\WebSite\Data\" />
+		<Folder Include="Areas\WebSite\Models\" />
+		<Folder Include="Areas\WebSite\Views\" />
+		<Folder Include="Utilities/TagHelpers/" />
+		<Folder Include="wwwroot\Images\Employee\photo\" />
+		<Folder Include="wwwroot\Images\Employee\NID\" />
+		<Folder Include="wwwroot\Images\Question\" />
+		<Folder Include="wwwroot\Images\Student\Photo\" />
+		<Folder Include="wwwroot\js\CoreUI\" />
+		<Folder Include="wwwroot\js\Upazila\" />
+		<Folder Include="wwwroot\lib\Select2\css\" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="Views\AcademicExamType\Delete.cshtml" />
+		<!-- <None Include="Views\Shared\_layout.cshtml" /> -->
+		<!-- <None Include="Views\Shared\_LayoutAdminLte.cshtml" /> -->
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\SMS.BLL\SMS.BLL.csproj" />
+		<ProjectReference Include="..\SMS.DB\SMS.DB.csproj" />
+		<ProjectReference Include="..\SMS.Entities\SMS.Entities.csproj" />
+		<ProjectReference Include="..\SMS.Frameworks\SMS.Frameworks.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<UpToDateCheckInput Remove="Views\AcademicExamType\Delete.cshtml" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<_ContentIncludedByDefault Remove="Views\AcademicExamType\Delete.cshtml" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<AdditionalDesignTimeBuildInput Remove="FakesAssemblies\**" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,441 @@
+@using SMS_App.Utilities.Export;
+@{
+    ViewData["Title"] = "Students";
+    GlobalUI.PageTitle = ViewBag.Title;
+
+    // Current filter selections, pre-populated from the query string by the controller so a
+    // restored/bookmarked URL opens with the same filters and the grid's first AJAX call
+    // (which reads the controls) picks them up.
+    var selSession = ViewData["selectedAcademicSessionId"]?.ToString();
+    var selClass = ViewData["selectedAcademicClassId"]?.ToString();
+    var selSection = ViewData["selectedAcademicSectionId"]?.ToString();
+    var selCategory = ViewData["categoryId"]?.ToString();
+    var selStatus = ViewData["statusId"]?.ToString();
+    var selSearch = ViewData["searchString"]?.ToString();
+    var pageSize = Convert.ToInt32(ViewData["pageSize"] ?? 20);
+
+    // Role flags drive which per-row action buttons are rendered client-side.
+    var canEdit = User.IsInRole("Admin") || User.IsInRole("SuperAdmin");
+    var canDelete = User.IsInRole("SuperAdmin");
+
+    // Keep the filter panel open only when the user arrived with explicit filters, so the
+    // default view gives the grid as much vertical room as possible.
+    var hasExplicitFilters = !string.IsNullOrEmpty(selClass) || !string.IsNullOrEmpty(selSection)
+        || !string.IsNullOrEmpty(selCategory) || !string.IsNullOrEmpty(selStatus)
+        || !string.IsNullOrEmpty(selSearch);
+}
+
+<div class="card shadow-sm mb-3">
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
+        <h5 class="mb-0"><i class="fa fa-users mr-2"></i> Students</h5>
+        <div class="d-flex align-items-center flex-wrap">
+            <button type="button" id="toggleFilters" class="btn btn-outline-primary btn-sm mr-2"
+                    data-bs-toggle="collapse" data-toggle="collapse"
+                    data-bs-target="#studentFilters" data-target="#studentFilters"
+                    aria-expanded="@(hasExplicitFilters ? "true" : "false")" aria-controls="studentFilters">
+                <i class="fa fa-filter"></i> Filters
+                <span class="badge bg-primary" id="activeFilterCount" style="margin-left:4px;display:none;"></span>
+            </button>
+            <div class="btn-group btn-group-sm">
+                <a asp-action="Create" class="btn btn-primary"><i class="fa fa-plus"></i> Add Student</a>
+                <a asp-action="BulkUpload" class="btn btn-outline-secondary"
+                   title="Import many students from a CSV or Excel file"><i class="fa fa-upload"></i> Bulk Upload</a>
+                <button type="button" id="openExportBtn" class="btn btn-success"
+                        title="Choose columns and format, then download the filtered list"><i class="fa fa-file-excel"></i> Export</button>
+                <a id="openIdCardsBtn" class="btn btn-info" target="_blank"
+                   title="Generate printable ID cards for the filtered students"><i class="fa fa-id-card"></i> ID Cards</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="collapse @(hasExplicitFilters ? "show" : "")" id="studentFilters">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label for="aAcademicSessionId" class="form-label mb-0 small text-muted">Session</label>
+                    <select class="form-control form-control-sm filter-select" name="AcademicSessionId" id="aAcademicSessionId"
+                            asp-items="@ViewBag.academicSessionId"></select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label for="aAcademicClassId" class="form-label mb-0 small text-muted">Class</label>
+                    <select class="form-control form-control-sm filter-select" name="AcademicClassId" id="aAcademicClassId"
+                            asp-items="@ViewBag.academicClassId">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label for="aAcademicSectionId" class="form-label mb-0 small text-muted">Section</label>
+                    <select class="form-control form-control-sm filter-select" id="aAcademicSectionId" name="AcademicSectionId"
+                            asp-items="ViewBag.SectionList">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label for="aCategoryId" class="form-label mb-0 small text-muted">Category</label>
+                    <select class="form-control form-control-sm filter-select" id="aCategoryId" name="aCategory" asp-items="ViewBag.aCategory">
+                        <option value="">All</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-6 mb-2">
+                    <label for="aStatusType" class="form-label mb-0 small text-muted">Status</label>
+                    <select class="form-control form-control-sm filter-select" name="aStatus" id="aStatusType" asp-items="ViewBag.aStatus">
+                        <option value="">Active &amp; Inactive</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-12 mb-2">
+                    <label for="nameRoll" class="form-label mb-0 small text-muted">Keyword</label>
+                    <input type="text" class="form-control form-control-sm" id="nameRoll"
+                           placeholder="Name / Roll / ID / Phone" value="@selSearch">
+                </div>
+                <div class="col-12 col-lg-auto mb-2 d-flex align-items-center">
+                    <button type="button" class="btn btn-primary btn-sm mr-2" id="findButton"><i class="fa fa-search"></i> Find</button>
+                    <a class="btn btn-outline-warning btn-sm" asp-action="Index" asp-route-reset="true"><i class="fa fa-undo"></i> Reset</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped table-bordered align-middle w-100" id="studentsTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Photo</th>
+                        <th>Unique ID</th>
+                        <th>Roll</th>
+                        <th>Name</th>
+                        <th>নাম</th>
+                        <th>Class</th>
+                        <th>Section</th>
+                        <th>Student Phone</th>
+                        <th>Guardian Phone</th>
+                        <th>Session</th>
+                        <th>Gender</th>
+                        <th>Status</th>
+                        <th class="text-nowrap">Actions</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Export column-picker modal -->
+<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-navy-blue text-light">
+                <h5 class="modal-title" id="exportModalLabel"><i class="fa fa-file-excel"></i> Export Students</h5>
+                <button type="button" class="close text-light" style="background:none;border:0;font-size:1.5rem;line-height:1;"
+                        data-bs-dismiss="modal" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-2">
+                    The export respects the filters currently applied to the list. Tick the columns you want, choose a
+                    format, and download.
+                </p>
+                <div class="d-flex align-items-center mb-2">
+                    <div class="btn-group btn-group-sm mr-3">
+                        <button type="button" class="btn btn-outline-primary" id="exportSelectAll">Select all</button>
+                        <button type="button" class="btn btn-outline-secondary" id="exportClear">Clear</button>
+                    </div>
+                    <div class="ml-auto">
+                        <label class="mr-2 mb-0"><strong>Format:</strong></label>
+                        <label class="mr-2 mb-0"><input type="radio" name="exportFormat" value="csv" checked> CSV</label>
+                        <label class="mr-2 mb-0"><input type="radio" name="exportFormat" value="xlsx"> Excel (.xlsx)</label>
+                        <label class="mb-0"><input type="radio" name="exportFormat" value="pdf"> PDF</label>
+                    </div>
+                </div>
+                <div class="row">
+                    @foreach (var group in StudentExportColumns.Grouped())
+                    {
+                        <div class="col-md-4 col-sm-6 mb-3">
+                            <div class="border rounded p-2 h-100">
+                                <div class="fw-bold text-primary mb-1" style="font-weight:600;">@group.Key</div>
+                                @foreach (var col in group)
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input export-col" type="checkbox" value="@col.Key"
+                                               id="exp_@col.Key" @(col.Default ? "checked" : "")>
+                                        <label class="form-check-label" for="exp_@col.Key">@col.Header</label>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span class="mr-auto text-muted small"><span id="exportSelectedCount">0</span> column(s) selected</span>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="doExportBtn"><i class="fa fa-download"></i> Download</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
+    <script>
+        (function () {
+            const listUrl = '@Url.Action("List", "Students")';
+            const exportUrl = '@Url.Action("Export", "Students")';
+            const editBase = '@Url.Action("Edit", "Students")';
+            const detailsBase = '@Url.Action("Details", "Students")';
+            const deleteBase = '@Url.Action("Delete", "Students")';
+            const idCardBase = '@Url.Action("IdCards", "Students")';
+            const canEdit = @canEdit.ToString().ToLower();
+            const canDelete = @canDelete.ToString().ToLower();
+
+            // TempData flash messages from the previous CRUD operation.
+            const flash = { saved: '@TempData["saved"]', deleted: '@TempData["deleted"]', edited: '@TempData["edited"]', failed: '@TempData["failed"]' };
+            if (flash.saved) alertify.success("Saved Successfully");
+            if (flash.deleted) alertify.error("Deleted Successfully");
+            if (flash.edited) alertify.message('Updated Successfully');
+            if (flash.failed) alertify.error(flash.failed);
+
+            // Enhance the filter dropdowns with Select2 when it is available (admin layout);
+            // falls back to plain selects otherwise (teacher layout). Initialisation is deferred
+            // until the panel is visible: Select2 measures its container while building, so doing
+            // it inside a collapsed (display:none) panel makes it render blank.
+            function initFilterSelects() {
+                if (!$.fn.select2) return;
+                $('.filter-select').each(function () {
+                    if (!$(this).data('select2')) {
+                        $(this).select2({ theme: 'bootstrap-5', width: '100%' });
+                    }
+                });
+            }
+
+            // Read the live filter state. Used both as the grid's AJAX payload and to build
+            // the return URL/export URL so they always reflect what the user is looking at.
+            function filterState() {
+                return {
+                    academicSessionId: $('#aAcademicSessionId').val() || '',
+                    academicClassId: $('#aAcademicClassId').val() || '',
+                    academicSectionId: $('#aAcademicSectionId').val() || '',
+                    aCategory: $('#aCategoryId').val() || '',
+                    aStatus: $('#aStatusType').val() || ''
+                };
+            }
+
+            // The Index URL that reproduces the current filtered view (for "return to list").
+            function currentListUrl() {
+                const f = filterState();
+                const p = new URLSearchParams();
+                if (f.academicSessionId) p.set('academicSessionId', f.academicSessionId);
+                if (f.academicClassId) p.set('academicClassId', f.academicClassId);
+                if (f.academicSectionId) p.set('academicSectionId', f.academicSectionId);
+                if (f.aStatus) p.set('aStatus', f.aStatus);
+                if (f.aCategory) p.set('aCategory', f.aCategory);
+                const kw = table ? table.search() : $('#nameRoll').val();
+                if (kw) p.set('searchString', kw);
+                const qs = p.toString();
+                return '@Url.Action("Index", "Students")' + (qs ? '?' + qs : '');
+            }
+
+            function esc(v) { return $('<div>').text(v == null ? '' : v).html(); }
+
+            const table = $('#studentsTable').DataTable({
+                serverSide: true,
+                processing: true,
+                searchDelay: 400,
+                pageLength: @(pageSize > 0 ? pageSize : 20),
+                lengthMenu: [[20, 50, 100, -1], [20, 50, 100, "All"]],
+                order: [], // let the server apply its default ordering
+                dom: 'lrtip', // hide DataTables' own search box; we drive search from the keyword field
+                search: { search: $('#nameRoll').val() },
+                ajax: {
+                    url: listUrl,
+                    type: 'POST', // POST so the (large) DataTables state is sent in the body, not the URL
+                    data: function (d) { return $.extend({}, d, filterState()); }
+                },
+                language: {
+                    processing: '<div class="spinner-border text-primary" role="status"></div>',
+                    emptyTable: 'No students match the current filters.',
+                    zeroRecords: 'No students match the current filters.'
+                },
+                columns: [
+                    {
+                        data: 'photoUrl', orderable: false, searchable: false, width: '42px',
+                        render: function (url, t, row) {
+                            return '<a href="' + detailsBase + '/' + row.id + '">' +
+                                '<img src="' + esc(url) + '" class="rounded-circle" style="width:34px;height:34px;object-fit:cover;" /></a>';
+                        }
+                    },
+                    { data: 'uniqueId' },
+                    { data: 'classRoll' },
+                    {
+                        data: 'studentName',
+                        render: function (name, t, row) {
+                            const badge = row.isResidential ? ' <span class="badge bg-info"><i class="fas fa-home"></i></span>' : '';
+                            const cls = row.status ? '' : ' text-danger';
+                            return '<a class="fw-semibold' + cls + '" href="' + detailsBase + '/' + row.id + '">' + esc(name) + badge + '</a>';
+                        }
+                    },
+                    { data: 'nameBangla', orderable: false },
+                    { data: 'className' },
+                    { data: 'sectionName' },
+                    { data: 'phoneNo' },
+                    { data: 'guardianPhone' },
+                    { data: 'sessionName' },
+                    { data: 'gender' },
+                    {
+                        data: 'status', className: 'text-center',
+                        render: function (s) {
+                            return s
+                                ? '<span class="badge bg-success">Active</span>'
+                                : '<span class="badge bg-danger">Inactive</span>';
+                        }
+                    },
+                    {
+                        data: null, orderable: false, searchable: false, className: 'text-nowrap',
+                        render: function (t, type, row) {
+                            const ret = encodeURIComponent(currentListUrl());
+                            let html = '<div class="btn-group btn-group-sm" role="group">';
+                            if (canEdit) {
+                                html += '<a class="btn btn-sm" title="Edit" href="' + editBase + '/' + row.id + '?returnUrl=' + ret + '"><i class="fas fa-edit text-dark"></i></a>';
+                            }
+                            html += '<a class="btn btn-sm" title="Details" href="' + detailsBase + '/' + row.id + '?returnUrl=' + ret + '"><i class="fas fa-info-circle text-info"></i></a>';
+                            html += '<a class="btn btn-sm" title="ID Card" target="_blank" href="' + idCardBase + '?studentId=' + row.id + '"><i class="fas fa-id-card text-primary"></i></a>';
+                            if (canDelete) {
+                                html += '<a class="btn btn-sm" title="Delete" href="' + deleteBase + '/' + row.id + '?returnUrl=' + ret + '"><i class="fa fa-trash text-danger"></i></a>';
+                            }
+                            html += '</div>';
+                            return html;
+                        }
+                    }
+                ]
+            });
+
+            // "Find" and Enter in the keyword box push the keyword into DataTables' own search
+            // (which triggers a server-side reload); the dropdowns are part of every AJAX call.
+            function applyFilters() { updateActiveFilterCount(); table.search($('#nameRoll').val()).draw(); }
+            $('#findButton').on('click', applyFilters);
+            $('#nameRoll').on('keypress', function (e) { if (e.which === 13) { e.preventDefault(); applyFilters(); } });
+            $('#nameRoll').on('input', updateActiveFilterCount);
+
+            // Badge on the "Filters" toggle: how many filters narrow the list (session is
+            // excluded because it always defaults to the current session).
+            function updateActiveFilterCount() {
+                let n = 0;
+                if ($('#aAcademicClassId').val()) n++;
+                if ($('#aAcademicSectionId').val()) n++;
+                if ($('#aCategoryId').val()) n++;
+                if ($('#aStatusType').val()) n++;
+                if ($('#nameRoll').val()) n++;
+                $('#activeFilterCount').text(n).toggle(n > 0);
+            }
+            updateActiveFilterCount();
+            $('#aAcademicClassId, #aAcademicSectionId, #aCategoryId, #aStatusType').on('change', updateActiveFilterCount);
+
+            // Initialise Select2 now only if the panel starts visible; otherwise wait for the
+            // expand event. Either way, recalculate the grid's column widths afterwards.
+            const $filterPanel = $('#studentFilters');
+            if ($filterPanel.hasClass('show')) initFilterSelects();
+            $filterPanel.on('shown.bs.collapse', function () {
+                initFilterSelects();
+                table.columns.adjust();
+            });
+            $filterPanel.on('hidden.bs.collapse', function () { table.columns.adjust(); });
+
+            // Category and status are plain filters: changing them just reloads the grid.
+            $('#aCategoryId, #aStatusType').on('change', function () { table.draw(); });
+
+            // Session and class both affect which sections are valid, so they reset the
+            // section dropdown, reload its options, and only then redraw the grid.
+            $('#aAcademicSessionId, #aAcademicClassId').on('change', function () {
+                reloadSections(function () { updateActiveFilterCount(); table.draw(); });
+            });
+
+            // Rebuilds the section dropdown for the current class+session, resetting it to
+            // "All Sections". Invokes the callback once the dropdown reflects the new state.
+            function reloadSections(done) {
+                const classId = $('#aAcademicClassId').val();
+                const sessionId = $('#aAcademicSessionId').val();
+                const $sec = $('#aAcademicSectionId');
+                $sec.empty().append('<option value="">All Sections</option>');
+                if (!classId) {
+                    if ($.fn.select2) $sec.trigger('change.select2');
+                    if (done) done();
+                    return;
+                }
+                $.ajax({
+                    url: "/api/academicsections/getbyclasswithsessionId?classId=" + classId + "&sessionId=" + sessionId,
+                    dataType: "JSON", type: "POST", cache: false,
+                    success: function (data) {
+                        $.each(data || [], function (i, obj) {
+                            $sec.append('<option value="' + obj.id + '">' + obj.name + '</option>');
+                        });
+                    },
+                    complete: function () {
+                        if ($.fn.select2) $sec.trigger('change.select2');
+                        if (done) done();
+                    }
+                });
+            }
+
+            // ---------------------------------------------------------------------------
+            // Export column-picker. Works under Bootstrap 5 (admin layout) and Bootstrap 4
+            // (teacher layout) by feature-detecting the modal API.
+            // ---------------------------------------------------------------------------
+            function showModal(id) {
+                const el = document.getElementById(id);
+                if (window.bootstrap && bootstrap.Modal) { bootstrap.Modal.getOrCreateInstance(el).show(); }
+                else { $(el).modal('show'); }
+            }
+            function hideModal(id) {
+                const el = document.getElementById(id);
+                if (window.bootstrap && bootstrap.Modal) { bootstrap.Modal.getOrCreateInstance(el).hide(); }
+                else { $(el).modal('hide'); }
+            }
+            function refreshCount() {
+                $('#exportSelectedCount').text($('.export-col:checked').length);
+            }
+
+            $('#openExportBtn').on('click', function () { refreshCount(); showModal('exportModal'); });
+
+            // ID Cards: open the card screen pre-filtered to exactly what the list is showing.
+            $('#openIdCardsBtn').on('click', function (e) {
+                e.preventDefault();
+                const f = filterState();
+                const p = new URLSearchParams();
+                if (f.academicSessionId) p.set('academicSessionId', f.academicSessionId);
+                if (f.academicClassId) p.set('academicClassId', f.academicClassId);
+                if (f.academicSectionId) p.set('academicSectionId', f.academicSectionId);
+                const kw = table.search();
+                if (kw) p.set('searchString', kw);
+                window.open(idCardBase + '?' + p.toString(), '_blank');
+            });
+            $('#exportSelectAll').on('click', function () { $('.export-col').prop('checked', true); refreshCount(); });
+            $('#exportClear').on('click', function () { $('.export-col').prop('checked', false); refreshCount(); });
+            $('.export-col').on('change', refreshCount);
+            $('#exportModal [data-dismiss="modal"], #exportModal [data-bs-dismiss="modal"]').on('click', function () { hideModal('exportModal'); });
+
+            // Export uses the server endpoint so it exports ALL filtered rows, not just the
+            // visible page (DataTables' own export cannot see server-paged data).
+            $('#doExportBtn').on('click', function () {
+                const cols = $('.export-col:checked').map(function () { return this.value; }).get();
+                if (cols.length === 0) {
+                    if (window.alertify) { alertify.error('Please select at least one column.'); }
+                    else { alert('Please select at least one column.'); }
+                    return;
+                }
+
+                const f = filterState();
+                const p = new URLSearchParams();
+                Object.keys(f).forEach(k => { if (f[k]) p.set(k, f[k]); });
+                const kw = table.search();
+                if (kw) p.set('searchString', kw);
+                p.set('format', $('input[name="exportFormat"]:checked').val() || 'csv');
+                cols.forEach(c => p.append('columns', c));
+
+                hideModal('exportModal');
+                window.location.href = exportUrl + '?' + p.toString();
+            });
+        })();
+    </script>
+}

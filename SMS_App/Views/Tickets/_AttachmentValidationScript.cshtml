@@ -1,0 +1,36 @@
+@{
+    // Client-side mirror of TicketsController's AllowedExtensions / MaxAttachmentBytes.
+    // This is only a UX nicety - the server enforces the real limit either way.
+}
+<script>
+    (function () {
+        var input = document.querySelector('input[name="Attachments"]');
+        if (!input) {
+            return;
+        }
+
+        var allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf'];
+        var maxBytes = 2 * 1024 * 1024;
+
+        input.addEventListener('change', function () {
+            var rejected = [];
+
+            for (var i = 0; i < input.files.length; i++) {
+                var file = input.files[i];
+                var dot = file.name.lastIndexOf('.');
+                var extension = dot >= 0 ? file.name.substring(dot).toLowerCase() : '';
+
+                if (allowedExtensions.indexOf(extension) === -1) {
+                    rejected.push(file.name + ' (only images or PDF are allowed)');
+                } else if (file.size > maxBytes) {
+                    rejected.push(file.name + ' (larger than 2 MB)');
+                }
+            }
+
+            if (rejected.length > 0) {
+                alert('These files will not be attached:\n' + rejected.join('\n'));
+                input.value = '';
+            }
+        });
+    })();
+</script>

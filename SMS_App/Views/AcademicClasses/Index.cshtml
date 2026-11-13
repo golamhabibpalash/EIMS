@@ -1,0 +1,101 @@
+﻿@using SMS_App.Utilities.Others
+@model IEnumerable<SMS.Entities.AcademicClass>
+
+@{
+    ViewData["Title"] = "Academic Class";
+    GlobalUI.PageTitle = ViewBag.Title;
+    int i = 0;
+    string[] classPosition = { "", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th" };
+    string[] bgColor = { "bg-primary", "bg-secondary", "bg-success", "bg-danger", "bg-warning", "bg-info", "bg-light", "bg-dark" };
+    // string positionText = "";
+}
+
+
+<div class="card">
+    <div class="card-header" style="background:@AppColors.TableTitleBackground">
+        <h3 class="card-title"><i class="fas fa-chalkboard-teacher"></i> Academic Classes</h3>
+    </div>
+    <div class="card-body">
+        <table class="table table-striped table-hover shadow rounded table-responsive-sm datatable" id="myTable">
+            <thead class="bg-blue-sky">
+                <tr>
+                    <th>#</th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.Name)
+                    </th>
+                    <th>
+                        Total Students
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.Description)
+                    </th>
+                    <th>
+                        Serial
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.Status)
+                    </th>
+
+                    <th><a class="p-2 btn-sm btn-info rounded-pill" asp-action="Create"><i class="fa fa-plus"></i> Add</a></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@(++i).</td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.Name)
+                        </td>
+                        <td>
+                            @item.Students.Count
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.Description)
+                        </td>
+                        <td>
+                            @item.ClassSerial
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.Status)
+                        </td>
+                        <td>
+                            <partial name="_Edit_Details_Delete" model="@item.Id" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+    </div>
+</div>
+
+
+
+
+@section Scripts{
+    @if (TempData["create"] != null)
+    {
+        <script type="text/javascript">
+            $(function () {
+                alertify.success('@TempData["create"]');
+            });
+        </script>
+    }
+    @if (TempData["edit"] != null)
+    {
+        <script type="text/javascript">
+            $(function () {
+                alertify.warning('@TempData["edit"]');
+            });
+        </script>
+    }
+    @if (TempData["delete"] != null)
+    {
+        <script type="text/javascript">
+            $(function () {
+                alertify.error('@TempData["delete"]');
+            });
+        </script>
+    }
+}

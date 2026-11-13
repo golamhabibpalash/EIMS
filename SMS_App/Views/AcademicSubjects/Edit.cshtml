@@ -1,0 +1,111 @@
+﻿@model SMS.Entities.AcademicSubject
+
+@{
+    ViewData["Title"] = "Edit Subject";
+    GlobalUI.PageTitle = "Edit Academic Subject (" + Model.SubjectName + ")";
+}
+
+<div class="row">
+    <div class="col-md-6 offset-md-3 p-2">
+        <form asp-action="Edit">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="Id" />
+
+            @*<div class="form-group row">
+                <label asp-for="AcademicClassId" class="control-label col-form-label col-md-3 text-md-end "></label>
+                <div class="col-md-9">
+                    <select asp-for="AcademicClassId" class="form-control" asp-items="ViewBag.AcademicClassId">
+                        <option selected disabled>Select Class</option>
+                    </select>
+                    <span asp-validation-for="SubjectName" class="text-danger"></span>
+                </div>
+            </div>*@
+            <div class="form-group row">
+                <label asp-for="SubjectName" class="control-label col-form-label col-md-3 text-md-end "></label>
+                <div class="col-md-9">
+                    <input asp-for="SubjectName" class="form-control rounded" />
+                    <span asp-validation-for="SubjectName" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="SubjectCode" class="control-label  col-form-label col-md-3 text-md-end"></label>
+                <div class="col-md-9">
+                    <input asp-for="SubjectCode" class="form-control rounded" placeholder="Ex: 103" />
+                    <span asp-validation-for="SubjectCode" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="AcademicSubjectTypeId" class="control-label col-form-label col-md-3 text-md-end  "></label>
+                <div class="col-md-9">
+                    <select asp-for="AcademicSubjectTypeId" class="form-control rounded" asp-items="ViewBag.AcademicSubjectTypeId">
+                        <option selected disabled>Select Subject Type</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="SubjectFor" class="control-label  col-form-label col-md-3 text-md-end"></label>
+                <div class="col-md-9 input-group">
+                    <input asp-for="SubjectFor" class="form-control rounded" placeholder="please Input C for College & S for School" aria-label="Amount (to the nearest dollar)">
+                    <div class="input-group-append">
+                        <span class="input-group-text" title="s for School and c for College" data-toggle="tooltip" data-placement="top"><i class="fa fa-info-circle"></i></span>
+                    </div>
+                    <span asp-validation-for="SubjectFor" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="ReligionId" class="control-label  col-form-label col-md-3 text-md-end"></label>
+                <div class="col-md-9">
+                    <select asp-for="ReligionId" class="form-control rounded" asp-items="ViewBag.ReligionList">
+                        <option selected disabled>Select Religion</option>
+                        <option value="">All Religion</option>
+                    </select>
+                    <span asp-validation-for="ReligionId" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="TotalMarks" class="control-label col-form-label col-md-3 text-md-end"></label>
+                <div class="col-md-9">
+                    <input asp-for="TotalMarks" class="form-control" />
+                    <span asp-validation-for="TotalMarks" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="QuestionFormatId" class="control-label col-form-label col-md-3 text-md-end"></label>
+                <div class="col-md-9">
+                    @*<input asp-for="QuestionFormatId" class="form-control" />*@
+                    <select asp-for="QuestionFormatId" class="form-control" asp-items="ViewBag.QuestionFormatId">
+                        <option selected disabled>Select Question Format</option>
+                    </select>
+                    <span asp-validation-for="QuestionFormatId" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <div class="offset-md-3 col-md-9">
+                    <label class="">
+                        <input class="" asp-for="Status" /> @Html.DisplayNameFor(model => model.Status)
+                    </label>
+                </div>
+            </div>
+
+
+            <div class="form-group row">
+                <div class="offset-md-3 col-md-9 text-center">
+                    <partial name="_Update_Back" model="@Model.Id" />
+
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+
+    <script>
+        let deleted = '@TempData["deleted"]';
+        let created = '@TempData["created"]';
+        let updated = '@TempData["updated"]';
+        let failed = '@TempData["error"]';
+    </script>
+    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
+}

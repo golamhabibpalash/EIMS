@@ -1,0 +1,130 @@
+﻿@model IEnumerable<SMS.Entities.ClassFeeList>
+@inject UserManager<ApplicationUser> _userManager;
+
+@{
+    ViewData["Title"] = "Fee List";
+    GlobalUI.PageTitle = "Class Fee Lists";
+    string createdBy = string.Empty;
+    string updatedBy = string.Empty;
+    string trColor = string.Empty;
+    string panelShow = string.Empty;
+}
+
+
+<div class="shadow-lg p-2">
+    <div class="">
+        <table class="table table-responsive-sm" id="myTable">
+            <thead class="bg-info text-light">
+                <tr>
+                    <th>
+                        #
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.StudentFeeHead.Name)
+                    </th>
+
+                    <th>
+                        Academic Class
+                    </th>
+                    <th>
+                        Academic Session
+                    </th>
+                    <th>
+                        @Html.DisplayNameFor(model => model.Amount)
+                    </th>
+                    <th>
+                        Created By
+                    </th>
+                    <th>
+                        Updated By
+                    </th>
+                    <th>
+                        <a class="p-2 btn-sm btn-warning btn-round" asp-action="Create"><i class="fa fa-plus"></i> Add</a>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.OrderByDescending(s => s.AcademicSessionId))
+                {
+                    trColor = ViewBag.currentSessionId == item.AcademicSessionId ? "text-primary" : "";
+                    <tr class="@trColor">
+                        <td>
+                            @item.SL
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.StudentFeeHead.Name)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.AcademicClass.Name)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.AcademicSession.Name)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.Amount)
+                        </td>
+                        <td>
+                            @if (item.CreatedBy != null)
+                            {
+                                ApplicationUser aUser = await _userManager.FindByIdAsync(item.CreatedBy);
+                                createdBy = aUser?.UserName ?? "N/F";
+                            }
+                            else
+                            {
+                                createdBy = "N/F";
+                            }
+                        </td>
+                        <td>
+                            @if (item.EditedBy != null)
+                            {
+                                ApplicationUser aUser = await _userManager.FindByIdAsync(item.EditedBy);
+                                updatedBy = aUser?.UserName ?? "N/F";
+                            }
+                            else
+                            {
+                                updatedBy = "N/F";
+                            }
+                        </td>
+                        <td>
+                            <partial name="_Edit_Details_Delete" model="@item.Id" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+    </div>
+
+</div>
+
+<div class="row">
+    <table class="table">
+        <tr>
+            <td>Last Edited BY: </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>Last Edited Date: </td>
+            <td></td>
+        </tr>
+    </table>
+</div>
+@section Scripts{
+    <script src="~/js/DataTable/dataTable.js"></script>
+    @if (ViewBag.msg != null)
+    {
+        <script src="~/js/AlertifyNotify/successNotify.js"></script>
+    }
+
+    @if (TempData["edit"] != null)
+    {
+
+        <script src="~/js/AlertifyNotify/warningNotify.js"></script>
+    }
+
+    @if (TempData["delete"] != null)
+    {
+
+        <script src="~/js/AlertifyNotify/errorNotify.js"></script>
+    }
+}

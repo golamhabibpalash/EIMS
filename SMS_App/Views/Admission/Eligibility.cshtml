@@ -1,0 +1,39 @@
+@model AdmissionLandingVM
+@{
+    var s = Model.Session;
+    ViewData["Title"] = "Eligibility - " + s.Title;
+}
+<partial name="_SessionHeader" model="Model" />
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card adm-card mb-3"><div class="card-body">
+            <h2 class="h5">Admission eligibility / ভর্তির যোগ্যতা</h2>
+            <div class="prewrap">@s.EligibilityContent</div>
+        </div></div>
+        <div class="card adm-card mb-3"><div class="card-body">
+            <h2 class="h5">Criteria by class</h2>
+            @foreach (var p in s.Programs)
+            {
+                var ageOn = p.AgeCalculationDate ?? s.ApplicationEndDate;
+                <div class="border-bottom py-2">
+                    <div class="fw-semibold">@p.AcademicClass?.Name</div>
+                    <ul class="small mb-0">
+                        @if (p.MinAgeYears.HasValue || p.MaxAgeYears.HasValue)
+                        {
+                            <li>Age on @ageOn.ToString("dd MMM yyyy"): @(p.MinAgeYears.HasValue ? $"at least {p.MinAgeYears}" : "")@(p.MinAgeYears.HasValue && p.MaxAgeYears.HasValue ? " and " : "")@(p.MaxAgeYears.HasValue ? $"at most {p.MaxAgeYears}" : "") years</li>
+                        }
+                        @if (p.RequirePreviousResult) { <li>Result of the previous class is required.</li> }
+                        @if (p.MinPreviousGpa.HasValue) { <li>Minimum previous GPA: @p.MinPreviousGpa.Value.ToString("0.00")</li> }
+                        @if (!string.IsNullOrEmpty(p.EligibilityNotes)) { <li class="prewrap">@p.EligibilityNotes</li> }
+                        @if (!p.MinAgeYears.HasValue && !p.MaxAgeYears.HasValue && !p.RequirePreviousResult && !p.MinPreviousGpa.HasValue && string.IsNullOrEmpty(p.EligibilityNotes))
+                        {
+                            <li>No additional criteria.</li>
+                        }
+                    </ul>
+                </div>
+            }
+            <p class="small text-muted mt-2 mb-0">If the details you enter do not meet a criterion, the form tells you which one before you submit. The school decides on any exception.</p>
+        </div></div>
+    </div>
+    <div class="col-lg-4"><partial name="_ApplyBox" model="Model" /></div>
+</div>

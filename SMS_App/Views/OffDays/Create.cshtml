@@ -1,0 +1,94 @@
+﻿@model OffDay
+
+@{
+    ViewData["Title"] = "Holiday Create";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+}
+
+<div class="row">
+    <div class="col-md-8 offset-2">
+        <form asp-action="Create" method="post">
+            <fieldset class="border border-info p-3">
+                <legend  class="float-none w-auto text-primary px-2"
+                        style="font-size: 1.1rem; position: relative;" style="width:inherit">Holiday Information</legend>
+                <div class="form-group row">
+                    <label asp-for="OffDayName" class="col-sm-3 col-form-label text-right text-sm-left"></label>
+                    <div class="col-sm-9">
+                        <input asp-for="OffDayName" class="form-control" placeholder="Holiday Name">
+                        <span class="text-danger" asp-validation-for="OffDayName"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label asp-for="OffDayTypeId" class="col-sm-3 col-form-label text-right text-sm-left"></label>
+                    <div class="col-sm-9">
+                        <select asp-items="ViewBag.OffDayType" class="form-control" asp-for="OffDayTypeId">
+                            <option selected disabled>--Select Holiday Type--</option>
+                        </select>
+                        <span class="text-danger" asp-validation-for="OffDayTypeId"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label asp-for="OffDayStartingDate" class="col-sm-3 col-form-label text-right text-sm-left"></label>
+                    <div class="col-sm-9">
+                        <input type="date" asp-for="OffDayStartingDate" class="form-control">
+                        <span class="text-danger" asp-validation-for="OffDayStartingDate"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-sm-3 col-form-label text-right text-sm-left">Single day</label>
+                    <div class="col-sm-1">
+                        <input class="" type="checkbox" id="SingleDayId">
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label asp-for="OffDayEndDate" class="col-sm-3 col-form-label text-right text-sm-left"></label>
+                    <div class="col-sm-9">
+                        <input type="date" asp-for="OffDayEndDate" class="form-control" placeholder="Holiday End Date">
+                        <span class="text-danger" asp-validation-for="OffDayEndDate"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label asp-for="Description" class="col-sm-3 col-form-label text-right text-sm-left"></label>
+                    <div class="col-sm-9">
+                        <input asp-for="Description" class="form-control" placeholder="Description">
+                    </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-sm-10 text-end">
+                        <partial name="_Create_Back" />
+                    </div>
+                </div>
+            </fieldset>
+        </form>
+    </div>
+</div>
+
+@section scripts{ 
+    <script>
+
+        $(document).ready(function () {
+            $('#SingleDayId').on('change', function () {
+                if ($('#SingleDayId').is(':checked') == true) {
+                    $('#OffDayEndDate').val($("#OffDayStartingDate").val());
+                    $('#OffDayEndDate').prop("disabled", true);
+                }
+                else {
+                    $('#OffDayEndDate').prop("disabled", false);
+                }
+            });
+        });
+
+
+
+        //$("#SingleDayId").change(function () {
+        //    if ($('#SingleDayId').is(':checked') == true) {
+        //        let val = $("#OffDayStartingDate").val();
+        //        alert(val);
+        //        $("#OffDayEndDate").val() = val;
+        //        let val2 = $("#OffDayEndDate").val();
+        //        alert(val2);
+        //    }
+        //});
+    </script>
+}

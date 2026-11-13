@@ -1,0 +1,180 @@
+﻿@model SMS.Entities.AdditionalModels.StudentVM.ProfilePayment
+
+<div class="tab-pane fade" id="payment" role="tabpanel" aria-labelledby="payment-tab">
+
+    <div class="container mt-4">
+        <!-- Student Header -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="mb-0">Student Financial Profile (@Model.CurrentSession)</h4>
+                    <small class="text-muted">Last updated: @Model.LastPaymentDate.ToString("dd MMM yyyy")</small>
+                </div>
+               
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card text-white bg-primary shadow-sm">
+                    <div class="card-body">
+                        <h5>Total Payable</h5>
+                        <h3>৳ @Model.TotalFees</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card text-white bg-success shadow-sm">
+                    <div class="card-body">
+                        <h5>Total Paid</h5>
+                        <h3>৳ @Model.TotalPaid</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card text-white bg-danger shadow-sm">
+                    <div class="card-body">
+                        <h5>Total Due</h5>
+                        <h3>৳ @Model.TotalDue</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment History -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Payment History</strong>
+                <button class="btn btn-sm btn-dark" id="toggleHistory">Toggle</button>
+            </div>
+            <div class="card-body" id="paymentHistory">
+            @if (Model.PaymentDetails != null && Model.PaymentDetails.Count() > 0)
+                {
+                    <table class="table table-bordered table-striped">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th>Amount (৳)</th>
+                                <th>Method</th>
+                                <th>Receipt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var payment in Model.PaymentDetails)
+                            {
+                                <tr>
+                                    <td>@payment.PaymentDate</td>
+                                    <td>@payment.Description</td>
+                                    <td>@payment.Amount.ToString("N2")</td>
+                                    <td>@payment.Method</td>
+                                    <td><button class="btn btn-sm btn-info">View</button></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p class="text-muted">No payment records found.</p>
+                }
+            
+            </div>
+        </div>
+
+        <!-- Upcoming Payments -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <strong>Upcoming Installments</strong>
+            </div>
+            <div class="card-body">
+                @if (Model.UpcomingPayments != null && Model.UpcomingPayments.Count() > 0)
+                        {
+                            <table class="table table-bordered table-striped">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Due Date</th>
+                                        <th>Description</th>
+                                        <th>Amount (৳)</th>                                
+                                    </tr>                   
+                                </thead>                
+                                <tbody>                           
+                                    @foreach (var installment in Model.UpcomingPayments)                                  {                     
+                                        <tr>
+                                            <td>@installment.DueDate.ToString("dd MMM yyyy")</td>
+                                            <td>@installment.Description</td>
+                                            <td>@installment.Amount.ToString("N2")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        }
+
+            </div>
+        </div>
+
+        <!-- Make Payment Button -->
+        <div class="text-end">
+            <button class="btn btn-lg btn-primary" data-bs-toggle="modal" data-bs-target="#paymentModal">
+                Make a Payment
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Payment Modal -->
+    <div class="modal fade" id="paymentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Make Payment</h5>
+                    <button class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+
+                    <div class="mb-3">
+                        <label>Amount (৳)</label>
+                        <input type="number" class="form-control" id="paymentAmount" value="2000">
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Method</label>
+                        <select class="form-control" id="paymentMethod">
+                            <option>Cash</option>
+                            <option>Bank</option>
+                            <option>Online</option>
+                        </select>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-success" id="btnConfirmPayment">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts{
+    <script>
+        $(document).ready(function () {
+
+        // Toggle payment history
+        $("#toggleHistory").click(function () {
+            $("#paymentHistory").slideToggle();
+        });
+
+        // Dummy payment confirmation
+        $("#btnConfirmPayment").click(function () {
+            let amount = $("#paymentAmount").val();
+            let method = $("#paymentMethod").val();
+
+            alert("Payment of ৳" + amount + " received via " + method + "!");
+
+            $("#paymentModal").modal("hide");
+        });
+    </script>
+}

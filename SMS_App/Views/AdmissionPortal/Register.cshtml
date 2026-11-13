@@ -1,0 +1,47 @@
+@model GuardianRegisterVM
+@{
+    ViewData["Title"] = "Create account";
+}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <h1 class="h3">Create a guardian account / অ্যাকাউন্ট খুলুন</h1>
+        <p class="text-muted small">One account can apply for more than one child. Use a mobile number you can receive SMS on - the school sends updates to it.</p>
+        <div class="card adm-card"><div class="card-body">
+            <form asp-action="Register" method="post">
+                <input type="hidden" asp-for="ReturnUrl" />
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small" role="alert"></div>
+                <div class="mb-3">
+                    <label asp-for="FullName" class="form-label"></label>
+                    <input asp-for="FullName" class="form-control" autocomplete="name" />
+                    <span asp-validation-for="FullName" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="MobileNumber" class="form-label"></label>
+                    <input asp-for="MobileNumber" class="form-control" inputmode="tel" autocomplete="tel" placeholder="01XXXXXXXXX" />
+                    <span asp-validation-for="MobileNumber" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Email" class="form-label"></label>
+                    <input asp-for="Email" class="form-control" autocomplete="email" />
+                    <span asp-validation-for="Email" class="text-danger small"></span>
+                </div>
+                <div class="row">
+                    <div class="col-sm-6 mb-3">
+                        <label asp-for="Password" class="form-label"></label>
+                        <input asp-for="Password" class="form-control" autocomplete="new-password" />
+                        <div class="form-text">At least 6 characters.</div>
+                        <span asp-validation-for="Password" class="text-danger small"></span>
+                    </div>
+                    <div class="col-sm-6 mb-3">
+                        <label asp-for="ConfirmPassword" class="form-label"></label>
+                        <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
+                        <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 mb-2">Create account</button>
+                <div class="small text-center"><a asp-action="Login" asp-route-returnUrl="@Model.ReturnUrl">I already have an account</a></div>
+            </form>
+        </div></div>
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

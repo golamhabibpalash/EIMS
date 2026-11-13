@@ -1,0 +1,39 @@
+@model SMS_App.ViewModels.Tickets.TicketDetailsVM
+@{
+    ViewData["Title"] = "Delete Ticket";
+    GlobalUI.PageTitle = "Delete Ticket";
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="alert alert-danger">
+            <h5 class="mb-1">Delete this ticket?</h5>
+            <p class="mb-0">
+                Its discussion (@Model.Comments.Count entries) and
+                @Model.Attachments.Count attachment(s) are deleted with it. This cannot be undone.
+            </p>
+        </div>
+
+        <fieldset class="border p-3 shadow">
+            <legend class="float-none w-auto px-2" style="font-size:1.1rem;">#@Model.Ticket.Id &middot; @Model.Ticket.Title</legend>
+            <dl class="row mb-0">
+                <dt class="col-sm-3">Status</dt>
+                <dd class="col-sm-9"><partial name="_StatusBadge" model="Model.Ticket.Status" /></dd>
+
+                <dt class="col-sm-3">Type</dt>
+                <dd class="col-sm-9">@Model.Ticket.TicketType</dd>
+
+                <dt class="col-sm-3">Raised</dt>
+                <dd class="col-sm-9">@Model.Ticket.RaiseDate.ToString("dd MMM yyyy hh:mm tt") by @Model.RaisedByName</dd>
+
+                <dt class="col-sm-3">Description</dt>
+                <dd class="col-sm-9" style="white-space: pre-wrap;">@Model.Ticket.Description</dd>
+            </dl>
+        </fieldset>
+
+        <form asp-action="Delete" asp-route-id="@Model.Ticket.Id" method="post" class="mt-3 text-end">
+            <a asp-action="Details" asp-route-id="@Model.Ticket.Id" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-danger">Delete Ticket</button>
+        </form>
+    </div>
+</div>

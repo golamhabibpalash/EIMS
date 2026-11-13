@@ -1,0 +1,64 @@
+@model SMS_App.ViewModels.Tickets.TicketCreateVM
+@{
+    ViewData["Title"] = "Raise a Ticket";
+    GlobalUI.PageTitle = "Raise a Ticket";
+}
+
+<partial name="_Alerts" />
+
+<div class="row">
+    <div class="col-md-8">
+        <fieldset class="border p-3 shadow">
+            <legend class="float-none w-auto text-primary px-2" style="font-size:1.1rem;">New Ticket</legend>
+
+            <form asp-action="Create" method="post" enctype="multipart/form-data">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                <div class="form-group row mb-2">
+                    <label asp-for="Title" class="col-sm-3 col-form-label"></label>
+                    <div class="col-sm-9">
+                        <input asp-for="Title" class="form-control" placeholder="Short summary of the request" />
+                        <span asp-validation-for="Title" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="form-group row mb-2">
+                    <label asp-for="TicketType" class="col-sm-3 col-form-label"></label>
+                    <div class="col-sm-9">
+                        <select asp-for="TicketType" asp-items="Model.TicketTypeList" class="form-control"></select>
+                        <span asp-validation-for="TicketType" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="form-group row mb-2">
+                    <label asp-for="Description" class="col-sm-3 col-form-label"></label>
+                    <div class="col-sm-9">
+                        <textarea asp-for="Description" class="form-control" rows="8"
+                                  placeholder="What happened, what you expected, and how to reproduce it."></textarea>
+                        <span asp-validation-for="Description" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="form-group row mb-2">
+                    <label asp-for="Attachments" class="col-sm-3 col-form-label"></label>
+                    <div class="col-sm-9">
+                        <input asp-for="Attachments" type="file" multiple accept="image/*,application/pdf" class="form-control" />
+                        <small class="text-muted">Images or PDF only. Up to 2 MB each.</small>
+                    </div>
+                </div>
+
+                <div class="form-group row">
+                    <div class="col-sm-12 text-end">
+                        <a asp-action="Index" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">Raise Ticket</button>
+                    </div>
+                </div>
+            </form>
+        </fieldset>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <partial name="_AttachmentValidationScript" />
+}

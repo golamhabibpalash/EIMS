@@ -1,0 +1,77 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Attendance Summary</title>
+</head>
+<body style="margin:0; padding:0; font-family: Arial, sans-serif;">
+
+    <!-- Full Width Table for Background -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0"
+           background="{{BackgroundImageUrl}}"
+           style="
+         background-position: center center;
+         background-repeat: no-repeat;
+         background-size: 400px 400px;
+         height: 400px;
+         text-align: center;
+       ">
+        <tr>
+            <td align="center" valign="middle">
+
+                <!-- Email Container -->
+                <table width="600" cellpadding="20" cellspacing="0" border="0" style="background-color: rgba(255,255,255,0.9); border-radius: 8px;">
+                    <tr>
+                        <td style="text-align: center;">
+                            <h1 style="color: navy; margin-top: 0;">{{InstituteName}}</h1>
+                            <h3 style="color: #555;">Attendance Summary</h3>
+                            <p style="font-size: 14px;">Date: <strong>{{AttendanceDate}}</strong></p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            <h3 style="border-bottom: 1px solid #ccc;">Student Attendance</h3>
+                            <table width="100%" cellpadding="8" cellspacing="0" border="1" style="border-collapse: collapse;">
+                                <tr style="background-color: #f4f4f4;">
+                                    <th align="left">Student Type</th>
+                                    <th align="left">Count</th>
+                                </tr>
+                                <tr>
+                                    <td>Boys</td>
+                                    <td>{{BoysCount}}</td>
+                                </tr>
+                                <tr>
+                                    <td>Girls</td>
+                                    <td>{{GirlsCount}}</td>
+                                </tr>
+                                <tr>
+                                    <td>Total</td>
+                                    <td>{{TotalCount}}</td>
+                                </tr>
+                            </table>
+
+                            <h3 style="margin-top: 30px; border-bottom: 1px solid #ccc;">Employee Attendance</h3>
+                            <table width="100%" cellpadding="8" cellspacing="0" border="1" style="border-collapse: collapse;">
+                                <tr style="background-color: #f4f4f4;">
+                                    <th align="left">Employee Type</th>
+                                    <th align="left">Count</th>
+                                </tr>
+                                <tr>
+                                    <td>All Employees</td>
+                                    <td>{{EmployeesCount}}</td>
+                                </tr>
+                            </table>
+
+                            <p style="margin-top: 30px;">Thank you for your attention.</p>
+                            <p>Best regards,<br><strong>{{InstituteName}}</strong></p>
+                        </td>
+                    </tr>
+                </table>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>

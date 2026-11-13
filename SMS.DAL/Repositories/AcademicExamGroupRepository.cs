@@ -20,12 +20,12 @@ namespace SMS.DAL.Repositories
         }
         public override async Task<IReadOnlyCollection<AcademicExamGroup>> GetAllAsync()
         {
-            var result = await _dbContext.AcademicExamGroups.Include(s => s.AcademicSession).Include(s => s.academicExamType).Include(s => s.AcademicExams).ToListAsync();
+            var result = await _dbContext.AcademicExamGroups.Include(s => s.AcademicSession).Include(s => s.AcademicExamType).Include(s => s.AcademicExams).ToListAsync();
             return result;
         }
         public async Task<IReadOnlyCollection<AcademicExamGroup>> GetByMonthExamType(int monthId, int examTypeId)
         {
-            var result = await _dbContext.AcademicExamGroups.Where(s => s.ExamMonthId == monthId && s.academicExamTypeId == examTypeId).ToListAsync();
+            var result = await _dbContext.AcademicExamGroups.Where(s => s.ExamMonthId == monthId && s.AcademicExamTypeId == examTypeId).ToListAsync();
             return result;
         }
 
@@ -33,7 +33,7 @@ namespace SMS.DAL.Repositories
         {
             var result = await _dbContext
                 .AcademicExamGroups
-                .Include(s => s.academicExamType)
+                .Include(s => s.AcademicExamType)
                 .Include(s => s.AcademicExams)
                     .ThenInclude(m => m.AcademicClass)
                 .Include(s => s.AcademicExams).ThenInclude(c =>c.AcademicSubject)
@@ -41,7 +41,8 @@ namespace SMS.DAL.Repositories
                 .Include(s => s.AcademicExams)
                     .ThenInclude(s => s.Employee)
                 .Include(s => s.AcademicExams)
-                    .ThenInclude(m => m.AcademicExamDetails                    )
+                    .ThenInclude(m => m.AcademicExamDetails)
+                    .ThenInclude(d => d.Student)
                 .FirstOrDefaultAsync(s => s.Id == id);
             return result;
         }

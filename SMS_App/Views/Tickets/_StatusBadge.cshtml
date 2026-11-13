@@ -1,0 +1,12 @@
+@model SMS.Entities.TicketStatus
+@{
+    var css = Model switch
+    {
+        SMS.Entities.TicketStatus.Pending  => "bg-secondary",
+        SMS.Entities.TicketStatus.Working  => "bg-primary",
+        SMS.Entities.TicketStatus.Solved   => "bg-success",
+        SMS.Entities.TicketStatus.Rejected => "bg-danger",
+        _ => "bg-light text-dark"
+    };
+}
+<span class="badge @css">@Model</span>

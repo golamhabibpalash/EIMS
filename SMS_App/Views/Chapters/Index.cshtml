@@ -1,0 +1,209 @@
+﻿@model IEnumerable<Chapter>
+
+@{
+    ViewData["Title"] = "Chapter List";
+    GlobalUI.PageTitle = ViewBag.Title;
+    int i = 1;
+}
+
+@section Styles{
+    <style>
+        .errors
+        {
+            color: red;
+        }
+    </style>
+}
+
+@if (Model.Count() > 0)
+{
+<table class="table table-hover table-striped table-sm" id="myTable">
+    <thead>
+        <tr>
+            <td>#</td>
+            <td>Chapter</td>
+            <td>Class</td>
+            <td>Subject</td>
+            <td>
+                <button id="addButton" type="button" class="btn-sm btn btn-primary" data-toggle="modal" data-target="#exampleModalCenter">
+                    add New
+                </button>
+            </td>
+        </tr>
+    </thead>
+    <tbody id="tableBody">
+        @foreach (var item in Model)
+            {
+        <tr>
+            <td>@(i++)</td>
+            <td><input id="ChapterName_@item.Id" type="text" class="form-control-plaintext" name="ChapterName" value="@item.ChapterName" /> </td>
+            <td>@item.AcademicSubject.AcademicClass.Name</td>
+            <td>@item.AcademicSubject.SubjectName</td>
+            <td>
+                <div class="btn-group">
+                    <span class="btn btn-sm btn-success" id="edit_@item.Id" onclick="editChapter(@item.Id)">Edit</span>
+                    <span class="btn btn-sm btn-warning" id="update_@item.Id" style="display:none" onclick="updateChapter(@item.Id)">Update</span>
+                    <span class="btn btn-sm btn-danger" id="delete_@item.Id">Delete</span>
+                </div>
+            </td>
+
+        </tr>
+            }
+
+    </tbody>
+</table>
+}
+else
+{
+<div class="row">
+    <h2>There have no any chapter created yet!</h2> <br />
+    <button type="button" class="btn-sm btn btn-primary" data-toggle="modal" data-target="#exampleModalCenter">
+        add New
+    </button>
+</div>
+}
+
+
+<div class="modal fade" id="exampleModalCenter" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title" id="exampleModalLongTitle">Create new Chapter</h6>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="container-fluid">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <form id="chapterCreateForm" name="chapterCreateForm" method="post">
+
+                                <div class="form-group row">
+                                    <label for="AcademicClassId" class="control-label col-form-label col-md-3 text-md-end ">Academic Class</label>
+                                    <div class="col-md-9">
+                                        <select class="form-control" name="AcademicClassId" asp-items="ViewBag.AcademicClassId" id="AcademicClassId">
+                                            <option disabled selected>Select Academic Class</option>
+                                        </select>
+                                        <span id="AcademicClassIdMsg" class="text-danger" style="display:none">please select class</span>
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <label for="AcademicSubjectId" class="control-label col-form-label col-md-3 text-md-end ">Subject Name</label>
+                                    <div class="col-md-9">
+                                        <select class="form-control" name="AcademicSubjectId" id="AcademicSubjectId">
+                                            <option disabled selected>Select Subject</option>
+                                        </select>
+                                        <span id="AcademicSubjectIdMsg" class="text-danger" style="display:none">please select Subject</span>
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <label for="ChapterName" class="control-label  col-form-label col-md-3 text-md-end">Chapter Name</label>
+                                    <div class="col-md-9">
+                                        <input name="ChapterName" class="form-control rounded" placeholder="Input Chapter Name" id="ChapterName" />
+                                        <span id="ChapterNameMsg" class="text-danger" style="display:none">Input Chapter name</span>
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <label for="ChapterNumber" class="control-label  col-form-label col-md-3 text-md-end">Ch. Number</label>
+                                    <div class="col-md-9">
+                                        <input type="number" name="ChapterNumber" class="form-control rounded" placeholder="Input Chapter Number" id="ChapterNumber" />
+                                        <span id="ChapterNumberMsg" class="text-danger" style="display:none">Input Chapter Number</span>
+                                    </div>
+                                </div>
+
+                                <div class="form-group row">
+                                    <div class="offset-md-3 col-md-9">
+                                        <button id="modalCancelId" type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
+                                        <button type="submit" class="btn btn-primary btn-sm">Create</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts{
+
+    <script src="~/js/DataTable/dataTable.js"></script>
+    <script>
+        
+        $(document).ready(function () {
+            $('#AcademicClassId').change(function () {
+                let classId = $('#AcademicClassId option:selected').val();
+                $.ajax({
+                    url: '/AcademicSubjects/GetSubjectsByClassId?classId=' + classId,
+                    method: 'Post',
+                    type: 'JSON',
+                    success: function (data) {
+                        $('#AcademicSubjectId').empty();
+                        var op = '<option disabled selected>Select Subject</option>';
+                        $('#AcademicSubjectId').append(op);
+                        $.each(data, function (i, obj) {
+                            var op = "<option value='" + obj.id + "'>" + obj.subjectName + "</option>";
+                            $('#AcademicSubjectId').append(op);
+                        });
+                    },
+                    error: function () { }
+                });
+            });
+
+
+            $("form#chapterCreateForm").validate({
+                rules: {
+                    AcademicSubjectId: { required: true, },
+                    ChapterName: { required: true, },
+                    ChapterNumber: { required: true, },
+                },
+                messages: {
+                    AcademicSubjectId: { required: "Please select Subject", },
+                    ChapterName: { required: "Please enter chapter name", },
+                    ChapterNumber: { required: "Chapter number needed", },
+                },
+                submitHandler: function (form) {
+                    $.ajax({
+                        url: "/Chapters/Create",
+                        type: "post",
+                        data: $("form#chapterCreateForm").serialize(),
+                        success: function (data, status) {
+                            console.log(data);
+                            let totalTr = $('#tableBody tr').length + 1;
+                            let slTd = '<td>' + totalTr + '</td>';
+                            let nameTd = '<td> <input id="ChapterName_' + data.id + '" type="text" class="form-control-plaintext" name="ChapterName" value="' + data.chapterName + '" /></td>';
+
+                            let classTd = '<td>' + data.academicSubject.academicClass.name + '</td>';
+                            let subjectTd = '<td>' + data.academicSubject.subjectName + '</td>';
+                            let btnGroup = '<div class="btn-group"><span class="btn btn-sm btn-success" id="edit_' + data.id + '" onclick="editChapter(' + data.id + ')">Edit</span><span class="btn btn-sm btn-warning" id="update_' + data.id + '" style="display:none" onclick="updateChapter(' + data.id + ')">Update</span><span class="btn btn-sm btn-danger" id="delete_' + data.id + '">Delete</span></div>';
+                            let actionTd = '<td>' + btnGroup + '</td>';
+
+                            let tr = '<tr>' + slTd + nameTd + classTd + subjectTd + actionTd + '</tr>';
+
+                            $('#tableBody').append(tr);
+                            $('#modalCancelId').trigger("click");
+                            alertify.success('New Chapter Created');
+                        }
+                    });
+                }
+            });
+
+        });
+        function editChapter(id) {
+            document.getElementById("edit_" + id).style.display = "none";
+            document.getElementById("update_" + id).style.display = "block";
+            let nameInput = document.getElementById("ChapterName_" + id);
+            nameInput.classList.remove("form-control-plaintext");
+            nameInput.classList.add("form-control-sm");
+
+        }
+        function updateChapter(id) {
+            document.getElementById("edit_" + id).style.display = "block";
+            document.getElementById("update_" + id).style.display = "none";
+            document.getElementById("ChapterName_" + id).classList.add("form-control-plaintext");
+            document.getElementById("ChapterName_" + id).classList.remove("form-control-sm");
+        }
+    </script>
+}

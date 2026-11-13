@@ -1,0 +1,158 @@
+@{
+    ViewData["Title"] = "SMS Dashboard";
+}
+
+<div class="container mt-4">
+
+    <h3 class="mb-4">SMS Dashboard</h3>
+
+    <div class="row g-3">
+
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body text-center">
+                    <h6>Balance</h6>
+                    <h3 id="balance">0</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body text-center">
+                    <h6>SMS Rate</h6>
+                    <h3 id="rate">0</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body text-center">
+                    <h6>Total SMS</h6>
+                    <h3 id="totalsms">0</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body text-center">
+                    <h6>Token SMS</h6>
+                    <h3 id="tokensms">0</h3>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+
+    <div class="row mt-4">
+
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    Monthly SMS
+                </div>
+
+                <div class="card-body">
+                    <canvas id="smsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    Account Expiry
+                </div>
+
+                <div class="card-body text-center">
+                    <h4 id="expiry"></h4>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+
+        $(document).ready(function () {
+
+            loadSmsDashboard();
+
+        });
+
+        function loadSmsDashboard() {
+
+            $.ajax({
+                url: "/PhoneSMS/GetSmsData",
+                type: "GET",
+                success: function (data) {
+
+                    var result = typeof data === "string" ? JSON.parse(data) : data;
+
+                    var smsData = {};
+
+                    result.forEach(function (item) {
+
+                        if (item.action.includes("balance"))
+                            smsData.balance = item.response;
+
+                        if (item.action.includes("rate"))
+                            smsData.rate = item.response;
+
+                        if (item.action.includes("totalsms"))
+                            smsData.totalsms = item.response;
+
+                        if (item.action.includes("tokensms"))
+                            smsData.tokensms = item.response;
+
+                        if (item.action.includes("expiry"))
+                            smsData.expiry = item.response;
+
+                        if (item.action.includes("monthlysms"))
+                            smsData.monthlysms = item.response;
+
+                        if (item.action.includes("tokenmonthlysms"))
+                            smsData.tokenmonthlysms = item.response;
+
+                    });
+
+                    $("#balance").text(smsData.balance+" BDT");
+                    $("#rate").text(smsData.rate);
+                    $("#totalsms").text(smsData.totalsms);
+                    $("#tokensms").text(smsData.tokensms);
+                    $("#expiry").text(smsData.expiry);
+
+                    createChart(smsData);
+                }
+            });
+        }
+
+
+        function createChart(data) {
+
+            new Chart(document.getElementById("smsChart"), {
+
+                type: 'bar',
+
+                data: {
+                    labels: ['Monthly SMS', 'Token Monthly SMS'],
+
+                    datasets: [{
+                        label: 'SMS Usage',
+                        data: [data.monthlysms, data.tokenmonthlysms]
+                    }]
+                }
+
+            });
+
+        }
+
+    </script>
+}

@@ -1,7 +1,7 @@
 USE [SMSDB]
 GO
 
-/****** Object:  View [dbo].[vw_rpt_Admit_Card_Info]    Script Date: 18-Oct-23 11:35:51 AM ******/
+/****** Object:  View [dbo].[vw_rpt_Admit_Card_Info]    Script Date: 03/28/2026 11:41:56 PM ******/
 SET ANSI_NULLS ON
 GO
 
@@ -11,7 +11,7 @@ GO
 
 
 
-ALTER   view [dbo].[vw_rpt_Admit_Card_Info] as
+CREATE OR ALTER   view [dbo].[vw_rpt_Admit_Card_Info] as
 select s.Id[StudentId],
 	s.ClassRoll,
 	s.Name[StudentName],
@@ -25,13 +25,14 @@ select s.Id[StudentId],
 	sub.SubjectName,
 	eg.ExamMonthId[MonthId],
 	s.AcademicClassId,
+	t.Id[ExamTypeId],
 	t.ExamTypeName,
 	r.Name[Religion],
 	i.Name[InstituteName],
 	i.EIIN,
 	s.Status[StudentStauts],
-	g.Name[Gender] from Institute i, AcademicExams e
-left join AcademicExamGroups eg on e.AcademicExamGroupId = eg.Id
+	g.Name[Gender] from Institute i, (select exam.* from AcademicExams exam where exam.AcademicExamGroupId in (select gr.Id from AcademicExamGroups gr where gr.AcademicSessionid = (select sess.Id from AcademicSession sess where sess.CurrentSession = 1))) e
+left join (select * from AcademicExamGroups where AcademicSessionId = (select Id from AcademicSession where CurrentSession = 1)) eg on e.AcademicExamGroupId = eg.Id
 left join AcademicExamDetails d on e.Id = d.AcademicExamId
 left join AcademicExamTypes t on eg.academicExamTypeId = t.Id
 left join AcademicSubject sub on e.AcademicSubjectId = sub.Id

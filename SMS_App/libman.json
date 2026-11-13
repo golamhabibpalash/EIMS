@@ -1,0 +1,26 @@
+{
+  "version": "1.0",
+  "defaultProvider": "cdnjs",
+  "libraries": [
+    {
+      "library": "font-awesome@4.6.3",
+      "destination": "wwwroot/lib/font-awesome/"
+    },
+    {
+      "library": "jquery@1.10.2",
+      "destination": "wwwroot/lib/jquery/j1.10.2/jquery/"
+    },
+    {
+      "library": "jquery@3.7.1",
+      "destination": "wwwroot/lib/jquery/jquery3.7/jquery/"
+    },
+    {
+      "library": "fullcalendar@6.1.19",
+      "destination": "wwwroot/lib/fullcalendar/"
+    },
+    {
+      "library": "select2@4.0.13",
+      "destination": "wwwroot/lib/select2/"
+    }
+  ]
+}

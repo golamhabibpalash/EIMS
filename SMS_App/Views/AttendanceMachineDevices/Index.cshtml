@@ -1,0 +1,80 @@
+@model IEnumerable<SMS.Entities.AttendanceMachine>
+
+@{
+    ViewData["Title"] = "Attendance Machines";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+    int sl = 0;
+}
+
+@if (TempData["success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["success"]
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+    </div>
+}
+
+<table class="table table-striped table-hover shadow-sm">
+    <thead class="table-info">
+        <tr>
+            <th>#</th>
+            <th>@Html.DisplayNameFor(model => model.Name)</th>
+            <th>IP : Port</th>
+            <th>@Html.DisplayNameFor(model => model.SerialNumber)</th>
+            <th>@Html.DisplayNameFor(model => model.Model)</th>
+            <th>@Html.DisplayNameFor(model => model.Brand)</th>
+            <th>@Html.DisplayNameFor(model => model.Location)</th>
+            <th>Last Sync</th>
+            <th>
+                <a class="btn-sm p-2 rounded-pill btn-success" asp-action="Create"><i class="fa fa-plus"></i> Add New Machine</a>
+            </th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr class="@(!item.IsActive ? "text-muted" : "")">
+            <td>@(++sl).</td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Name)
+                @if (!item.IsActive)
+                {
+                    <span class="badge badge-secondary">Inactive</span>
+                }
+            </td>
+            <td>
+                @if (item.UsePushMode)
+                {
+                    <span class="badge badge-info" title="Device uploads to /iclock on its own; no IP is dialled">Push</span>
+                }
+                else
+                {
+                    @($"{item.IPAddress}:{item.Port}")
+                }
+            </td>
+            <td>@item.SerialNumber</td>
+            <td>@item.Model</td>
+            <td>@item.Brand</td>
+            <td>@item.Location</td>
+            <td>
+                @(item.LastSyncAt?.ToString("dd MMM yyyy hh:mm tt") ?? "Never")
+                @if (!string.IsNullOrEmpty(item.LastError))
+                {
+                    <br /><small class="text-danger">@item.LastError</small>
+                }
+            </td>
+            <td>
+                <partial name="_Edit_Details_Delete" model="@item.Id" />
+                @if (!item.UsePushMode)
+                {
+                    <form asp-action="PullAttendance" asp-route-id="@item.Id" method="post" class="d-inline">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-primary btn-sm" title="Pull attendance now"><i class="fa fa-download"></i></button>
+                    </form>
+                }
+            </td>
+        </tr>
+}
+    </tbody>
+</table>
+
+<a asp-controller="MachineEnrollment" asp-action="Index" class="btn btn-outline-info mt-2"><i class="fa fa-fingerprint"></i> Manage User Enrollment</a>

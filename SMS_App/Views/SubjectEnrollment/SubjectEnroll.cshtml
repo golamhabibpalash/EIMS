@@ -1,0 +1,291 @@
+﻿@model SubjectEnrollment;
+@{
+    int sl = 0;
+    bool isOptionalExist = false;
+}
+<div class="row pt-3 pb-2" style="background-color: #2A3F54;">
+    <div class="col-md-12 text-center">
+        <form id="frmSearchByRollId" asp-action="SubjectEnroll" asp-controller="SubjectEnrollment" method="get" class="">
+            <div class="row">
+                <div class="col-md-4 offset-md-3">
+                    <div class="input-group mb-3">
+                        @if (ViewBag.roll != null)
+                        {
+                            <input id="rollInput" class="form-control" name="stRoll" value="@ViewBag.roll" />
+                        }
+                        else
+                        {
+                            <input id="rollInput" placeholder="Input Student Roll Number" class="form-control" name="stRoll" />
+                        }
+                        <div class="input-group-append">
+                            <button class="btn btn-sm btn-info rounded" type="submit"><i class="fas fa-search"></i> Go</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-md-start">
+                    <button type="button" class="btn btn-light btn-sm" data-toggle="modal" data-target="#exampleModal">
+                        Select
+                    </button>
+                </div>
+            </div>
+
+        </form>
+    </div>
+</div>
+@if (Model.Student != null)
+{
+    <div class="row">
+        <div class="col-md-4 mh-100 p-1 ">
+            <div class="card bg-navy-blue" style="min-height:430px;">
+
+                <div class="row">
+                    <div class="col-md-6 offset-3 text-center pb-3">
+                        <img src="~/Images/Student/@Model.Student.Photo" onerror="this.src='@Url.Content("~/Images/Student/noimage.jpg")'" alt="Alternate Text" class="rounded-circle" style="width:50%;" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-10 offset-1">
+                        <table class="table text-light">
+                            <tr>
+                                <td width="140px">Student Name</td>
+                                <td>:</td>
+                                <td>@Model.Student.Name</td>
+                            </tr>
+                            <tr>
+                                <td>Academic Class</td>
+                                <td>:</td>
+                                <td>@Model.Student.AcademicClass.Name</td>
+                            </tr>
+                            @if (Model.Student.AcademicSection != null)
+                            {
+                                <tr>
+                                    <td>Academic Section</td>
+                                    <td>:</td>
+                                    <td>@Model.Student.AcademicSection.Name</td>
+                                </tr>
+                            }
+                            <tr>
+                                <td>Class Roll</td>
+                                <td>:</td>
+                                <td>@Model.Student.ClassRoll</td>
+                            </tr>
+                            <tr>
+                                <td>Academic Session</td>
+                                <td>:</td>
+                                <td>@Model.Student.AcademicSession.Name</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8" id="myDiv">
+            <div class="p-1">
+                @if (Model.EnrolledSubjects != null && Model.EnrolledSubjects.Count() > 0)
+                {
+                    <table class="table table-responsive table-bordered">
+                        <thead>
+                            <tr>
+                                <td>#</td>
+                                <td>Subject Name</td>
+                                <td>Subject Code</td>
+                                <td>Action</td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="text-dark table-info">
+                                <td colspan="3">Compulsory Subject</td>
+                                <td>
+                                    <button class="btn-group-sm">Reset</button>
+                                </td>
+                            </tr>
+                            @foreach (var item in Model.EnrolledSubjects.OrderBy(s => s.IsOptional))
+                            {
+                                if (!item.IsOptional)
+                                {
+                                    <tr>
+                                        <td>@(++sl)</td>
+                                        <td>@item.AcademicSubject.SubjectName</td>
+                                        <td>@item.AcademicSubject.SubjectCode</td>
+                                        <td></td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    <tr class="text-dark table-info">
+                                        <td colspan="4">Optional Subject</td>
+                                    </tr>
+                                    <tr>
+                                        <td>@(++sl)</td>
+                                        <td>@item.AcademicSubject.SubjectName</td>
+                                        <td>@item.AcademicSubject.SubjectCode</td>
+                                        <td>
+                                            <span class="btn btn-sm" onclick="loadSubjectDropdown(@Model.StudentId)" id="editBtn" data-toggle="modal" data-target="#editOptionalMadal"><i class="fas fa-edit"></i></span>
+                                        </td>
+                                    </tr>
+                                    isOptionalExist = true;
+                                }
+                            }
+
+                        </tbody>
+                        @if (!isOptionalExist)
+                        {
+                            <tfoot>
+                                <tr>
+                                    <td colspan="4" class="text-right">
+                                        <span class="btn btn-sm btn-group-sm btn-primary" onclick="loadSubjectDropdown(@Model.StudentId)" id="editBtn" data-toggle="modal" data-target="#editOptionalMadal">Set Optional Subject</span>
+                                    </td>
+                                </tr>
+                            </tfoot>
+
+                        }
+                    </table>
+
+                }
+                else
+                {
+                    <div class="d-flex justify-content-center align-items-center" id="centeredButtonId">
+                        <form asp-action="DefaultEnroll" asp-controller="SubjectEnrollment" method="get">
+                            <input type="hidden" asp-for="StudentId" />
+                            <button type="submit" class="btn btn-primary">Enroll Now</button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+
+
+<!-- Student Select Modal -->
+<div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content text-center">
+            <div class="modal-header text-center">
+                <h4 class="text-center">Select Student</h4>
+            </div>
+            <div class="modal-body">
+                <form action="/" method="post">
+                    <div class="form-group row">
+                        <label class="col-md-4 text-md-end col-form-label">Academic Class</label>
+                        <div class="col-md-8">
+                            <select class="form-control" asp-items="ViewBag.AcademicClassList" id="modalAcademicClassId">
+                                <option selected disabled>-Select Class-</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-md-4 text-md-end col-form-label">Student</label>
+                        <div class="col-md-8">
+                            <select class="form-control" id="studentListId">
+                                <option selected disabled>-Select Student-</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Button Modal -->
+@if (ViewBag.AcademicSubjectList != null)
+{
+    <div class="modal fade" id="editOptionalMadal" tabindex="-1" role="dialog" aria-labelledby="editOptionalMadalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content text-center">
+                <div class="modal-header text-center">
+                    <h4 class="text-center">Select Subject</h4>
+                </div>
+                <form asp-action="SetOptionalSubject" asp-controller="SubjectEnrollment" method="post">
+                    <div class="modal-body">
+                        <div class="form-group row">
+                            <label class="col-md-4 text-md-end col-form-label">Select Subject</label>
+                            <div class="col-md-8">
+                                <input type="hidden" asp-for="StudentId" />
+                                <select class="form-control" id="subjectListId" name="subjectId" asp-items="ViewBag.AcademicSubjectList">
+                                    <option selected disabled>-Select Subject-</option>
+                                </select>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-info">Submit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts{
+    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
+
+    <script>
+        let deleted = '@TempData["deleted"]';
+        let created = '@TempData["created"]';
+        let updated = '@TempData["updated"]';
+        let failed = '@TempData["error"]';
+    </script>
+
+    <script>
+        $('#modalAcademicClassId').change(function () {
+            let id = $('#modalAcademicClassId option:selected').val();
+
+            $.ajax({
+                url: "/api/Students/getbyclasswithsessionId?academicClassId=" + id + "&academicSessionId=" + null,
+                dataType: "JSON",
+                type: "POST",
+                cache: false,
+                success: function (data) {
+                    $('#studentListId').empty();
+
+                    if (data != null || data != '') {
+                        var o = '<option disabled selected>Select Student</option>';
+
+                        $('#studentListId').append(o);
+
+                        $.each(data, function (i, obj) {
+                            console.log(obj.name);
+                            var op = '<option value="' + obj.classRoll + '">' + obj.classRoll + " - " + obj.name + '</option>';
+                            $('#studentListId').append(op);
+                        });
+                    }
+                    else {
+                        var o = '<option disabled selected>Section Not Found</option>';
+                        $('#studentListId').append(o);
+                    }
+                },
+                error: function (err) {
+                    console.log(err);
+                }
+            });
+        });
+        $('#studentListId').change(function () {
+            let cRoll = $('#studentListId option:selected').val();
+            $('#rollInput').val(cRoll);
+            $('#frmSearchByRollId').submit();
+        });
+        function loadSubjectDropdown() {
+
+        }
+
+
+        //Code for Center Button
+        var divElement = document.getElementById("myDiv");
+        var anotherDivElement = document.getElementById("centeredButtonId");
+        // Get the height of the first div
+        var divHeight = divElement.offsetHeight;
+        // Set the height of the second div to the height of the first div
+        if (anotherDivElement != null) {
+            anotherDivElement.style.height = divHeight + "px";
+        }
+    </script>
+}

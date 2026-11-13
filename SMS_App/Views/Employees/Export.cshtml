@@ -1,0 +1,242 @@
+@model IEnumerable<SMS_App.ViewModels.Employees.EmployeeExportVM>
+
+@{
+    ViewData["Title"] = "Export Employees";
+    GlobalUI.PageTitle = ViewBag.Title;
+
+    var selectedFields = ViewBag.SelectedFields as List<string>;
+    var fieldsList = ViewBag.FieldsList as List<string>;
+    var currentStatus = ViewBag.Status as string ?? "all";
+}
+
+<div class="row mb-3">
+    <div class="col-md-12 d-flex justify-content-between align-items-center">
+        <h4 class="text-muted">Employee Export Preview</h4>
+        <div class="d-flex gap-2">
+            <a asp-action="Index" class="btn btn-secondary">
+                <i class="fa fa-arrow-left"></i> Back
+            </a>
+            <form asp-action="DownloadCsv" method="post" style="display:inline;">
+                <input type="hidden" name="fields" value="@string.Join(",", selectedFields)" />
+                <input type="hidden" name="status" value="@currentStatus" />
+                <button type="submit" class="btn btn-success">
+                    <i class="fa fa-download"></i> Download CSV
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <form asp-action="Export" method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label fw-bold">Status Filter</label>
+                <select name="status" class="form-select">
+                    <option value="all" selected="@(currentStatus == "all")">All Employees</option>
+                    <option value="active" selected="@(currentStatus == "active")">Active Only</option>
+                    <option value="inactive" selected="@(currentStatus == "inactive")">Inactive Only</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label fw-bold">Fields</label>
+                <input type="hidden" name="fields" value="@string.Join(",", selectedFields)" />
+                <span class="form-control" style="height: auto; padding-top: 0.375rem;">
+                    @string.Join(", ", selectedFields.Select(f => f.Replace("EmployeeName", "Name").Replace("NameBangla", "(Bangla)").Replace("EmpType", "Emp Type")))
+                </span>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fa fa-filter"></i> Apply Filter
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light">
+        <h6 class="mb-0">Selected Fields: @string.Join(", ", selectedFields.Select(f => f.Replace("EmployeeName", "Name").Replace("NameBangla", "(Bangla)").Replace("EmpType", "Emp Type")))</h6>
+        <small class="text-muted">Total Employees: @Model.Count()</small>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 70vh;">
+            <table class="table table-striped table-hover table-bordered mb-0">
+                <thead class="table-dark position-sticky top-0">
+                    <tr>
+                        <th>Employee Id</th>
+                        @if (selectedFields.Contains("EmployeeName"))
+                        {
+                            <th>Name</th>
+                        }
+                        @if (selectedFields.Contains("EmployeeNameBangla"))
+                        {
+                            <th>Name (Bangla)</th>
+                        }
+                        @if (selectedFields.Contains("FatherName"))
+                        {
+                            <th>Father Name</th>
+                        }
+                        @if (selectedFields.Contains("MotherName"))
+                        {
+                            <th>Mother Name</th>
+                        }
+                        @if (selectedFields.Contains("Phone"))
+                        {
+                            <th>Phone</th>
+                        }
+                        @if (selectedFields.Contains("Email"))
+                        {
+                            <th>Email</th>
+                        }
+                        @if (selectedFields.Contains("Designation"))
+                        {
+                            <th>Designation</th>
+                        }
+                        @if (selectedFields.Contains("EmpType"))
+                        {
+                            <th>Employee Type</th>
+                        }
+                        @if (selectedFields.Contains("Gender"))
+                        {
+                            <th>Gender</th>
+                        }
+                        @if (selectedFields.Contains("BloodGroup"))
+                        {
+                            <th>Blood Group</th>
+                        }
+                        @if (selectedFields.Contains("Religion"))
+                        {
+                            <th>Religion</th>
+                        }
+                        @if (selectedFields.Contains("DOB"))
+                        {
+                            <th>Date of Birth</th>
+                        }
+                        @if (selectedFields.Contains("NIDNo"))
+                        {
+                            <th>NID No</th>
+                        }
+                        @if (selectedFields.Contains("JoiningDate"))
+                        {
+                            <th>Joining Date</th>
+                        }
+                        @if (selectedFields.Contains("PresentAddress"))
+                        {
+                            <th>Present Address</th>
+                        }
+                        @if (selectedFields.Contains("PermanentAddress"))
+                        {
+                            <th>Permanent Address</th>
+                        }
+                        @if (selectedFields.Contains("Nominee"))
+                        {
+                            <th>Nominee</th>
+                        }
+                        @if (selectedFields.Contains("NomineePhone"))
+                        {
+                            <th>Nominee Phone</th>
+                        }
+                        @if (selectedFields.Contains("Status"))
+                        {
+                            <th>Status</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model)
+                    {
+                        <tr>
+                            <td><strong>@item.EmployeeId</strong></td>
+                            @if (selectedFields.Contains("EmployeeName"))
+                            {
+                                <td>@item.EmployeeName</td>
+                            }
+                            @if (selectedFields.Contains("EmployeeNameBangla"))
+                            {
+                                <td>@item.EmployeeNameBangla</td>
+                            }
+                            @if (selectedFields.Contains("FatherName"))
+                            {
+                                <td>@item.FatherName</td>
+                            }
+                            @if (selectedFields.Contains("MotherName"))
+                            {
+                                <td>@item.MotherName</td>
+                            }
+                            @if (selectedFields.Contains("Phone"))
+                            {
+                                <td>@item.Phone</td>
+                            }
+                            @if (selectedFields.Contains("Email"))
+                            {
+                                <td>@item.Email</td>
+                            }
+                            @if (selectedFields.Contains("Designation"))
+                            {
+                                <td>@item.Designation</td>
+                            }
+                            @if (selectedFields.Contains("EmpType"))
+                            {
+                                <td>@item.EmpType</td>
+                            }
+                            @if (selectedFields.Contains("Gender"))
+                            {
+                                <td>@item.Gender</td>
+                            }
+                            @if (selectedFields.Contains("BloodGroup"))
+                            {
+                                <td>@item.BloodGroup</td>
+                            }
+                            @if (selectedFields.Contains("Religion"))
+                            {
+                                <td>@item.Religion</td>
+                            }
+                            @if (selectedFields.Contains("DOB"))
+                            {
+                                <td>@item.DOB</td>
+                            }
+                            @if (selectedFields.Contains("NIDNo"))
+                            {
+                                <td>@item.NIDNo</td>
+                            }
+                            @if (selectedFields.Contains("JoiningDate"))
+                            {
+                                <td>@item.JoiningDate</td>
+                            }
+                            @if (selectedFields.Contains("PresentAddress"))
+                            {
+                                <td>@item.PresentAddress</td>
+                            }
+                            @if (selectedFields.Contains("PermanentAddress"))
+                            {
+                                <td>@item.PermanentAddress</td>
+                            }
+                            @if (selectedFields.Contains("Nominee"))
+                            {
+                                <td>@item.Nominee</td>
+                            }
+                            @if (selectedFields.Contains("NomineePhone"))
+                            {
+                                <td>@item.NomineePhone</td>
+                            }
+                            @if (selectedFields.Contains("Status"))
+                            {
+                                <td>
+                                    @if (item.Status == "Active")
+                                    {
+                                        <span class="badge bg-success">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary">Inactive</span>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

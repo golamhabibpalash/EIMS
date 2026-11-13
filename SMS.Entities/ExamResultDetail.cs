@@ -15,9 +15,9 @@ namespace SMS.Entities
         public int AcademicSubjectId { get; set; }
         public AcademicSubject AcademicSubject { get; set; }
         
-        public double ObtainMark { get; set; }
-        public double TotalMark { get; set; }
-        public double GPA { get; set; }
-        public string Grade { get; set; }
+        public double ObtainMark { get; set; } = 0;
+        public double TotalMark { get; set; } = 0;
+        public double GPA { get; set; } = 0;
+        public string Grade { get; set; } = "F";
     }
 }

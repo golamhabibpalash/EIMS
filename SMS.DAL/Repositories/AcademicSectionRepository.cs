@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using SMS.DAL.Contracts;
 using SMS.DAL.Contracts.Base;
 using SMS.DAL.Repositories.Base;
@@ -39,6 +39,19 @@ namespace SMS.DAL.Repositories
         {
             return await _context.AcademicSection
                 .Where(s => s.AcademicClassId == classId && s.AcademicSessionId == sessionId)
+                .ToListAsync();
+        }
+
+        public async Task<IReadOnlyCollection<AcademicSection>> GetAllByExamGroupId(int examGroupId, int classId, int sessionId)
+        {
+            var sectionIds = await _context.AcademicExams
+                .Where(ae => ae.AcademicExamGroupId == examGroupId && ae.AcademicClassId == classId && ae.AcademicSectionId != null)
+                .Select(ae => ae.AcademicSectionId)
+                .Distinct()
+                .ToListAsync();
+
+            return await _context.AcademicSection
+                .Where(s => s.AcademicClassId == classId && s.AcademicSessionId == sessionId && sectionIds.Contains(s.Id))
                 .ToListAsync();
         }
 

@@ -1,0 +1,26 @@
+# ============================================================
+# systemd service for ONE EIMS instance
+# Copy to: /etc/systemd/system/eims-school1.service
+# Then: sudo systemctl daemon-reload
+# Then: sudo systemctl enable eims-school1
+# Then: sudo systemctl start eims-school1
+# ============================================================
+
+[Unit]
+Description=EIMS - School Instance (%i)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/eims/%i
+ExecStart=/usr/bin/dotnet /var/www/eims/%i/SMS_App.dll --urls "http://127.0.0.1:PORT"
+Restart=always
+RestartSec=10
+User=www-data
+Group=www-data
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+
+[Install]
+WantedBy=multi-user.target

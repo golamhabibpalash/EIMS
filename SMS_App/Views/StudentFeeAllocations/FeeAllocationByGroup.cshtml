@@ -1,0 +1,690 @@
+﻿@{
+    GlobalUI.PageTitle = "Group Fee Allocation";
+}
+@model SMS_App.ViewModels.Students.StudentFeeAllocationGroupVM
+
+@inject UserManager<ApplicationUser> _userManager;
+
+@{
+    string lastEditedUser = string.Empty;
+}
+
+@section Styles {
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+}
+
+<div class="row">
+    <form action="FeeAllocationByGroup" method="post" id="myForm">
+        @Html.AntiForgeryToken()
+        <div class="col-md-8">
+            <div class="card mb-3" id="filterSummaryCard">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fa fa-filter"></i> Filter Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <small class="text-muted">Session</small>
+                            <p class="font-weight-bold mb-0" id="summarySession">-</p>
+                        </div>
+                        <div class="col-md-3">
+                            <small class="text-muted">Class</small>
+                            <p class="font-weight-bold mb-0" id="summaryClass">-</p>
+                        </div>
+                        <div class="col-md-2">
+                            <small class="text-muted">Student Type</small>
+                            <p class="font-weight-bold mb-0" id="summaryType">-</p>
+                        </div>
+                        <div class="col-md-2">
+                            <small class="text-muted">Section</small>
+                            <p class="font-weight-bold mb-0" id="summarySection">-</p>
+                        </div>
+                        <div class="col-md-2 text-center">
+                            <small class="text-muted">Total Students</small>
+                            <p class="font-weight-bold mb-0 h3" id="summaryCount">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="jumbotron py-3" id="jumbotron">
+                <h5 class="text-center text-muted">Select criteria to load students</h5>
+            </div>
+            <table class="table table-striped table-bordered rounded table-responsive-sm" id="studentTable" style="display:none">
+                <thead class="bg-navy-blue text-light">
+                    <tr>
+                        <td> <input type="checkbox" id="checkAll" /> </td>
+                        <td>Class Roll</td>
+                        <td width="20%">Student</td>
+                        <td>Session</td>
+                        <td>Section</td>
+                        <td>Student Type</td>
+                    </tr>
+                </thead>
+                <tbody id="tbody">
+                </tbody>
+                <tfoot>
+                </tfoot>
+            </table>
+            <div>
+                <input class="btn btn-info" type="submit" id="submitButton" style="display:none" onclick="onSubmitAction()" />
+            </div>
+        </div>
+        <div class="col-md-4 p-2 " style="background-color:antiquewhite;position:relative" id="studentFeeAllocationCreatePortion">
+            <fieldset class="border-primary p-2 border" id="createFieldSetId" style="position:sticky;top:50px;right:5px">
+                <legend  class="float-none w-auto text-primary px-2"
+                        style="font-size: 1.1rem; position: relative;" id="create_update_title_id">Create New Group Allocation</legend>
+                <input type="hidden" asp-for="SFAllocation.Id" />
+                <div class="form-group row">
+                    <label class="col-md-4 col-form-label">Academic Session</label>
+                    <div class="col-md-8">
+                        <select class="form-control" asp-for="AcademicSessionId" asp-items="Model.AcademicSessionList" onchange="academicSessionIdChange()">
+                            <option selected disabled>-Select Session-</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-md-4 col-form-label">Academic Class</label>
+                    <div class="col-md-8">
+                        <select class="form-control" asp-items="Model.AcademicClassList" asp-for="AcademicClassId" onchange="academicClassIdChange()">
+                            <option selected disabled>-Select Class-</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-md-4 col-form-label">Student Type</label>
+                    <div class="col-md-8">
+                        <select class="form-control" id="residentialNonResidentialId" onchange="residentialNonResidentialIdChange()">
+                            <option selected disabled>-Select Type -</option>
+                            <option value="1">Residential</option>
+                            <option value="0">Non-Residential</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label asp-for="AcademicSectionId" class="col-md-4 col-form-label">Academic Section</label>
+                    <div class="col-md-8">
+                        <select class="form-control" onchange="handleSectionIdChange($('#residentialNonResidentialId').val() === '1')" asp-for="AcademicSectionId">
+                            <option selected disabled>-Select Section-</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-md-4 col-form-label">Fee Name</label>
+                    <div class="col-md-8">
+                        <select class="form-control" asp-for="FeeHeadId" onchange="handleFeeHeadIdChange()">
+                            <option selected disabled>-Select type-</option>
+                        </select>
+                        <input type="hidden" asp-for="SFAllocation.ClassFeeListId" />
+                        <span asp-validation-for="FeeHeadId" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label class="col-md-4 col-form-label">Allocate Amount</label>
+                    <div class="col-md-8">
+                        <input class="form-control" asp-for="AllocationAmount" type="number" min="0" step="any" placeholder="0 = free" />
+                    </div>
+                </div>
+            </fieldset>
+        </div>
+    </form>
+</div>
+
+
+<!-- Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger" id="exampleModalLabel">Do you want to delete this item?</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <table class="table card">
+
+                    <tr>
+                        <td width="20%">Student</td>
+                        <td width="10%">:</td>
+                        <td width="70%" id="deleteStudentName" class="font-weight-bold"></td>
+                    </tr>
+                    <tr>
+                        <td>Class Roll </td>
+                        <td>:</td>
+                        <td id="deleteClassRoll" class="font-weight-bold"></td>
+                    </tr>
+                    <tr>
+                        <td>Payment Type</td>
+                        <td>:</td>
+                        <td id="deletePaymentType" class="font-weight-bold"></td>
+                    </tr>
+                    <tr>
+                        <td>Amount </td>
+                        <td>:</td>
+                        <td id="deleteAmount" class="font-weight-bold"></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary col-form-label" data-dismiss="modal">Cancel</button>
+                <form asp-action="delete" method="post">
+                    <input type="hidden" name="StudentFeeAllocationId" id="StudentFeeAllocationId" />
+                    <button type="submit" class="btn btn-danger col-form-label">Delete Confirm</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
+    @if (TempData["notifications"] != null)
+    {
+        <script type="text/javascript">
+            $(function () {
+                alertify.success('@TempData["notifications"]');
+            });
+        </script>
+    }
+    <script>
+        
+        
+            async function academicClassIdChange() {
+
+                document.getElementById('submitButton').style.display = 'none';
+                document.getElementById('studentTable').style.display = 'none';
+                document.getElementById('jumbotron').style.display = 'block';
+
+                let id = $('#AcademicClassId option:selected').val();
+                let sessionId = $('#AcademicSessionId option:selected').val();
+                let isResidential = $('#residentialNonResidentialId option:selected').val();
+
+                updateFilterSummary();
+
+                $.ajax({
+                    url: "/api/academicsections/getbyclasswithsessionId?classId=" + id + "&sessionId=" + sessionId,
+                    dataType: "JSON",
+                    type: "GET",
+                    cache: false,
+                    success: function (data) {
+                        $('#AcademicSectionId').empty();
+
+                        if (data != null || data != '') {
+                            var o = '<option disabled selected value="0">Select Section Name</option>';
+                            var o2 = '<option value="all">All Section</option>';
+                            $('#AcademicSectionId').append(o);
+                            $('#AcademicSectionId').append(o2);
+                            $.each(data, function (i, obj) {
+                                var op = '<option value="' + obj.id + '">' + obj.name + '</option>';
+                                $('#AcademicSectionId').append(op);
+                            });
+                        }
+                        else {
+                            var o = '<option disabled selected>Section Not Found</option>';
+                            $('#AcademicSectionId').append(o);
+                        }
+                    },
+                    error: function (err) {
+                        console.log(err);
+                    }
+                });
+
+                $.ajax({
+                    url:"/ClassFeeLists/GetClassListBySessionClassType",
+                    dataType: "JSON",
+                    type: "GET",
+                    cache: false,
+                    data: {
+                        academicSessionId: sessionId,
+                        academicClassId: id,
+                        isResidential: isResidential
+                    },
+                    success: function (data) {
+                        $('#FeeHeadId').empty();
+
+                        if (data != null || data != '') {
+                            var o = '<option disabled selected value="0">Select Fee Name</option>';
+                            $('#FeeHeadId').append(o);
+                            $.each(data, function (i, obj) {
+                                var op = '<option value="' + obj.studentFeeHead.id + '">' + obj.studentFeeHead.name + '</option>';
+                                $('#FeeHeadId').append(op);
+                            });
+                        }
+                        else {
+                            var o = '<option disabled selected>Section Not Found</option>';
+                            $('#AcademicSectionId').append(o);
+                        }
+                    },
+                    error: function (err) {
+                        console.log(err);
+                    }
+                })
+            };
+
+            $('#checkAll').on('change', function () {
+                const isChecked = $(this).is(':checked');
+                $('.child-checkbox').prop('checked', isChecked);
+            });
+
+            function updateFilterSummary() {
+                let sessionText = $('#AcademicSessionId option:selected').text() || '-';
+                let classText = $('#AcademicClassId option:selected').text() || '-';
+                let typeValue = $('#residentialNonResidentialId option:selected').val();
+                let typeText = typeValue === "1" ? "Residential" : typeValue === "0" ? "Non-Residential" : "-";
+                let sectionText = $('#AcademicSectionId option:selected').text() || '-';
+                let studentCount = $('#tbody tr').length;
+
+                document.getElementById('summarySession').textContent = sessionText;
+                document.getElementById('summaryClass').textContent = classText;
+                document.getElementById('summaryType').textContent = typeText;
+                document.getElementById('summarySection').textContent = sectionText;
+                document.getElementById('summaryCount').textContent = studentCount;
+            }
+
+            function academicSessionIdChange(){
+                document.getElementById('summarySession').textContent = $('#AcademicSessionId option:selected').text() || '-';
+            }
+
+            function residentialNonResidentialIdChange() {
+                let sessionId = $('#AcademicSessionId option:selected').val();
+                let classId = $('#AcademicClassId option:selected').val();
+                let isResidentialValue = $('#residentialNonResidentialId option:selected').val();
+                let isResidential = isResidentialValue === "1";
+                let sectionId = $('#AcademicSectionId option:selected').val();
+
+                if (sessionId && classId && isResidentialValue !== undefined) {
+                    $.ajax({
+                        url: "/ClassFeeLists/GetClassListBySessionClassType",
+                        dataType: "JSON",
+                        type: "GET",
+                        cache: false,
+                        data: {
+                            academicSessionId: sessionId,
+                            academicClassId: classId,
+                            isResidential: isResidential
+                        },
+                        success: function (data) {
+                            $('#FeeHeadId').empty();
+
+                            if (data != null && data.length > 0) {
+                                var o = '<option disabled selected value="0">Select Fee Name</option>';
+                                $('#FeeHeadId').append(o);
+                                $.each(data, function (i, obj) {
+                                    var op = '<option value="' + obj.studentFeeHead.id + '">' + obj.studentFeeHead.name + '</option>';
+                                    $('#FeeHeadId').append(op);
+                                });
+                            } else {
+                                var o = '<option disabled selected>No fee heads found</option>';
+                                $('#FeeHeadId').append(o);
+                            }
+                        },
+                        error: function (err) {
+                            console.log(err);
+                        }
+                    });
+                }
+
+                if (sectionId && sectionId !== '0' && sectionId !== 'all') {
+                    handleSectionIdChange(isResidential);
+                } else if (sectionId === 'all') {
+                    loadAllStudentsForClass();
+                } else {
+                    updateFilterSummary();
+                }
+            }
+
+            function loadAllStudentsForClass() {
+                let classId = $('#AcademicClassId option:selected').val();
+                let sessionId = $('#AcademicSessionId option:selected').val();
+                let sessionText = $('#AcademicSessionId option:selected').text();
+                let isResidentialValue = $('#residentialNonResidentialId option:selected').val();
+                let isResidential = isResidentialValue === "1";
+                let studentTypeText = isResidentialValue === "1" ? "Residential" : "Non-Residential";
+
+                if (!classId || !sessionId || isResidentialValue === undefined) {
+                    return;
+                }
+
+                document.getElementById('submitButton').style.display = 'none';
+                document.getElementById('studentTable').style.display = 'none';
+                document.getElementById('jumbotron').style.display = 'block';
+                document.getElementById('jumbotron').innerHTML = '<h2 class="text-center">Loading students...</h2>';
+
+                $.ajax({
+                    url: "/Students/GetAllStudentsByClassSessionResidential",
+                    dataType: "JSON",
+                    type: "GET",
+                    cache: false,
+                    data: {
+                        classId: classId,
+                        sessionId: sessionId,
+                        isResidential: isResidential
+                    },
+                    success: function (data) {
+                        $('#tbody').empty();
+
+                        if (data != null && data.length > 0) {
+                            document.getElementById('submitButton').style.display = 'block';
+                            document.getElementById('studentTable').style.display = 'block';
+                            document.getElementById('jumbotron').style.display = 'none';
+
+                            $.each(data, function (i, obj) {
+                                const tr = document.createElement('tr');
+
+                                const tdCheckBox = document.createElement('td');
+                                const tdRoll = document.createElement('td');
+                                const tdName = document.createElement('td');
+                                const tdSession = document.createElement('td');
+                                const tdSection = document.createElement('td');
+                                const tdType = document.createElement('td');
+
+                                const inputField = document.createElement('input');
+                                inputField.type = 'checkbox';
+                                inputField.classList.add('child-checkbox');
+                                inputField.name = `Students[${i}].IsChecked`;
+                                inputField.value = 'true';
+                                tdCheckBox.appendChild(inputField);
+
+                                const inputFieldStuId = document.createElement('input');
+                                inputFieldStuId.type = 'hidden';
+                                inputFieldStuId.name = `Students[${i}].Student.Id`;
+                                inputFieldStuId.value = obj.id;
+                                tdCheckBox.appendChild(inputFieldStuId);
+
+                                const inputFieldStuUniqueId = document.createElement('input');
+                                inputFieldStuUniqueId.type = 'hidden';
+                                inputFieldStuUniqueId.name = `Students[${i}].Student.UniqueId`;
+                                inputFieldStuUniqueId.value = obj.uniqueId;
+                                tdCheckBox.appendChild(inputFieldStuUniqueId);
+
+                                tdName.textContent = obj.name;
+                                tdRoll.textContent = obj.classRoll;
+                                tdSession.textContent = sessionText;
+                                tdSection.textContent = obj.sectionName || '-';
+                                tdType.textContent = studentTypeText;
+
+                                tr.appendChild(tdCheckBox);
+                                tr.appendChild(tdRoll);
+                                tr.appendChild(tdName);
+                                tr.appendChild(tdSession);
+                                tr.appendChild(tdSection);
+                                tr.appendChild(tdType);
+
+                                document.getElementById('tbody').appendChild(tr);
+                            });
+                            updateFilterSummary();
+                        } else {
+                            document.getElementById('submitButton').style.display = 'none';
+                            document.getElementById('studentTable').style.display = 'none';
+                            document.getElementById('jumbotron').style.display = 'block';
+                            document.getElementById('jumbotron').innerHTML = '<h2 class="text-center">No students found for selected criteria</h2>';
+                            updateFilterSummary();
+                        }
+                    },
+                    error: function (err) {
+                        console.log(err);
+                        document.getElementById('jumbotron').innerHTML = '<h2 class="text-center text-danger">Error loading students</h2>';
+                    }
+                });
+            }
+
+            function handleSectionIdChange(isResidential){
+                var sectionId = $('#AcademicSectionId option:selected').val();
+                let classId = $('#AcademicClassId option:selected').val();
+                let sessionId = $('#AcademicSessionId option:selected').val();
+                let sessionText = $('#AcademicSessionId option:selected').text();
+                let sectionText = $('#AcademicSectionId option:selected').text();
+                let isResidentialValue = $('#residentialNonResidentialId option:selected').val();
+                let studentTypeText = isResidentialValue === "1" ? "Residential" : "Non-Residential";
+
+                if (isResidential === undefined) {
+                    isResidential = isResidentialValue === "1";
+                }
+
+                $.ajax({
+                    url: "/Students/GetAllStudentBySectionId",
+                    dataType: "JSON",
+                    type: "GET",
+                    cache: false,
+                    data: {
+                        academicSectionId: sectionId,
+                        classId: classId,
+                        sessionId: sessionId,
+                        isResidential: isResidential
+                    },
+                    success: function (data) {
+                        $('#tbody').empty();
+
+                        if (data != null && data.length > 0) {
+                            document.getElementById('submitButton').style.display = 'block';
+                            document.getElementById('studentTable').style.display = 'block';
+                            document.getElementById('jumbotron').style.display = 'none';
+
+                            $.each(data, function (i, obj) {
+
+                                const tr = document.createElement('tr');
+
+                                const tdCheckBox = document.createElement('td');
+                                const tdRoll = document.createElement('td');
+                                const tdName = document.createElement('td');
+                                const tdSession = document.createElement('td');
+                                const tdSection = document.createElement('td');
+                                const tdType = document.createElement('td');
+
+                                const inputField = document.createElement('input');
+                                inputField.type = 'checkbox';
+                                inputField.classList.add('child-checkbox');
+                                inputField.name = `Students[${i}].IsChecked`;
+                                inputField.value = 'true';
+                                tdCheckBox.appendChild(inputField);
+
+                                const inputFieldStuId = document.createElement('input');
+                                inputFieldStuId.type = 'hidden';
+                                inputFieldStuId.name = `Students[${i}].Student.Id`;
+                                inputFieldStuId.value = obj.id;
+                                tdCheckBox.appendChild(inputFieldStuId);
+
+                                const inputFieldStuUniqueId = document.createElement('input');
+                                inputFieldStuUniqueId.type = 'hidden';
+                                inputFieldStuUniqueId.name = `Students[${i}].Student.UniqueId`;
+                                inputFieldStuUniqueId.value = obj.uniqueId;
+                                tdCheckBox.appendChild(inputFieldStuUniqueId);
+
+                                tdName.textContent = obj.name;
+                                tdRoll.textContent = obj.classRoll;
+                                tdSession.textContent = sessionText;
+                                tdSection.textContent = sectionText;
+                                tdType.textContent = studentTypeText;
+
+                                tr.appendChild(tdCheckBox);
+                                tr.appendChild(tdRoll);
+                                tr.appendChild(tdName);
+                                tr.appendChild(tdSession);
+                                tr.appendChild(tdSection);
+                                tr.appendChild(tdType);
+
+                                document.getElementById('tbody').appendChild(tr);
+
+                            });
+                            updateFilterSummary();
+                        }
+                        else {
+
+                            document.getElementById('submitButton').style.display = 'none';
+                            document.getElementById('studentTable').style.display = 'none';
+                            document.getElementById('jumbotron').style.display = 'block';
+                            updateFilterSummary();
+                        }
+                    },
+                    error: function (err) {
+                        console.log(err);
+                    }
+                })
+            }
+
+        function formUIChange() {
+            let form = document.getElementById('createUpdateForm');
+            form.action = "/StudentFeeAllocations/Edit";
+            document.getElementById('studentFeeAllocationCreatePortion').style.backgroundColor = '#2A3F54';
+
+            var fieldSet = document.getElementById('createFieldSetId');
+            fieldSet.classList.remove('border-primary');
+
+
+            var legendData = document.getElementById('create_update_title_id');
+            legendData.innerText = "Update Student Allocation";
+            legendData.classList.remove('text-primary');
+
+            document.getElementById('create_update_title_id').style.color = "#fff";
+            document.getElementById('studentFeeAllocationCreatePortion').style.color = '#fff';
+            document.getElementById('submitId').value = 'Update';
+
+            let rDoc = document.getElementById('SFAllocation_FeeAllocationApplication');
+        }
+        
+        function LoadStudentTable() {
+            let classId = $('#AcademicClassId option:selected').val();
+            let sessionId = $('#AcademicSessionId option:selected').val();
+            let isResidentialValue = $('#residentialNonResidentialId option:selected').val();
+            let sectionId = $('#AcademicSectionId option:selected').val();
+
+            // Validate required fields
+            if (!classId || !sessionId || isResidentialValue === undefined) {
+                return;
+            }
+
+            // If section is "all", load all students for the class
+            if (sectionId === 'all') {
+                loadAllStudentsForClass();
+            } else if (sectionId && sectionId !== '0') {
+                // If a specific section is selected, load students for that section
+                handleSectionIdChange();
+            } else {
+                // No section selected, hide the table
+                document.getElementById('submitButton').style.display = 'none';
+                document.getElementById('studentTable').style.display = 'none';
+                document.getElementById('jumbotron').style.display = 'block';
+                document.getElementById('jumbotron').innerHTML = '<h2 class="text-center">Please select a section</h2>';
+            }
+        }
+
+        $(document).ready(function () {
+
+            
+            // Add a click event listener to the button
+            $(".updateBtn").click(async function () {
+                formUIChange();
+                var classId = $(this).data("classid");
+                var studentId = $(this).data("studentid");
+                var feeType = $(this).data("feetype");
+                var amount = $(this).data("amount");
+                var refDoc = $(this).data("refdoc");
+                var isActive = $(this).data("isactive");
+                var id = $(this).data("id");
+
+                $("#AcademicClassListId").val(classId);
+
+                try {
+                    await academicClassIdChange(); // Wait for the dropdown to be populated
+                    $("#SFAllocation_StudentId").val(studentId); // Set the selected student
+                    await handleStudentIdChange();
+                    $("#SFAllocation_StudentFeeHeadId").val(feeType);
+                } catch (error) {
+                    console.error("An error occurred:", error);
+                }
+
+                $('#SFAllocation_AllocatedAmount').val(amount);
+                $('#SFAllocation_Id').val(id);
+
+                if (isActive == "True") {
+                    $('#SFAllocation_IsActive').prop('checked', true);
+                } else {
+                    $('#SFAllocation_IsActive').prop('checked', false);
+                }
+            });
+            $('.deleteBtn').click(function () {
+                var stName = $(this).data('studentname');
+                var stClassRoll = $(this).data('classroll');
+                var feeTypeName = $(this).data('feetypename');
+                var studentId = $(this).data("studentid");
+                var classId = $(this).data("classid");
+                var feeType = $(this).data("feetype");
+                var amount = $(this).data("amount");
+                var refDoc = $(this).data("refdoc");
+                var isActive = $(this).data("isactive");
+                var id = $(this).data("id");
+
+                $('#StudentFeeAllocationId').val(id);
+                $('#deleteStudentName').html(stName);
+                $('#deleteClassRoll').html(stClassRoll);
+                $('#deletePaymentType').html(feeTypeName);
+                $('#deleteAmount').html(amount);
+
+            });
+
+        });
+        async function handleFeeHeadIdChange() {
+            let feeheadId = $('#SFAllocation_StudentFeeHeadId option:selected').val();
+            let studentId = $('#SFAllocation_StudentId option:selected').val();
+            let classId = $('#AcademicClassListId option:selected').val();
+            console.log(classId);
+
+        }
+        async function handleStudentIdChange() {
+            let studentId = $('#SFAllocation_StudentId option:selected').val();
+
+            try {
+                // Get Unique ID by Student ID
+                let uniqueId = await getUniqueIdByStudentId(studentId);
+
+                // Set the unique ID to the input field
+                $('#SFAllocation_UniqueId').val(uniqueId);
+
+                // Get and populate fee heads based on unique ID
+                let feeData = await getClassListByUniqueId(uniqueId);
+                populateStudentFeeHeadDropdown(feeData);
+            } catch (error) {
+                console.error("An error occurred:", error);
+            }
+        }
+
+        // Function to get Unique ID by Student ID
+        function getUniqueIdByStudentId(studentId) {
+            return $.ajax({
+                url: '/api/Students/GetUniqueIdByStudentId',
+                data: { id: studentId },
+                cache: false,
+                type: 'GET',
+                dataType: 'JSON',
+            });
+        }
+
+        // Function to get class list by unique ID
+        function getClassListByUniqueId(uniqueId) {
+            return $.ajax({
+                url: 'ClassFeeLists/GetClassListByUniqueId',
+                data: { uniqueId: uniqueId },
+                cache: false,
+                type: 'GET',
+                dataType: 'JSON',
+            });
+        }
+
+        // Function to populate the Student Fee Head dropdown
+        function populateStudentFeeHeadDropdown(feeData) {
+            const $feeHeadDropdown = $('#SFAllocation_StudentFeeHeadId');
+            $feeHeadDropdown.empty();
+
+            // Add default option
+            $feeHeadDropdown.append('<option value="" selected disabled> -Select type - </option>');
+
+            // Append options from feeData
+            $.each(feeData, function (i, obj) {
+                $feeHeadDropdown.append(`<option value="${obj.studentFeeHead.id}">${obj.studentFeeHead.name}</option>`);
+            });
+        }
+
+    </script>
+    
+}

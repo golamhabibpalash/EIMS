@@ -1,0 +1,743 @@
+@model SMS_App.ViewModels.ExamVM.MergedExamDetailVM
+@inject UserManager<ApplicationUser> _userManager;
+
+@{
+    ViewData["Title"] = "Exam Details (Merged View)";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+
+    int i = 0;
+    string examLocked = Model.IsLocked == true ? "(All Exams Locked)" : string.Empty;
+    string updatedBy = string.Empty;
+}
+@section Styles{
+    <link href="~/css/switch.css" rel="stylesheet" />
+    <style>
+        .error {
+            border: 1px solid red !important;
+            color: red;
+        }
+        .section-header {
+            background-color: #e3f2fd;
+            font-weight: bold;
+        }
+        .merged-table tbody tr:hover {
+            background-color: #f5f5f5;
+        }
+    </style>
+}
+
+<div class="row" style="color:#000">
+    <div class="col-md-4">
+        <fieldset class="border border-info p-2 m-2">
+            <legend style="width:fit-content;padding:5px">@Model.ExamGroupName</legend>
+            <table class="table table-sm table-responsive-sm">
+                <thead>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Subject</td>
+                        <td>:</td>
+                        <td>@Model.SubjectName (@Model.SubjectCode)</td>
+                    </tr>
+                    <tr>
+                        <td>Exam Category</td>
+                        <td>:</td>
+                        <td>@Model.ExamCategory</td>
+                    </tr>
+                    <tr>
+                        <td>Class</td>
+                        <td>:</td>
+                        <td>@Model.ClassName</td>
+                    </tr>
+                    <tr>
+                        <td>Session</td>
+                        <td>:</td>
+                        <td>@Model.SessionName</td>
+                    </tr>
+                    <tr>
+                        <td>Month</td>
+                        <td>:</td>
+                        <td>@Model.MonthName</td>
+                    </tr>
+                    <tr>
+                        <td>Total Students</td>
+                        <td>:</td>
+                        <td>@Model.MergedExamDetails.Count()</td>
+                    </tr>
+                    <tr>
+                        <td>Teacher</td>
+                        <td>:</td>
+                        <td>@Model.TeacherName</td>
+                    </tr>
+                    <tr>
+                        <td>Total Marks</td>
+                        <td>:</td>
+                        <td>@Model.TotalMarks</td>
+                    </tr>
+                    <tr>
+                        <td colspan="3">
+                            <strong>Sections Included:</strong>
+                            <ul class="mb-0 pl-3">
+                                @foreach (var exam in Model.MergedExams)
+                                {
+                                    <li>@exam.SectionName (@exam.TotalStudents students)</li>
+                                }
+                            </ul>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </fieldset>
+        
+        <div class="row mb-2">
+            <div class="col-md-12">
+                <div class="custom-control custom-switch">
+                    <input type="checkbox" class="custom-control-input" id="mergeModeSwitch" checked disabled />
+                    <label class="custom-control-label" for="mergeModeSwitch">Merged View Active</label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <a class="btn btn-info btn-sm btn-block" asp-action="Details" asp-controller="AcademicExams" asp-route-id="@Model.PrimaryExamId" asp-route-mergeMode="false">
+                    <i class="fa fa-th"></i> Switch to Separate View
+                </a>
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-md-12">
+                <a class="btn btn-secondary btn-sm btn-block" asp-action="Index" asp-controller="AcademicExams">Back to Exam List</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8 p-2">
+        <div class="row">
+            <div class="col-md-12 text-center">
+                <h3 class="well well-sm bg-info text-light">
+                    Mark Distribution (Merged) <span class="text-danger">@examLocked</span>
+                </h3>
+            </div>
+        </div>
+        
+        <form id="mergedMarkForm">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="PrimaryExamId" value="@Model.PrimaryExamId" />
+            
+            <div class="row mb-2">
+                <div class="col-md-12">
+                    <div class="card bg-light">
+                        <div class="card-body p-2">
+                            <h5 class="card-title">OCR Mark Import</h5>
+                            <p class="card-text small mb-2">Upload an image of handwritten marksheet to auto-fill marks. Expected format: ClassRoll | CQ | MCQ | Prac columns</p>
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <input type="file" class="form-control form-control-sm" id="ocrImageInput" accept="image/*" />
+                                </div>
+                                <div class="col-md-3">
+                                    <select class="form-select form-select-sm" id="ocrExamType">
+                                        <option value="CQ">CQ (Written)</option>
+                                        <option value="MCQ">MCQ</option>
+                                        <option value="Prac">Practical</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <button type="button" class="btn btn-primary btn-sm" onclick="processOCRImage()">Process OCR</button>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-12">
+                                    <div class="progress" id="ocrProgress" style="display: none;">
+                                        <div class="progress-bar" role="progressbar" style="width: 0%" id="ocrProgressBar">0%</div>
+                                    </div>
+                                    <small id="ocrStatus" class="text-muted"></small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-sm table-striped table-bordered merged-table" id="markTable">
+                    <thead class="table-info font-weight-bolder">
+                        <tr>
+                            <th>#</th>
+                            <th>Roll</th>
+                            <th>Student Name</th>
+                            <th>Section</th>
+                            <th>Marks</th>
+                            <th>Present</th>
+                            <th>Remarks</th>
+                            <th>Updated By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.MergedExamDetails.OrderBy(x => x.ClassRoll))
+                        {
+                            if (!string.IsNullOrEmpty(item.EditedBy))
+                            {
+                                ApplicationUser aUser = await _userManager.FindByIdAsync(item.EditedBy);
+                                updatedBy = aUser?.UserName ?? string.Empty;
+                            }
+                            else
+                            {
+                                updatedBy = string.Empty;
+                            }
+                            
+                            <tr data-examId="@item.ExamId" data-sectionId="@(item.SectionId ?? 0)">
+                                <td>@(++i)</td>
+                                <td>@item.ClassRoll</td>
+                                <td>@item.StudentName</td>
+                                <td>
+                                    <span class="badge badge-secondary">@item.SectionName</span>
+                                </td>
+                                <td style="width:70px;padding:0px;">
+                                    @if (Model.IsLocked)
+                                    {
+                                        <input type="number" 
+                                               name="examDetails[@(i-1)].ObtainMark" 
+                                               value="@item.ObtainMark"
+                                               max="@Model.TotalMarks" 
+                                               min="0" 
+                                               disabled
+                                               class="markInput form-control form-control-sm"
+                                               style="text-align:center" />
+                                    }
+                                    else
+                                    {
+                                        <input type="number" 
+                                               name="examDetails[@(i-1)].ObtainMark" 
+                                               value="@(item.ObtainMark > 0 ? item.ObtainMark.ToString() : "")"
+                                               max="@Model.TotalMarks" 
+                                               min="0" 
+                                               inputmode="numeric"
+                                               placeholder="0"
+                                               class="markInput form-control form-control-sm"
+                                               style="text-align:center"
+                                               onchange="handleInputChange(this)"
+                                               data-examDetailId="@item.ExamDetailId"
+                                               data-examId="@item.ExamId" />
+                                    }
+                                </td>
+                                <td class="text-center" style="width:60px;">
+                                    <label class="switch m-0">
+                                        @if (Model.IsLocked)
+                                        {
+                                            <input type="checkbox" name="examDetails[@(i-1)].Status" checked="@item.Status" disabled />
+                                        }
+                                        else
+                                        {
+                                            <input type="checkbox" name="examDetails[@(i-1)].Status" checked="@item.Status" 
+                                                   onchange="handleStatusChange(this)" data-examDetailId="@item.ExamDetailId" />
+                                        }
+                                        <span class="slider round"></span>
+                                    </label>
+                                </td>
+                                <td style="padding:0px;min-width:120px;">
+                                    @if (Model.IsLocked)
+                                    {
+                                        <input type="text" 
+                                               name="examDetails[@(i-1)].Remarks" 
+                                               value="@item.Remarks"
+                                               disabled
+                                               class="form-control form-control-sm"
+                                               style="height:30px" />
+                                    }
+                                    else
+                                    {
+                                        <input type="text" 
+                                               name="examDetails[@(i-1)].Remarks" 
+                                               value="@item.Remarks"
+                                               placeholder="Remarks"
+                                               class="form-control form-control-sm"
+                                               style="height:30px"
+                                               onchange="handleRemarksChange(this)"
+                                               data-examDetailId="@item.ExamDetailId" />
+                                    }
+                                </td>
+                                <td style="min-width:80px;">@updatedBy</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="row mt-3">
+                <div class="col-md-12 text-center">
+                    @if (Model.IsLocked)
+                    {
+                        <button type="button" class="btn btn-info" disabled>Submit</button>
+                    }
+                    else
+                    {
+                        <button type="button" id="submitAllBtn" class="btn btn-info" onclick="submitMergedForm()">
+                            <i class="fa fa-save"></i> Submit All Marks
+                        </button>
+                    }
+                    <span class="ml-3 text-muted">
+                        <small>Total: @Model.MergedExamDetails.Count() students across @Model.MergedExams.Count sections</small>
+                    </span>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts{
+    <script>
+        $(document).ready(function () {
+            var inputFields = document.getElementsByClassName("markInput");
+            for (var i = 0; i < inputFields.length; i++) {
+                var inputValue = inputFields[i].value.trim();
+                if (inputValue === "0" || inputValue === "0.0") {
+                    inputFields[i].value = "";
+                }
+            }
+            
+            // Set tabindex on mark inputs and make other elements not focusable via tab
+            setupTabNavigation();
+            
+            highlightSectionHeaders();
+        });
+
+        function setupTabNavigation() {
+            var markInputs = document.querySelectorAll('.markInput:not([disabled])');
+            
+            // Set tabindex on mark inputs
+            markInputs.forEach(function(input, index) {
+                input.setAttribute('tabindex', index + 1);
+            });
+            
+            // Make other inputs (checkbox, remarks) not focusable via Tab
+            var statusCheckboxes = document.querySelectorAll('input[type="checkbox"][name*="Status"]');
+            statusCheckboxes.forEach(function(cb) {
+                cb.setAttribute('tabindex', '-1');
+            });
+            
+            var remarksInputs = document.querySelectorAll('input[name*="Remarks"]:not([disabled])');
+            remarksInputs.forEach(function(input) {
+                input.setAttribute('tabindex', '-1');
+            });
+            
+            // Handle Enter key to move to next mark input
+            markInputs.forEach(function(input, index) {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        // Save current mark first
+                        handleInputChange(this);
+                        
+                        // Move to next mark input
+                        var nextInput = markInputs[index + 1];
+                        if (nextInput) {
+                            nextInput.focus();
+                            // Select the text for easy overwrite
+                            nextInput.select();
+                        } else {
+                            // If last input, submit
+                            submitMergedForm();
+                        }
+                    }
+                    // Handle Tab to skip non-mark inputs
+                    if (e.key === 'Tab' && !e.shiftKey) {
+                        // Let default tab behavior work, but ensure we only land on mark inputs
+                    }
+                });
+                
+                // Handle arrow keys for quick navigation
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        var nextInput = markInputs[index + 1];
+                        if (nextInput) {
+                            nextInput.focus();
+                            nextInput.select();
+                        }
+                    }
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        var prevInput = markInputs[index - 1];
+                        if (prevInput) {
+                            prevInput.focus();
+                            prevInput.select();
+                        }
+                    }
+                });
+            });
+        }
+
+        function highlightSectionHeaders() {
+            var rows = document.querySelectorAll('#markTable tbody tr');
+            var currentSection = null;
+            var firstInSection = null;
+            
+            rows.forEach(function(row, index) {
+                var sectionId = row.getAttribute('data-sectionId');
+                var sectionName = row.querySelector('.badge').textContent;
+                
+                if (sectionId !== currentSection) {
+                    if (currentSection !== null && firstInSection) {
+                        var rowspan = index - parseInt(firstInSection.getAttribute('data-original-index'));
+                        if (rowspan > 1) {
+                            firstInSection.setAttribute('rowspan', rowspan);
+                        }
+                    }
+                    currentSection = sectionId;
+                    firstInSection = row;
+                    row.setAttribute('data-original-index', index);
+                }
+            });
+            
+            if (currentSection !== null && firstInSection) {
+                var lastIndex = rows.length;
+                var rowspan = lastIndex - parseInt(firstInSection.getAttribute('data-original-index'));
+                if (rowspan > 1) {
+                    firstInSection.setAttribute('rowspan', rowspan);
+                }
+            }
+        }
+
+        function handleInputChange(inputElement) {
+            var maxValue = parseFloat(inputElement.getAttribute('max'));
+            var obtainMark = parseFloat(inputElement.value) || 0;
+            var examDetailId = inputElement.getAttribute('data-examDetailId');
+            var examId = inputElement.getAttribute('data-examId');
+
+            if (obtainMark > maxValue) {
+                inputElement.classList.add('error');
+                alert(`Mark should not exceed Total Mark (${maxValue}).`);
+                return;
+            }
+            inputElement.classList.remove('error');
+
+            saveMarkAjax(examDetailId, obtainMark);
+        }
+
+        function handleStatusChange(checkbox) {
+            var examDetailId = checkbox.getAttribute('data-examDetailId');
+            var isPresent = checkbox.checked;
+            
+            saveStatusAjax(examDetailId, isPresent);
+        }
+
+        function handleRemarksChange(inputElement) {
+            var examDetailId = inputElement.getAttribute('data-examDetailId');
+            var remarks = inputElement.value;
+            
+            saveRemarksAjax(examDetailId, remarks);
+        }
+
+        function saveMarkAjax(examDetailId, obtainMark) {
+            var data = {
+                Id: examDetailId,
+                ObtainMark: obtainMark,
+                Status: true,
+                Remarks: ""
+            };
+            
+            $.ajax({
+                type: 'POST',
+                url: '/AcademicExams/ExamMarkSubmitAjax',
+                data: JSON.stringify(data),
+                contentType: 'application/json',
+                dataType: 'json',
+                success: function (response) {
+                    console.log('Mark saved:', response);
+                },
+                error: function (error) {
+                    console.error('Error saving mark:', error);
+                }
+            });
+        }
+
+        function saveStatusAjax(examDetailId, isPresent) {
+            var data = {
+                Id: examDetailId,
+                Status: isPresent
+            };
+            
+            $.ajax({
+                type: 'POST',
+                url: '/AcademicExams/UpdateExamDetailStatus',
+                data: JSON.stringify(data),
+                contentType: 'application/json',
+                dataType: 'json',
+                success: function (response) {
+                    console.log('Status saved:', response);
+                },
+                error: function (error) {
+                    console.error('Error saving status:', error);
+                }
+            });
+        }
+
+        function saveRemarksAjax(examDetailId, remarks) {
+            var data = {
+                Id: examDetailId,
+                Remarks: remarks
+            };
+            
+            $.ajax({
+                type: 'POST',
+                url: '/AcademicExams/UpdateExamDetailRemarks',
+                data: JSON.stringify(data),
+                contentType: 'application/json',
+                dataType: 'json',
+                success: function (response) {
+                    console.log('Remarks saved:', response);
+                },
+                error: function (error) {
+                    console.error('Error saving remarks:', error);
+                }
+            });
+        }
+
+        function submitMergedForm() {
+            var inputFields = document.getElementsByClassName('markInput');
+            for (var i = 0; i < inputFields.length; i++) {
+                var inputValue = inputFields[i].value.trim();
+                if (inputValue === '' || inputValue === null) {
+                    inputFields[i].value = '0';
+                }
+                var maxValue = parseFloat(inputFields[i].getAttribute('max'));
+                var currentValue = parseFloat(inputFields[i].value);
+                if (currentValue > maxValue) {
+                    inputFields[i].classList.add('error');
+                    alert('Mark should not exceed Total Mark.');
+                    return;
+                }
+                inputFields[i].classList.remove('error');
+            }
+
+            var formData = [];
+            var rows = document.querySelectorAll('#markTable tbody tr');
+            rows.forEach(function(row, index) {
+                var examDetailId = row.querySelector('.markInput').getAttribute('data-examDetailId');
+                var examId = row.querySelector('.markInput').getAttribute('data-examId');
+                var obtainMark = parseFloat(row.querySelector('.markInput').value) || 0;
+                var isPresent = row.querySelector('input[type="checkbox"]').checked;
+                var remarks = row.querySelector('input[type="text"]').value;
+
+                formData.push({
+                    ExamDetailId: parseInt(examDetailId),
+                    ExamId: parseInt(examId),
+                    ObtainMark: obtainMark,
+                    Status: isPresent,
+                    Remarks: remarks
+                });
+            });
+
+            var $btn = $('#submitAllBtn');
+            var originalText = $btn.html();
+            $btn.prop('disabled', true).html('<i class="fa fa-spinner fa-spin"></i> Saving...');
+
+            $.ajax({
+                type: 'POST',
+                url: '/AcademicExams/ExmaMarkSubmitMerged',
+                data: JSON.stringify(formData),
+                contentType: 'application/json',
+                dataType: 'json',
+                timeout: 30000,
+                success: function (response) {
+                    if (response.success) {
+                        window.location.href = response.redirectUrl || '/AcademicExams/Index';
+                    } else {
+                        $btn.prop('disabled', false).html(originalText);
+                        alert(response.message || 'Error saving marks. Please try again.');
+                    }
+                },
+                error: function (xhr, status, error) {
+                    $btn.prop('disabled', false).html(originalText);
+                    var errorMsg = 'Error saving marks. Please try again.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    alert(errorMsg);
+                    console.error('Error:', xhr, status, error);
+                }
+            });
+        }
+
+        // ============================================
+        // OCR Mark Import Functions
+        // ============================================
+
+        async function processOCRImage() {
+            var fileInput = document.getElementById('ocrImageInput');
+            var file = fileInput.files[0];
+            
+            if (!file) {
+                alertify.error('Please select an image file first');
+                return;
+            }
+            
+            var examType = document.getElementById('ocrExamType').value;
+            
+            // Show progress
+            var progressDiv = document.getElementById('ocrProgress');
+            var progressBar = document.getElementById('ocrProgressBar');
+            var statusText = document.getElementById('ocrStatus');
+            
+            progressDiv.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            statusText.textContent = 'Initializing OCR...';
+            
+            try {
+                progressBar.style.width = '10%';
+                progressBar.textContent = '10%';
+                statusText.textContent = 'Loading OCR engine...';
+                
+                var worker = await Tesseract.createWorker('eng', 1, {
+                    logger: function(m) {
+                        if (m.status === 'recognizing text') {
+                            var percent = Math.round(m.progress * 80 + 10);
+                            progressBar.style.width = percent + '%';
+                            progressBar.textContent = percent + '%';
+                            statusText.textContent = 'Processing image: ' + Math.round(m.progress * 100) + '%';
+                        }
+                    }
+                });
+                
+                progressBar.style.width = '20%';
+                progressBar.textContent = '20%';
+                statusText.textContent = 'Recognizing text...';
+                
+                var result = await worker.recognize(file);
+                
+                await worker.terminate();
+                
+                progressBar.style.width = '90%';
+                progressBar.textContent = '90%';
+                statusText.textContent = 'Parsing results...';
+                
+                console.log('Raw OCR Text:', result.data.text);
+                console.log('Lines:', result.data.text.split('\n').length);
+                
+                var extractedData = parseOCRText(result.data.text);
+                
+                console.log('Extracted Data:', extractedData);
+                
+                if (extractedData.length === 0) {
+                    console.log('Full OCR:', result.data.text);
+                    alertify.warning('No marks extracted. Check browser console for raw text.');
+                    statusText.textContent = '0 rows - see console';
+                    return;
+                }
+                
+                var filledCount = autoFillMarksFromOCR(extractedData);
+                
+                progressBar.style.width = '100%';
+                progressBar.textContent = '100%';
+                statusText.textContent = 'Completed! ' + filledCount + ' marks filled.';
+                
+                alertify.success(filledCount + ' marks filled successfully from OCR');
+                
+            } catch (error) {
+                console.error('OCR Error:', error);
+                statusText.textContent = 'Error: ' + error.message;
+                alertify.error('OCR processing failed: ' + error.message);
+            }
+        }
+
+        function parseOCRText(text) {
+            var results = [];
+            var lines = text.split('\n');
+            
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i].trim();
+                if (!line) continue;
+                
+                // Skip header lines
+                if (line.match(/^(Class)?Roll/i) || line.match(/Student\s*Name/i) || 
+                    line.match(/^CQ/i) || line.match(/^MCQ/i) || line.match(/^Prac/i) ||
+                    line.match(/^Total/i) || line.match(/^---/) || line.length < 5) {
+                    continue;
+                }
+                
+                var numbers = line.match(/\d+/g);
+                
+                if (!numbers) continue;
+                if (numbers.length >= 2) {
+                    var roll = parseInt(numbers[0]);
+                    
+                    if (roll > 0 && roll < 100000) {
+                        var mark = parseInt(numbers[numbers.length - 1]);
+                        
+                        if (mark >= 0 && mark <= 100) {
+                            results.push({ roll: roll, mark: mark });
+                        }
+                    }
+                }
+            }
+            
+            return results;
+        }
+
+        function autoFillMarksFromOCR(extractedData) {
+            var filledCount = 0;
+            
+            var firstInput = document.querySelector('.markInput');
+            var totalMarks = firstInput ? parseInt(firstInput.getAttribute('max')) || 100 : 100;
+            
+            var markInputs = document.querySelectorAll('.markInput:not([disabled])');
+            
+            console.log('Inputs found:', markInputs.length);
+            
+            var inputsArray = Array.from(markInputs);
+            
+            var rollInputMap = {};
+            
+            inputsArray.forEach(function(input, index) {
+                var row = input.closest('tr');
+                var firstTd = row.querySelector('td:nth-child(2)');
+                if (firstTd) {
+                    var text = firstTd.textContent.trim();
+                    var roll = parseInt(text);
+                    if (roll) {
+                        rollInputMap[roll] = input;
+                    }
+                }
+            });
+            
+            console.log('Roll map:', rollInputMap);
+            console.log('OCR data:', extractedData);
+            
+            extractedData.forEach(function(data, idx) {
+                if (!data.roll || data.mark === undefined || data.mark === null) return;
+                
+                var ocrRoll = data.roll;
+                var markValue = data.mark;
+                var matchedInput = rollInputMap[ocrRoll];
+                
+                // Suffix match
+                if (!matchedInput && ocrRoll > 1000) {
+                    var lastDigits = parseInt(ocrRoll.toString().slice(-2));
+                    if (lastDigits && rollInputMap[lastDigits]) {
+                        matchedInput = rollInputMap[lastDigits];
+                        console.log('Matched suffix:', ocrRoll, '->', lastDigits);
+                    }
+                }
+                
+                // Index fallback
+                if (!matchedInput && idx < inputsArray.length) {
+                    matchedInput = inputsArray[idx];
+                    console.log('Index fallback:', idx);
+                }
+                
+                if (matchedInput) {
+                    if (markValue <= totalMarks) {
+                        matchedInput.value = markValue;
+                        matchedInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        filledCount++;
+                        console.log('Filled:', ocrRoll, '=', markValue);
+                    }
+                }
+            });
+            
+            return filledCount;
+        }
+    </script>
+}

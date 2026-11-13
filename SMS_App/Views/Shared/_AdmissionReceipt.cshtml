@@ -1,0 +1,30 @@
+@using SMS.Entities.Enums
+@using SMS_App.Utilities.OnlineAdmission
+@model AdmissionPayment
+@inject IInstituteManager InstituteManager
+@{
+    var institute = await InstituteManager.GetFirstOrDefaultAsync();
+    var a = Model.AdmissionApplication;
+    var amount = Model.VerifiedAmount ?? Model.Amount;
+}
+<div class="border rounded p-4 bg-white" style="max-width:720px;margin:auto">
+    <div class="text-center mb-3">
+        @if (!string.IsNullOrEmpty(institute?.Logo)) { <img src="~/Images/Institute/@institute.Logo" alt="" style="height:56px" /> }
+        <div class="h5 mb-0">@institute?.Name</div>
+        <div class="small text-muted">@institute?.Address</div>
+        <div class="fw-semibold mt-2">ADMISSION FEE RECEIPT / ভর্তি ফি রশিদ</div>
+    </div>
+    <table class="table table-sm table-borderless mb-3">
+        <tr><th style="width:40%">Receipt no.</th><td>@Model.ReceiptNo</td></tr>
+        <tr><th>Application no.</th><td>@a?.ApplicationNo</td></tr>
+        <tr><th>Applicant</th><td>@a?.Name</td></tr>
+        <tr><th>Class / session</th><td>@a?.AdmissionProgram?.AcademicClass?.Name · @a?.AdmissionSession?.Title</td></tr>
+        <tr><th>Amount</th><td class="fw-semibold">BDT @amount.ToString("0.00")</td></tr>
+        <tr><th>Payment type</th><td>@(Model.Method == AdmissionPaymentMethod.Online ? "Online" : "Offline") - @AdmissionDisplay.Name(Model.Method)@(string.IsNullOrEmpty(Model.Channel) ? "" : " (" + Model.Channel + ")")</td></tr>
+        @if (!string.IsNullOrEmpty(Model.TransactionReference)) { <tr><th>Transaction / reference</th><td>@Model.TransactionReference</td></tr> }
+        <tr><th>Paid on</th><td>@Model.PaidOn.ToString("dd MMM yyyy")</td></tr>
+        <tr><th>Verified on</th><td>@Model.VerifiedAt?.ToString("dd MMM yyyy HH:mm")</td></tr>
+    </table>
+    <p class="small text-muted mb-0">This receipt confirms payment only. Admission is confirmed when the school completes enrolment.</p>
+    <div class="text-center mt-3 no-print"><button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.print()"><i class="fa fa-print"></i> Print</button></div>
+</div>

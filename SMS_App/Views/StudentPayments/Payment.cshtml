@@ -1,0 +1,508 @@
+﻿@model SMS_App.ViewModels.StudentPaymentVM
+@using System.Collections.Specialized
+@inject UserManager<ApplicationUser> _userManager;
+@{
+    ListDictionary months = new ListDictionary();
+    months.Add(1, "January");
+    months.Add(2, "February");
+    months.Add(3, "March");
+    months.Add(4, "April");
+    months.Add(5, "May");
+    months.Add(6, "Jun");
+    months.Add(7, "July");
+    months.Add(8, "August");
+    months.Add(9, "September");
+    months.Add(10, "October");
+    months.Add(11, "November");
+    months.Add(12, "December");
+}
+@{
+    ViewData["Title"] = "Payment page";
+    if (Model.StudentPayment.Student != null)
+    {
+        GlobalUI.PageTitle = "Payment for " + Model.StudentPayment.Student.Name;
+    }
+    else
+    {
+        GlobalUI.PageTitle = "Student Payment";
+    }
+    string createdBy = string.Empty;
+    
+    var isResidential = Model.StudentPayment.Student.IsResidential;
+   
+}
+
+@section Styles{
+    <style>
+        @@media print
+        {
+            body
+            {
+                margin: 0 !important;
+                padding: 0 !important;
+                height: 100% !important;
+                visibility: hidden;
+            }
+
+                body.modal-open .modal
+                {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    margin: 0;
+                    padding: 0;
+                    overflow: visible !important;
+                }
+
+            .modal-dialog
+            {
+                top: 0;
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .modal-body
+            {
+                visibility: visible;
+                font-size: 20px;
+            }
+        }
+
+        .multiselect-container > li > a > label
+        {
+            padding: 4px 20px 3px 20px;
+        }
+
+        .mt-100
+        {
+            margin-top: 100px
+        }
+
+        body
+        {
+            color: #514B64;
+            min-height: 100vh
+        }
+
+        /*Collaps Panel Code*/
+        .panel-heading
+        {
+            padding: 0;
+            border: 0;
+        }
+
+        .panel-title > a, .panel-title > a:active
+        {
+            display: block;
+            padding: 15px;
+            color: #555;
+            font-size: 16px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            word-spacing: 3px;
+            text-decoration: none;
+        }
+
+        .panel-heading a:before
+        {
+            font-family: 'Glyphicons Halflings';
+            content: "\e114";
+            float: right;
+            transition: all 0.5s;
+        }
+
+        .panel-heading.active a:before
+        {
+            -webkit-transform: rotate(180deg);
+            -moz-transform: rotate(180deg);
+            transform: rotate(180deg);
+        }
+
+        .panelPointer
+        {
+            cursor: pointer;
+        }
+
+            .panelPointer:hover
+            {
+                background-color: antiquewhite;
+            }
+    </style>
+}
+<div class="row">
+    <div class="col-md-12 text-center">
+        <div class="panel p-2 clearfix bg-navy-blue">
+            <form id="frmSearchByRollId" asp-action="Payment" asp-controller="StudentPayments" method="get" class="">
+                <div class="row">
+                    <div class="col-md-4 offset-md-3">
+                        <div class="input-group">
+                            @if (ViewBag.roll != null)
+                            {
+                                <input id="rollInput" class="form-control form-control-sm" name="stRoll" value="@ViewBag.roll" />
+                            }
+                            else
+                            {
+                                <input id="rollInput" placeholder="Input Student Roll Number" class="form-control form-control-sm" name="stRoll" />
+                            }
+                            <div class="input-group-append">
+                                <button class="btn btn-info" type="submit"><i class="fas fa-search"></i> Go</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-md-start">
+                        <button type="button" class="btn btn-light" data-toggle="modal" data-target="#exampleModal">
+                            Select
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@if (Model != null)
+{
+    <div class="row text-white pt-1 pb-1" id="paymentDiv">
+        <div class="col-md-5 mh-100 ">
+            <partial name="_StudentInfoPortion" model="@Model" />
+        </div>
+        <div class="col-md-7 mh-100">
+
+            <div class="panel bg-navy-blue " id="inputPanel" style="min-height:300px;">
+                <div class="form-horizontal pt-3">
+                    <form asp-action="payment" asp-controller="StudentPayments" method="post" id="studentPaymentFormId">
+                        <input type="hidden" id="academicSessionId" value="@Model.SelectedSessionId" />
+                        <input type="hidden" asp-for="StudentPayment.StudentId" value="@Model.StudentId" />
+                        <input type="hidden" asp-for="StudentPayment.ReceiptNo" />
+                        <input type="hidden" asp-for="StudentPayment.Id" />
+                        <input type="hidden" asp-for="Id" />
+                        <input type="hidden" asp-for="StudentPayment.UniqueId" />
+                        <input type="hidden" asp-for="StudentPayment.StudentPaymentDetails[0].Id" />
+                        <input type="hidden" id="selectedSessionId" name="SelectedSessionId" value="@Model.SelectedSessionId" />
+                        <input type="hidden" id="selectedClassId" name="SelectedClassId" value="@Model.SelectedClassId" />
+                        <input type="hidden" id="studentIsResidential" value="@Model.StudentPayment.Student.IsResidential.ToString()" />
+                        <input type="hidden" id="originalClassId" value="@Model.StudentPayment.Student.AcademicClassId" />
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="form-group row pt-2">
+                                    <label class="col-md-2 col-form-label text-md-end">Date </label>
+                                    <div class="col-md-4">
+                                        <input type="date"
+                                               asp-for="StudentPayment.PaidDate"
+                                               class="form-control form-control-sm"
+                                               id="paidDate"
+                                               min="2020-01-31" />
+
+                                        <span asp-validation-for="StudentPayment.PaidDate" class="text-danger col-form-label"></span>
+                                    </div>
+
+                                    <label class="col-md-2 col-form-label text-md-end text-left">Session</label>
+                                    <div class="col-md-4">
+                                        <select class="form-control" id="sessionDropdown">
+                                            @if (Model.AvailableSessions != null)
+                                            {
+                                                @foreach (var session in Model.AvailableSessions)
+                                                {
+                                                    if (session.Id == Model.SelectedSessionId)
+                                                    {
+                                                        <option value="@session.Id" selected>@session.Name</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@session.Id">@session.Name</option>
+                                                    }
+                                                }
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group row pt-2">
+                                    <label class="col-md-2 col-form-label text-md-end text-left">Class</label>
+                                    <div class="col-md-4">
+                                        <select class="form-control" id="classDropdown">
+                                            @if (Model.AvailableClasses != null)
+                                            {
+                                                @foreach (var acaClass in Model.AvailableClasses)
+                                                {
+                                                    if (acaClass.Id == Model.SelectedClassId)
+                                                    {
+                                                        <option value="@acaClass.Id" selected>@acaClass.Name</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@acaClass.Id">@acaClass.Name</option>
+                                                    }
+                                                }
+                                            }
+                                        </select>
+                                    </div>                               
+
+                                    <label class="col-md-2 col-form-label text-md-end text-left">Payment For </label>
+                                    <div class="col-md-4">
+                                        <select class="form-control" id="feeHeadDropdown"  asp-for="StudentPayment.StudentPaymentDetails[0].StudentFeeHeadId">
+                                            <option selected disabled>Select Payment</option>
+                                        </select>
+                                        <span asp-validation-for="ClassFeeHeadId" class="text-danger col-form-label"></span>
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <label class="col-md-2 col-form-label text-md-end text-left">Amount</label>
+                                    <div class="col-md-4">
+                                        <input class="form-control form-control-sm text-dark font-weight-bolder text-right" placeholder="Amount" asp-for="StudentPayment.StudentPaymentDetails[0].PaidAmount" />
+                                        <input type="hidden" id="academicClassId" value="@Model.StudentPayment.Student.AcademicClassId" />
+                                        <input type="hidden" asp-for="StudentPayment.StudentPaymentDetails[0].ClassFeeId" />
+                                    </div>
+                                    <label class="col-md-2 col-form-label text-md-end text-left">Total</label>
+                                    <div class="col-md-4">
+                                        <input asp-for="StudentPayment.TotalPayment" class="form-control form-control-sm text-right text-dark font-weight-bolder" />
+                                    </div>
+                                    <span asp-validation-for="StudentPayment.TotalPayment" class="text-danger col-form-label"></span>
+                                </div>
+                                <div class="form-group row">
+                                    <label class="col-md-2 col-form-label text-md-end text-left">Remark</label>
+                                    <div class="col-md-4">
+                                        <input asp-for="StudentPayment.Remarks" class="form-control form-control-sm" />
+                                        <span asp-validation-for="StudentPayment.Remarks" class="text-danger col-form-label"></span>
+                                    </div>
+
+                                    <label asp-for="IsSMSSend" class="offset-md-2 col-md-4 col-form-label"><input asp-for="IsSMSSend" checked="checked" /> Send SMS Notification</label>
+                                    <span asp-validation-for="IsSMSSend" class="text-danger col-form-label"></span>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-md-12 offset-md-4">
+                                        <input type="submit" class="btn-block btn btn-info col-md-4" value="Submit" id="submitBtn" />
+                                    </div>
+                                </div>
+                                <div class="form-group row">
+                                    <div class="col-md-12 text-center">
+                                        <span class="text-warning font-italic">[Please try to input separate payment according to payment type]</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    foreach (var item in Model.PaymentVM.Payments)
+    {
+        <div class="row">
+            <partial name="_PaymentsDetails" model="@item" />
+        </div>
+        <br />
+    }
+
+}
+
+<div class="modal fade paymentUpdateModal" tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content card">
+            <div class="card-header text-center">
+                <span class="card-title">Payment Update (<span id="paymentNameTitle"></span>)</span>
+            </div>
+            <div class="card-body">
+                <form>
+                    <div class="form-group row">
+                        <label for="receipt" class="col-sm-2 col-form-label">Receipt</label>
+                        <div class="col-sm-10">
+                            <input type="text" readonly class="form-control-plaintext" id="updateReceipt" value="">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label for="paidDate" class="col-sm-2 col-form-label">Paid Date</label>
+                        <div class="col-sm-10">
+                            <input type="text" readonly class="form-control-plaintext" id="updatePaidDate" value="">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label for="updateAmount" class="col-sm-2 col-form-label">Amount*</label>
+                        <div class="col-sm-5">
+                            <input type="number" class="form-control" id="updateAmount" >
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label for="updateRemarks" class="col-sm-2 col-form-label">Remarks*</label>
+                        <div class="col-sm-10">
+                            <input type="text" class="form-control" id="updateRemarks" placeholder="Input remarks">
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label for="updateRemarks" class="col-sm-2 col-form-label"></label>
+                        <div class="col-sm-10">
+                            <input type="checkbox" > <span class="col-form-label">Send SMS Notification</span>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="offset-2 col-sm-10">
+                            <button class="btn btn-info btn-block">Update</button>
+                        </div>
+                    </div>
+                </form>
+
+            </div>
+            <div class="card-footer">
+                <span class="font-weight-bolder">Last Updated: <span class="font-italic font-weight-normal" id="modalFooterUpdateDate"> </span>; Last Updated By: <span class="font-italic font-weight-normal" id="modalFooterUpdateBy"> </span></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+
+<div style="color:black;font-weight:100" class="modal fade" id="exampleModalCenter" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg pb-0" role="document">
+        <div class="modal-content p-3" style="width:24cm">
+            <div class="row" style="height:11.5cm;width:23cm">
+                <iframe id="myIframe" style="width: 100%; height: 100%;">
+                </iframe>
+            </div>
+            <div class="row" id="exportOptions" style="display:block">
+                <div class="col-md-12 d-flex justify-content-between">
+
+                    <form asp-action="ReceiptPaymentExport" asp-controller="Reports" method="get">
+                        <input type="hidden" id="exportClassRollId" name="classRoll" />
+                        <div class="btn-group btn-sm mr-2 " role="group" aria-label="First group">
+                            <input type="hidden" name="myFileName" value="Payment Receipt @Model.StudentPayment.Id" />
+                            <input type="hidden" id="paymentIdExport" name="paymentId" />
+                            <button type="submit" name="reportType" value="pdf" class="btn-sm btn btn-danger" data-toggle="tooltip" title="Export PDF" data-placement="left"><i class="fas fa-file-pdf"></i></button>
+                            <button type="submit" name="reportType" value="xls" class="btn-sm btn btn-success" data-toggle="tooltip" title="Export xls" data-placement="top"><i class="fas fa-file-excel"></i></button>
+                            <button type="submit" name="reportType" value="word" class="btn-sm btn btn-primary" data-toggle="tooltip" title="Export doc" data-placement="top"><i class="fas fa-file-word"></i></button>
+                        </div>
+                    </form>
+                    <button type="button" class="btn btn-sm btn-danger" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Student Select Modal -->
+<div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content text-center">
+            <div class="modal-header text-center">
+                <h4 class="text-center">Select Student</h4>
+            </div>
+            <div class="modal-body">
+                <form action="/" method="post">
+                    <div class="form-group row">
+                        <label class="col-md-4 text-md-end col-form-label">Academic Class</label>
+                        <div class="col-md-8">
+                            <select class="form-control" asp-items="ViewBag.AcademicClassList" id="modalAcademicClassId">
+                                <option selected disabled>-Select Class-</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-md-4 text-md-end col-form-label">Student</label>
+                        <div class="col-md-8">
+                            <select class="form-control" id="studentListId">
+                                <option selected disabled>-Select Student-</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts{
+
+    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
+
+    <script>
+        // Get the current date
+        const today = new Date();
+
+        // Format the date as yyyy-MM-dd (required by <input type="date">)
+        const formattedDate = today.toISOString().split('T')[0];
+
+        // Set the value of the input element
+        document.getElementById('paidDate').value = formattedDate;
+
+        const dateInput = document.getElementById('paidDate');
+        dateInput.value = formattedDate;
+        dateInput.max = formattedDate;
+    </script>
+
+
+    <script>
+        //panel collaps decodeURI
+        $('.panel-collapse').on('show.bs.collapse', function () {
+            $(this).siblings('.panel-heading').addClass('active');
+        });
+
+        $('.panel-collapse').on('hide.bs.collapse', function () {
+            $(this).siblings('.panel-heading').removeClass('active');
+        });
+
+    </script>
+    <script>
+        $(function () {
+            let deleted = '@TempData["deleted"]';
+            let edited = '@TempData["updated"]';
+
+            if (deleted != "") {
+                alertify.error("Deleted Successfully");
+            }
+            if (edited != "") {
+                alertify.message('Updated Successfully');
+            }
+        });
+    </script>
+    <script>
+        // Global variable for available classes
+        var availableClasses = @Html.Raw(Json.Serialize(Model.AvailableClasses));
+        var currentSessionId = @Model.CurrentAcademicSession?.Id ?? 0;
+    </script>
+    <script>
+        function openReport(paymentId) {
+            var iframe = document.getElementById('myIframe');
+            iframe.src = '/Reports/ReceiptPaymentView?paymentId=' + paymentId;
+            document.getElementById('paymentIdExport').value = paymentId;
+            document.getElementById('exportOptions').style.display = 'flex';
+            $('#exampleModalCenter').modal('show');
+        }
+    </script>
+    <script src="@Url.Content("~/js/StudentPayments/Payment.js")"></script>
+    <script>
+        function loadFeeHeadsByStudent(sessionId, classId, studentId) {
+            $.ajax({
+                url: '/ClassFeeLists/GetClassFeeWithHeadBySessionClassStudentId',
+                data: { sessionId: sessionId, classId: classId, studentId: studentId },
+                cache: false,
+                type: 'GET',
+                dataType: 'json',
+                success: function (data) {
+                    console.log(data);
+                    if (data && data.length > 0) {
+                        $.each(data, function (i, item) {
+                            var op = '<option value="' + item.studentFeeHeadId + '" data-amount="' + item.amount + '" data-classFeeId="' + item.id + '">' + item.studentFeeHead.name + ' - ' + item.amount + '</option>';
+                            $('#feeHeadDropdown').append(op);
+                        });
+                    } else {
+                        var op = '<option disabled>No fee heads found</option>';
+                        $('#feeHeadDropdown').append(op);
+                    }
+                },
+                error: function (err) {
+                    console.log('Error loading fee heads:', err);
+                }
+            });
+        }
+
+        $(document).ready(function () {
+            let sessionId = $('#selectedSessionId').val();
+            let classId = $('#originalClassId').val();
+            let studentId = $('#StudentPayment_StudentId').val();
+            loadFeeHeadsByStudent(sessionId, classId, studentId);
+        });
+    </script>
+}

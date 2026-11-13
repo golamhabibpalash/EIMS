@@ -10,7 +10,7 @@ namespace SMS.BLL.Contracts
 {
     public interface IAcademicSessionManager : IManager<AcademicSession>
     {
-        Task<AcademicSession> GetCurrentAcademicSession();
-        Task<bool> IsExistByName(string name);
+        Task<AcademicSession> GetCurrentAcademicSessionAsync();
+        Task<bool> IsExistByNameAsync(string name);
     }
 }

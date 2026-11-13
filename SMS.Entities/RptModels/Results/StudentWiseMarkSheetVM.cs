@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection.Metadata.Ecma335;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SMS.Entities.RptModels.Results
 {
@@ -16,7 +11,7 @@ namespace SMS.Entities.RptModels.Results
         public string MotherName { get; set; }
         public int ClassRoll { get; set; }
         public string SectionName { get; set; }
-        public int AcademicSectionId { get; set; }
+        public int? AcademicSectionId { get; set; }
         public string GenderName { get; set; }
         public string SubjectName { get; set; }
         public double TotalMark { get; set; }

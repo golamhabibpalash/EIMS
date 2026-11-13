@@ -1,0 +1,38 @@
+<Project>
+
+	<!--
+		Single source of truth for the EIMS product version. Every project in the
+		solution inherits these properties automatically.
+
+		VersionPrefix is the product version and is bumped BY HAND when you cut a
+		release. The fourth part is the build number, supplied per publish so that
+		every deployment is uniquely identifiable:
+
+			CI      : dotnet publish -p:BuildNumber=$(github.run_number) -p:GitCommit=$(github.sha)
+			Local   : falls back to 0 / "local", which is how you can tell a hand
+			          built publish apart from one produced by the deploy workflow.
+
+		The resulting InformationalVersion is read back at runtime by
+		SMS_App/BuildInfo.cs and shown in the UI footer, sidebar and version dialog.
+	-->
+
+	<PropertyGroup>
+		<!-- The SDK otherwise appends the git SHA to InformationalVersion, which
+		     corrupts the trailing timestamp field BuildInfo.cs parses. -->
+		<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+		<VersionPrefix>1.4.0</VersionPrefix>
+
+		<BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+		<GitCommit Condition="'$(GitCommit)' == ''">local</GitCommit>
+		<BuildTimestampUtc Condition="'$(BuildTimestampUtc)' == ''">$([System.DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss"))</BuildTimestampUtc>
+
+		<Version>$(VersionPrefix).$(BuildNumber)</Version>
+		<!-- AssemblyVersion stays on the product version so assembly binding is not
+		     disturbed by every build; FileVersion carries the build number. -->
+		<AssemblyVersion>$(VersionPrefix).0</AssemblyVersion>
+		<FileVersion>$(Version)</FileVersion>
+		<InformationalVersion>$(Version)+$(GitCommit)+$(BuildTimestampUtc)</InformationalVersion>
+	</PropertyGroup>
+
+</Project>

@@ -1,0 +1,491 @@
+name: Deploy EIMS
+
+# One release branch, one commit, every instance.
+#
+#   push to FinalDeployment ............ deploys ALL instances automatically
+#   Actions -> Deploy EIMS -> Run workflow -> pick an instance ... just that one
+#
+# Instances (GitHub Settings -> Environments; names must match exactly):
+#
+#   DMCPS          https://eims.mcpsbd.com           Windows shared hosting (IIS/Plesk)
+#   Unityschoolbd  https://eims.unityschoolbd.com    Windows shared hosting (IIS/Plesk)
+#   Curiosity      https://curiosity.mcpsbd.com      Windows shared hosting (IIS/Plesk)
+#   SchoolBD       https://schoolbd.hekzor.com       Linux VPS (systemd + nginx)
+#
+# Windows instances get a SELF-CONTAINED win-x64 package over FTP, so they never
+# depend on which .NET runtime the host happens to have installed.
+#   secrets: FTP_SERVER  FTP_USERNAME  FTP_PASSWORD  FTP_PATH
+#   vars:    SITE_URL
+#
+# The Linux instance builds on the box: CI runs Resources/deployment/eims-deploy.sh
+# over SSH for the exact commit being released (backup, swap, restart, health check).
+#   secrets: SSH_HOST  SSH_USER  SSH_KEY   (SSH_USER needs passwordless sudo)
+#   vars:    SITE_URL
+#
+# Never touched on any server: appsettings*.json, Keys/, logs/, App_Data/ (admission
+# uploads), wwwroot/Uploads/, and uploaded images. A server's own web.config is kept;
+# only its processPath is pointed at the self-contained SMS_App.exe when needed.
+#
+# Windows uploads are checksum deltas: each release leaves a manifest in the site root and
+# the next one sends only changed files (Resources/deployment/ftp-delta.sh). A first deploy,
+# or "Run workflow" with full_sync ticked, mirrors everything instead.
+#
+# Every deploy ends by reading <SITE_URL>/build-info and FAILS unless the instance
+# reports the commit that was just shipped.
+
+on:
+  push:
+    branches: [FinalDeployment]
+  workflow_dispatch:
+    inputs:
+      client:
+        description: "Instance to deploy"
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - DMCPS
+          - Unityschoolbd
+          - Curiosity
+          - SchoolBD
+      full_sync:
+        description: "Windows: ignore the server's release manifest and mirror every file (slow; use if a server's files may have been changed by hand)"
+        required: false
+        default: false
+        type: boolean
+
+# Two releases must never interleave on the same servers.
+concurrency:
+  group: deploy-eims
+  cancel-in-progress: false
+
+jobs:
+  # 1. Decide which instances this run targets ------------------------------
+  setup:
+    runs-on: [self-hosted, eims]
+    outputs:
+      windows: ${{ steps.pick.outputs.windows }}
+      linux: ${{ steps.pick.outputs.linux }}
+    steps:
+      - id: pick
+        shell: bash
+        run: |
+          # Production only ever runs FinalDeployment, even if "Run workflow" is started
+          # from another branch in the GitHub UI.
+          if [ "$GITHUB_REF" != "refs/heads/FinalDeployment" ]; then
+            echo "::error::Deploys run only from FinalDeployment (this run is on $GITHUB_REF). Pick FinalDeployment under 'Use workflow from'."
+            exit 1
+          fi
+          windows=(DMCPS Unityschoolbd Curiosity)
+          linux=(SchoolBD)
+          sel="${{ github.event.inputs.client }}"
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] || [ -z "$sel" ] || [ "$sel" = "all" ]; then
+            win_sel=("${windows[@]}"); lin_sel=("${linux[@]}")
+          else
+            win_sel=(); lin_sel=()
+            [[ " ${windows[*]} " == *" $sel "* ]] && win_sel=("$sel")
+            [[ " ${linux[*]} " == *" $sel "* ]] && lin_sel=("$sel")
+          fi
+          to_json() { local out="" x; for x in "$@"; do out+="${out:+,}\"$x\""; done; echo "[$out]"; }
+          echo "windows=$(to_json "${win_sel[@]}")" >> "$GITHUB_OUTPUT"
+          echo "linux=$(to_json "${lin_sel[@]}")" >> "$GITHUB_OUTPUT"
+          echo "Windows: ${win_sel[*]:-none}   Linux: ${lin_sel[*]:-none}"
+
+  # 2. Build the Windows package ONCE (also proves the commit compiles) -----
+  build:
+    needs: setup
+    runs-on: [self-hosted, eims]
+    timeout-minutes: 20
+    outputs:
+      commit: ${{ steps.meta.outputs.git_commit }}
+      release_dir: ${{ steps.stash.outputs.release_dir }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Use the VPS's own .NET 8 SDK. actions/setup-dotnet installs into /usr/share/dotnet,
+      # which the unprivileged runner user can't write to, and the default `dotnet` on
+      # this host (/usr/bin/dotnet) is a separate .NET 10-only install.
+      - name: Use the server's .NET 8 SDK
+        shell: bash
+        run: |
+          echo "DOTNET_ROOT=/usr/share/dotnet" >> "$GITHUB_ENV"
+          echo "DOTNET_CLI_TELEMETRY_OPTOUT=1" >> "$GITHUB_ENV"
+          echo "DOTNET_NOLOGO=1" >> "$GITHUB_ENV"
+          echo "/usr/share/dotnet" >> "$GITHUB_PATH"
+          /usr/share/dotnet/dotnet --version
+
+      - name: Build metadata
+        id: meta
+        shell: bash
+        run: |
+          echo "git_commit=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "built_utc=$(date -u '+%Y-%m-%d %H:%M:%S')" >> "$GITHUB_OUTPUT"
+
+      - name: Publish (self-contained win-x64)
+        run: >
+          dotnet publish SMS_App/SMS_App.csproj -c Release -o ./publish --nologo
+          --runtime win-x64 --self-contained true
+          -p:PublishSingleFile=false -p:PublishTrimmed=false
+          -p:BuildNumber=${{ github.run_number }}
+          -p:GitCommit=${{ steps.meta.outputs.git_commit }}
+          -p:BuildTimestampUtc="${{ steps.meta.outputs.built_utc }}"
+
+      - name: Strip files that must never leave the build server
+        shell: bash
+        run: |
+          rm -f  ./publish/appsettings*.json   # per-instance config lives on each server
+          rm -f  ./publish/web.config          # each server keeps its own (see deploy step)
+          rm -f  ./publish/*.pdb
+          rm -rf ./publish/publish ./publish/wwwroot/Images
+
+      # Every job runs on this same self-hosted runner, so the deploy jobs read the package
+      # straight from disk instead of round-tripping it through GitHub artifact storage
+      # (that upload + 3 downloads cost ~3-4 minutes per release). Keyed by run id so a
+      # "Re-run failed jobs" still finds it; the summary job prunes old releases.
+      - name: Stash the release on the runner + write its manifest
+        id: stash
+        shell: bash
+        run: |
+          source Resources/deployment/ftp-delta.sh
+          rel="$(cd "$RUNNER_WORKSPACE/.." && pwd)/_eims-releases/${{ github.run_id }}"
+          rm -rf "$rel" && mkdir -p "$rel"
+          mv publish "$rel/publish"
+          delta_manifest "$rel/publish" "$rel/manifest.txt"
+          echo "Release: $rel ($(wc -l < "$rel/manifest.txt") files)"
+          echo "release_dir=$rel" >> "$GITHUB_OUTPUT"
+
+  # 3a. Windows / IIS instances (FTP) ---------------------------------------
+  deploy-windows:
+    needs: [setup, build]
+    if: needs.setup.outputs.windows != '[]'
+    runs-on: [self-hosted, eims]
+    timeout-minutes: 180        # a first deploy uploads the whole runtime; later ones are small
+    environment: ${{ matrix.client }}
+    strategy:
+      fail-fast: false          # one instance failing must not block the others
+      max-parallel: 2
+      matrix:
+        client: ${{ fromJSON(needs.setup.outputs.windows) }}
+    env:
+      FTP_SERVER: ${{ secrets.FTP_SERVER }}
+      FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+      FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+      LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}   # read by lftp --env-password; keeps it out of `ps`
+      FTP_PATH: ${{ secrets.FTP_PATH }}
+      RELEASE_DIR: ${{ needs.build.outputs.release_dir }}
+      PUBLISH: ${{ needs.build.outputs.release_dir }}/publish
+      FULL_SYNC: ${{ github.event.inputs.full_sync == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: Resources/deployment
+
+      - name: Locate the release
+        shell: bash
+        run: |
+          if [ ! -f "$PUBLISH/SMS_App.dll" ] || [ ! -s "$RELEASE_DIR/manifest.txt" ]; then
+            echo "::error::Release package not found at $PUBLISH. It is kept on the runner for the last few runs only - use 'Re-run all jobs' to rebuild it."
+            exit 1
+          fi
+
+      - name: Check secrets
+        shell: bash
+        run: |
+          for v in FTP_SERVER FTP_USERNAME FTP_PASSWORD FTP_PATH; do
+            [ -n "${!v}" ] || { echo "::error::Environment ${{ matrix.client }} is missing secret $v"; exit 1; }
+          done
+
+      # Resolves the FTP folder that really contains the app, then proves it is writable.
+      # Plesk FTP users are often chrooted to httpdocs (so FTP_PATH must be "/") while the
+      # main subscription user sees httpdocs as a subfolder (so FTP_PATH must be "/httpdocs").
+      # Trying the candidates here means one bad secret can no longer fail later, mid-release.
+      - name: Resolve FTP path, verify writability + prepare web.config
+        id: ftp
+        shell: bash
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          source Resources/deployment/ftp-lib.sh
+          set -uo pipefail
+          rm -f server-web.config remote-check.txt
+
+          candidates=()
+          if [ -n "${FTP_PATH:-}" ]; then candidates+=("$FTP_PATH"); fi
+          candidates+=( "/" "/httpdocs" "httpdocs" )
+          if [ -n "${SITE_URL:-}" ]; then
+            domain="$(printf '%s' "$SITE_URL" | sed -E 's#^[a-z]+://##; s#/.*$##')"
+            if [ -n "$domain" ]; then candidates+=("/$domain/httpdocs" "$domain/httpdocs"); fi
+          fi
+
+          resolved=""
+          for p in "${candidates[@]}"; do
+            out="$(lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" 2>&1 <<EOF || true
+          set ftp:passive-mode on
+          set ssl:verify-certificate no
+          set net:timeout 30
+          set net:max-retries 2
+          set cmd:fail-exit yes
+          cd "$p"
+          cls -1 SMS_App.dll
+          bye
+          EOF
+          )"
+            # cmd:fail-exit makes a bad `cd` abort before `cls`, so a match here proves the
+            # directory was entered - not that SMS_App.dll merely exists in the login home.
+            # Reuse the candidate that worked: lftp's `pwd` does not print a "/..." line,
+            # and the runner's `set -e` aborted the step when that grep found nothing.
+            if printf '%s\n' "$out" | grep -qx "SMS_App.dll"; then
+              resolved="$p"
+              echo "FTP path '$p' contains SMS_App.dll."
+              break
+            fi
+          done
+
+          if [ -z "$resolved" ]; then
+            echo "::error::No SMS_App.dll found via FTP on $FTP_SERVER. Tried: ${candidates[*]}. Check FTP_PATH / the FTP user's home directory. Nothing was changed."
+            exit 1
+          fi
+          # ftp-lib.sh reads FTP_PATH, so export the resolved folder for this and later steps.
+          export FTP_PATH="$resolved"
+          echo "FTP_PATH=$resolved" >> "$GITHUB_ENV"
+          echo "ftp_path=$resolved" >> "$GITHUB_OUTPUT"
+
+          # Fail now - before app_offline.htm - if the account cannot write to that folder.
+          probe=".eims-write-test-$$"
+          printf 'ok\n' > "$probe"
+          if ! lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" 2>&1 <<EOF
+          set ftp:passive-mode on
+          set ssl:verify-certificate no
+          set net:timeout 30
+          set cmd:fail-exit yes
+          cd "$resolved"
+          put "$probe" -o "$probe"
+          rm -f "$probe"
+          bye
+          EOF
+          then
+            rm -f "$probe"
+            echo "::error::FTP user cannot write to '$resolved' on $FTP_SERVER. Fix the account's permissions/home directory. Nothing was changed."
+            exit 1
+          fi
+          rm -f "$probe"
+          echo "FTP path '$resolved' is writable."
+
+          ftp_retry 3 120 "get web.config -o server-web.config" || true
+          if [ -s server-web.config ]; then
+            cp server-web.config web.config
+            # Self-contained package: IIS must start SMS_App.exe, not "dotnet SMS_App.dll".
+            # Everything else in the server's file (env vars, logging) is preserved.
+            perl -pi -e 's/processPath="[^"]*"/processPath=".\\SMS_App.exe"/; s/\barguments="[^"]*"/arguments=""/' web.config
+            if cmp -s server-web.config web.config; then
+              echo "Server web.config already targets SMS_App.exe - leaving it alone."
+              rm -f web.config
+            else
+              echo "Server web.config will be updated:"; diff server-web.config web.config || true
+            fi
+          else
+            echo "No web.config on the server - using the repo template."
+            cp Resources/deployment/unityschoolbd/web.config web.config
+          fi
+
+      # Fast path: diff this release's checksums against the manifest the previous release
+      # left on the server, and upload only what changed. Falls back to the full mirror
+      # below on a first deploy, an unreadable manifest, a very large change, or full_sync.
+      - name: Plan the upload
+        id: plan
+        shell: bash
+        run: |
+          source Resources/deployment/ftp-lib.sh
+          source Resources/deployment/ftp-delta.sh
+          rm -f server-manifest.txt online.txt offline.txt
+          mode=full
+          if [ "$FULL_SYNC" = "true" ]; then
+            echo "Full sync requested - mirroring every file."
+          elif ! delta_fetch_server_manifest server-manifest.txt; then
+            echo "No usable release manifest on the server (first fast deploy?) - mirroring every file this time."
+          else
+            delta_plan "$RELEASE_DIR/manifest.txt" server-manifest.txt online.txt offline.txt
+            total=$(( $(grep -c . online.txt || true) + $(grep -c . offline.txt || true) ))
+            if [ "$total" -gt "$DELTA_MAX_FILES" ]; then
+              echo "$total files changed (more than $DELTA_MAX_FILES) - one mirror pass is faster."
+            else
+              mode=delta
+              echo "Delta release: $(grep -c . online.txt || true) file(s) while online, $(grep -c . offline.txt || true) during the swap."
+            fi
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+      # The hosting FTP server can't keep file timestamps (no MFMT/MLSD), so date
+      # comparison would resend all ~3,000 files every time. Instead:
+      #  - third-party files (runtime, NuGet DLLs, wwwroot/lib) are compared by SIZE
+      #    (--ignore-time); a version change always changes them, and
+      #  - files we build ourselves are ALWAYS sent, since a code change can keep the size.
+      #
+      # Most of the transfer happens while the site is still serving users. Safe because
+      # files missing on the server (e.g. the bundled .NET runtime on a first deploy) are
+      # not loaded by the running app, and wwwroot holds static files IIS never locks.
+      - name: Pre-stage new files (site stays online)
+        shell: bash
+        run: |
+          source Resources/deployment/ftp-lib.sh
+          source Resources/deployment/ftp-delta.sh
+          if [ "${{ steps.plan.outputs.mode }}" = "delta" ]; then
+            delta_upload "$PUBLISH" online.txt "Online"
+            exit $?
+          fi
+          ftp_retry 4 2400 "mirror -R --only-missing --no-perms --no-umask --parallel=2 \
+            --exclude-glob app_offline.htm --exclude-glob 'appsettings*.json' --exclude-glob web.config \
+            --exclude-glob '*.pdb' --exclude Keys/ --exclude logs/ --exclude App_Data/ --exclude wwwroot/ \
+            \"$PUBLISH/\" ."
+          ftp_retry 4 2400 "mirror -R --ignore-time --no-perms --no-umask --parallel=2 \
+            --exclude Uploads/ --exclude Images/ \
+            \"$PUBLISH/wwwroot/\" wwwroot"
+          # The app's own static files: small, always resent.
+          for d in js css Reports EmailTemplates; do
+            [ -d "$PUBLISH/wwwroot/$d" ] || continue
+            ftp_retry 4 600 "mirror -R --no-perms --no-umask --parallel=2 \"$PUBLISH/wwwroot/$d/\" wwwroot/$d"
+          done
+
+      - name: Take the app offline
+        shell: bash
+        run: |
+          source Resources/deployment/ftp-lib.sh
+          cat > app_offline.htm <<'EOF'
+          <!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>System Maintenance</title><style>
+          body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;text-align:center;
+          padding:50px 20px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;
+          margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+          .card{background:rgba(255,255,255,.1);backdrop-filter:blur(10px);padding:40px;
+          border-radius:15px;box-shadow:0 8px 32px rgba(0,0,0,.1);max-width:500px}
+          h1{margin:0 0 20px;font-size:2em}p{font-size:1.1em;margin:10px 0}
+          .spin{border:4px solid rgba(255,255,255,.3);border-top:4px solid #fff;border-radius:50%;
+          width:40px;height:40px;animation:s 1s linear infinite;margin:20px auto}
+          @keyframes s{to{transform:rotate(360deg)}}</style></head><body><div class="card">
+          <h1>&#128295; System Maintenance</h1><div class="spin"></div>
+          <p>We're updating the system with the latest improvements.</p>
+          <p><small>This will only take a moment. Please refresh in a few seconds.</small></p>
+          </div></body></html>
+          EOF
+          ftp_retry 3 120 "put app_offline.htm -o app_offline.htm"
+          sleep 10   # give IIS time to shut the app down and release the DLL locks
+
+      - name: Swap the app files (site offline)
+        shell: bash
+        run: |
+          source Resources/deployment/ftp-lib.sh
+          source Resources/deployment/ftp-delta.sh
+          if [ "${{ steps.plan.outputs.mode }}" = "delta" ]; then
+            # Only the locked files whose checksum changed (always includes SMS_App.dll,
+            # which embeds the commit).
+            delta_upload "$PUBLISH" offline.txt "Swap" || exit 1
+          else
+            # wwwroot was staged while online. Here: third-party top-level files whose size
+            # changed, then our own build output, always. mirror never deletes server files.
+            ftp_retry 4 1200 "mirror -R --ignore-time --verbose --no-perms --no-umask --parallel=2 \
+              --exclude-glob app_offline.htm --exclude-glob 'appsettings*.json' --exclude-glob web.config \
+              --exclude-glob '*.pdb' --exclude Keys/ --exclude logs/ --exclude App_Data/ --exclude wwwroot/ \
+              \"$PUBLISH/\" ." || exit 1
+            ftp_retry 4 600 "lcd \"$PUBLISH\"
+              mput -O . SMS*.dll SMS_App.exe SMS_App.deps.json SMS_App.runtimeconfig.json SiteMap.Config" || exit 1
+          fi
+          if [ -f web.config ]; then
+            ftp_retry 3 120 "put web.config -o web.config" || exit 1
+          fi
+          # Written last: the server now holds exactly this release, so the next deploy can
+          # upload only what changes after it.
+          # Not fatal: without it the next deploy just falls back to a full mirror.
+          delta_record "$RELEASE_DIR/manifest.txt" \
+            || echo "::warning::Could not store the release manifest; the next deploy will do a full mirror."
+
+      - name: Bring the app back online
+        if: always()
+        shell: bash
+        run: |
+          # Nothing was taken offline if the path could not be resolved.
+          [ -n "${FTP_PATH:-}" ] || exit 0
+          source Resources/deployment/ftp-lib.sh
+          ftp_retry 5 120 "rm -f app_offline.htm"
+
+      - name: Verify the new build is live
+        shell: bash
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+          EXPECTED: ${{ needs.build.outputs.commit }}
+        run: bash Resources/deployment/verify-build.sh "$SITE_URL" "$EXPECTED"
+
+      - name: Cleanup
+        if: always()
+        shell: bash
+        run: rm -f app_offline.htm web.config server-web.config remote-check.txt server-manifest.txt online.txt offline.txt
+
+  # 3b. Linux VPS instance (on-box build over SSH) --------------------------
+  deploy-linux:
+    needs: [setup, build]       # only runs once the commit is known to compile
+    if: needs.setup.outputs.linux != '[]'
+    runs-on: [self-hosted, eims]
+    timeout-minutes: 30
+    environment: ${{ matrix.client }}
+    strategy:
+      fail-fast: false
+      matrix:
+        client: ${{ fromJSON(needs.setup.outputs.linux) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: Resources/deployment
+
+      - name: Deploy over SSH
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          for v in SSH_HOST SSH_USER SSH_KEY; do
+            [ -n "${!v}" ] || { echo "::error::Environment ${{ matrix.client }} is missing secret $v"; exit 1; }
+          done
+          key="$(mktemp)"; trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$SSH_KEY" > "$key"; chmod 600 "$key"
+          # Runs the repo's copy of the script, so server and repo never drift apart. It is
+          # copied to a file first and run with stdin closed: piping it into `bash -s` lets
+          # any command inside that reads stdin swallow the rest of the script.
+          ssh -i "$key" -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 \
+            "$SSH_USER@$SSH_HOST" \
+            'f=$(mktemp /tmp/eims-deploy.XXXXXX) && cat > "$f" && sudo -n bash "$f" '"${{ github.sha }} ${{ github.run_number }}"' </dev/null; rc=$?; rm -f "$f"; exit $rc' \
+            < Resources/deployment/eims-deploy.sh
+
+      - name: Verify the new build is live
+        shell: bash
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: bash Resources/deployment/verify-build.sh "$SITE_URL" "${{ github.sha }}"
+
+  # 4. One summary table for the whole release ------------------------------
+  summary:
+    needs: [setup, build, deploy-windows, deploy-linux]
+    if: always()
+    runs-on: [self-hosted, eims]
+    steps:
+      - name: Prune old release packages on the runner
+        shell: bash
+        run: |
+          dir="$(cd "$RUNNER_WORKSPACE/.." && pwd)/_eims-releases"
+          [ -d "$dir" ] || exit 0
+          # Keep the 3 most recent so "Re-run failed jobs" keeps working for a while.
+          ls -1dt "$dir"/*/ 2>/dev/null | tail -n +4 | xargs -r rm -rf
+      - shell: bash
+        run: |
+          {
+            echo "### EIMS release ${{ needs.build.outputs.commit }} (build ${{ github.run_number }})"
+            echo ""
+            echo "| Stage | Result |"
+            echo "|-------|--------|"
+            echo "| Build | ${{ needs.build.result }} |"
+            echo "| Windows: ${{ needs.setup.outputs.windows }} | ${{ needs.deploy-windows.result }} |"
+            echo "| Linux: ${{ needs.setup.outputs.linux }} | ${{ needs.deploy-linux.result }} |"
+            echo ""
+            echo "Per-instance details are in each deploy job's log."
+          } >> "$GITHUB_STEP_SUMMARY"

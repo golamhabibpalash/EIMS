@@ -1,0 +1,19 @@
+@model AdmissionLandingVM
+@{
+    var s = Model.Session;
+    var current = ViewContext.RouteData.Values["action"]?.ToString();
+}
+<nav aria-label="breadcrumb" class="small mb-2"><a asp-action="Index">Admission notices</a> / @s.Title</nav>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+    <div>
+        <h1 class="h3 mb-1">@s.Title</h1>
+        <div class="text-muted">Academic year @s.AcademicSession?.Name</div>
+    </div>
+    <span class="badge fs-6 @AdmissionDisplay.WindowBadge(Model.State)">@AdmissionDisplay.Name(Model.State)</span>
+</div>
+<ul class="nav nav-pills mb-3 small flex-nowrap overflow-auto">
+    <li class="nav-item"><a class="nav-link @(current == "Notice" ? "active" : "")" asp-action="Notice" asp-route-id="@s.Id">Overview</a></li>
+    <li class="nav-item"><a class="nav-link text-nowrap @(current == "Eligibility" ? "active" : "")" asp-action="Eligibility" asp-route-id="@s.Id">Eligibility / যোগ্যতা</a></li>
+    <li class="nav-item"><a class="nav-link text-nowrap @(current == "Guidelines" ? "active" : "")" asp-action="Guidelines" asp-route-id="@s.Id">Guidelines / নীতিমালা</a></li>
+    <li class="nav-item"><a class="nav-link text-nowrap" asp-action="Manual">How to apply</a></li>
+</ul>

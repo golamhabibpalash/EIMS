@@ -1,0 +1,813 @@
+﻿@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Http
+@using SMS_App.ViewModels.Layout 
+@using System.IO
+
+@inject SignInManager<ApplicationUser> _signInManager
+@inject UserManager<ApplicationUser> _userManager
+@inject IInstituteManager _instituteManager
+@inject IEmployeeManager _employeeManager
+@inject IStudentManager _studentManager
+@inject IHttpContextAccessor httpContextAccessor
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment _webHostEnvironment 
+
+
+@{
+    var headerVM = new LayoutHeaderVM();
+
+    var info = await _instituteManager.GetAllAsync();
+    var user = await _userManager.GetUserAsync(User);
+
+    if (info.Any())
+    {
+        var firstInstitute = info.First();
+        GlobalUI.InstituteName = firstInstitute.Name;
+        GlobalUI.Logo = firstInstitute.Logo;
+        GlobalUI.Language = "En";
+    }
+
+    string instituteName = GlobalUI.InstituteName ?? "Institute Name";
+    string instituteLogo = GlobalUI.Logo ?? "instituteLogo.png";
+    var userName = _userManager.GetUserName(User);
+    // Scopes the remembered sidebar state to this user, so two people sharing a browser keep their own preference.
+    var sidebarUserKey = user?.Id ?? "anon";
+    headerVM.InstituteName = instituteName;
+
+    string userImage = "/Images/noProfileImage.png";
+
+    if (_signInManager.IsSignedIn(User) && user != null)
+    {
+        if (user.UserType == 's')
+        {
+            var stu = await _studentManager.GetStudentByUniqueIdAsync(user.ReferenceId.ToString())
+                ?? await _studentManager.GetByIdAsync(user.ReferenceId);
+            if (!string.IsNullOrEmpty(stu?.Photo))
+                userImage = $"/Images/Student/{stu.Photo}";
+        }
+
+
+        else if (user.UserType == 'e')
+        {
+            var emp = await _employeeManager.GetByIdAsync(user.ReferenceId);
+            if (!string.IsNullOrEmpty(emp?.Image))
+                userImage = $"/Images/Employee/photo/{emp.Image}";
+        }
+    }
+    else
+    {
+        <a asp-area="Identity" asp-page="/Account/Login">Log in</a>
+    }
+
+}
+
+
+<!DOCTYPE html>
+<html lang="en">
+    <!-- BEGIN HEAD -->
+    @await Html.PartialAsync("_HeadPartial", headerVM)
+    @await RenderSectionAsync("Styles", required: false)
+    <!-- END HEAD -->
+
+<body class="page-header-fixed sidemenu-closed-hidelogo page-content-white page-md header-white dark-sidebar-color logo-indigo">
+    @if (Context.Session.GetString("ImpersonatorId") != null)
+    {
+        <div class="alert alert-warning text-center mb-0" role="alert" style="position:fixed;top:0;left:0;right:0;z-index:10060;">
+            <i class="fa fa-user-secret"></i> You are testing as another user. Actions count as them.
+            <a asp-controller="Accounts" asp-action="StopImpersonation" class="btn btn-sm btn-danger ms-2">Stop &amp; return to my account</a>
+        </div>
+    }
+    <script>
+        // Re-apply the sidebar's collapsed state before the page paints, so it does not
+        // flash open on every navigation. layout.js has its own save/restore for this,
+        // but it is gated on the jquery.cookie plugin, which this project never loads.
+        (function () {
+            window.EIMS_SIDEBAR_KEY = "eims.sidebar.collapsed.@sidebarUserKey";
+            try {
+                // 992px is the theme's "md" breakpoint; below it the sidebar uses the
+                // mobile slide-out instead, which has its own open/closed handling.
+                if (localStorage.getItem(window.EIMS_SIDEBAR_KEY) === "1" && window.innerWidth >= 992) {
+                    document.body.classList.add("sidemenu-closed");
+                }
+            } catch (e) { /* storage blocked: fall back to the default expanded sidebar */ }
+        })();
+    </script>
+    <div class="page-wrapper">
+
+        <!-- start header -->
+        <div class="page-header navbar navbar-fixed-top">
+            <div class="page-header-inner ">
+
+
+
+                <!-- logo start -->
+                <div class="page-logo p-2">
+                    <a class="" asp-action="index" asp-controller="Home">
+
+                        <img class="logo-icon material-icons"
+                             src="~/Images/Institute/@instituteLogo"
+                             style="max-width:50px;max-height:50px"
+                             onerror="this.onerror=null;this.src='/Images/Institute/smslogo.png';" />
+
+                        <span class="logo-default fs-1 hidden-516"
+                              style="font-size:12px !important; line-height:0.7 !important">@GlobalUI.InstituteName</span>
+                        </a>
+                    </div>
+                    <!-- logo end -->
+                    <ul class="nav navbar-nav navbar-left in">
+                        <li>
+                            <a href="#" class="menu-toggler sidebar-toggler" data-bs-toggle="collapse" data-bs-target=".sidemenu-container">
+                                <i class="icon-menu"></i>@(GlobalUI.PageTitle ?? "Dashboard")
+                            </a>
+                        </li>
+
+
+                    </ul>
+                    <form class="search-form-opened" action="#" method="GET">
+                        <div class="input-group">
+                            <input type="text" class="form-control" placeholder="Search..." name="query">
+                            <span class="input-group-btn">
+                                <a href="javascript:;" class="btn submit">
+                                    <i class="icon-magnifier"></i>
+                                </a>
+                            </span>
+                        </div>
+                    </form>
+                    <!-- start mobile menu -->
+                    <a class="menu-toggle responsive-toggler" data-bs-toggle="collapse" data-bs-target=".page-sidebar-wrapper">
+                        <span></span>
+                    </a>
+                    <!-- end mobile menu -->
+                    <!-- start header menu -->
+                    <div class="top-menu">
+                        <ul class="nav navbar-nav pull-right">
+                            <li class="hidden-320"><a class="fullscreen-btn"><i data-feather="maximize"></i></a></li>
+                            <!-- start language menu -->
+                            @* <li class="dropdown language-switch">
+                                    <a class="dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <img src="~/lib/Theme/smart/assets/img/flags/gb.png" class="position-left" alt="">
+                                        English
+                                    </a>
+                                    <ul class="dropdown-menu">
+                                        <li>
+                                            <a class="german"><img src="~/lib/Theme/smart/assets/img/flags/de.png" alt="">
+                                                German</a>
+                                        </li>
+                                        <li>
+                                            <a class="french"><img src="~/lib/Theme/smart/assets/img/flags/fr.png" alt="">
+                                                French</a>
+                                        </li>
+                                        <li>
+                                            <a class="english"><img src="~/lib/Theme/smart/assets/img/flags/gb.png" alt="">
+                                                English</a>
+                                        </li>
+                                    </ul>
+                                </li> *@
+                            <!-- end language menu -->
+                            <!-- start notification dropdown -->
+                            <li class="dropdown dropdown-extended dropdown-notification" id="header_notification_bar">
+                                <a class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
+                                   data-close-others="true">
+                                    <i data-feather="bell"></i>
+                                    <span class="badge headerBadgeColor1" id="notif-badge"> @(await Component.InvokeAsync("NotificationCount")) </span>
+                                </a>
+                                <ul class="dropdown-menu">
+                                    <li class="external d-flex justify-content-between align-items-center">
+                                        <h3 class="mb-0"><span class="bold">Notifications</span>
+                                            <span class="notification-label purple-bgcolor" id="notif-count-label">@(await Component.InvokeAsync("NotificationCount"))</span>
+                                        </h3>
+                                        <a href="javascript:void(0)" id="notif-mark-all" class="small">Mark all read</a>
+                                    </li>
+                                    <li>
+                                        <ul class="dropdown-menu-list small-slimscroll-style" data-handle-color="#637283" id="notif-list">
+                                            <li class="text-center text-muted p-3" data-notif-empty="1">
+                                                <p class="mb-0">No new notifications</p>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                    <div class="dropdown-menu-footer">
+                                        <a href="/Notifications"> All notifications </a>
+                                    </div>
+                                </ul>
+                            </li>
+                            <!-- end notification dropdown -->
+                            <!-- start message dropdown -->
+                            <li class="dropdown dropdown-extended dropdown-inbox" id="header_inbox_bar">
+                                <a class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
+                                   data-close-others="true">
+                                    <i data-feather="mail"></i>
+                                    <span class="badge headerBadgeColor2"> 0 </span>
+                                </a>
+                                <ul class="dropdown-menu">
+<li class="external">
+                                        <h3><span class="bold">Messages</span></h3>
+                                        <span class="notification-label cyan-bgcolor">0</span>
+                                    </li>
+                                    <li>
+                                        <ul class="dropdown-menu-list small-slimscroll-style" data-handle-color="#637283">
+                                            <li class="text-center text-muted p-3">
+                                                <p class="mb-0">No new messages</p>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                    <div class="dropdown-menu-footer">
+                                        <a href="javascript:void(0)"> All messages </a>
+                                    </div>
+                                </ul>
+                            </li>
+                            <!-- end message dropdown -->
+                            <!-- start manage user dropdown -->
+                            <li class="dropdown dropdown-user">
+                                <a class="dropdown-toggle" data-bs-toggle="dropdown" data-hover="dropdown"
+                                   data-close-others="true">
+                                    <img alt="" class="img-circle " src="@userImage" onerror="this.onerror=null;this.src='/Images/noProfileImage.png';" />
+                                    <!--      <span class="username username-hide-on-mobile"> @userName</span> -->
+                                </a>
+                                <ul class="dropdown-menu dropdown-menu-default">
+                                    <li>
+                                        <a asp-action="Details" asp-controller="Employees" asp-route-id="@user?.ReferenceId">
+                                            <i class="icon-user"></i> Profile
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#">
+                                            <i class="icon-settings"></i> Settings
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a href="#">
+                                            <i class="icon-directions"></i> Help
+                                        </a>
+                                    </li>
+                                    <li class="divider"> </li>
+                                    <li>
+                                        <a asp-action="LockScreen" asp-controller="Accounts">
+                                            <i class="icon-lock"></i> Lock
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <form asp-action="Logout" asp-controller="Accounts" method="post"
+                                              style="display:inline;">
+                                            <button type="submit" class="dropdown-item"
+                                                    style="background:none; border:none; padding:6px 20px; width:100%; text-align:left;">
+                                                <i class="icon-logout"></i> Log Out
+                                            </button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </li>
+                            <!-- end manage user dropdown -->
+                            @* <li class="dropdown dropdown-quick-sidebar-toggler">
+                                    <a id="headerSettingButton" class="mdl-button mdl-js-button mdl-button--icon pull-right"
+                                        data-upgraded=",MaterialButton">
+                                        <i class="material-icons">more_vert</i>
+                                    </a>
+                                </li> *@
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <!-- end header -->
+            <!-- start color quick setting -->
+            <div class="settingSidebar">
+                <a href="javascript:void(0)" class="settingPanelToggle">
+                    <i class="fa fa-spin fa-cog"></i>
+                </a>
+                <div class="settingSidebar-body ps-container ps-theme-default">
+                    <div class=" fade show active">
+                        <div class="setting-panel-header">
+                            Setting Panel
+                        </div>
+                        <div class="quick-setting slimscroll-style">
+                            <ul id="themecolors">
+                                <li>
+                                    <p class="sidebarSettingTitle">Sidebar Color</p>
+                                </li>
+                                <li class="complete">
+                                    <div class="theme-color sidebar-theme">
+                                        <a href="#" data-theme="white">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="dark">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="blue">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="indigo">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="cyan">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="green">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="red">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                    </div>
+                                </li>
+                                <li>
+                                    <p class="sidebarSettingTitle">Header Brand color</p>
+                                </li>
+                                <li class="theme-option">
+                                    <div class="theme-color logo-theme">
+                                        <a href="#" data-theme="logo-white">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="logo-dark">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="logo-blue">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="logo-indigo">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="logo-cyan">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="logo-green">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="logo-red">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                    </div>
+                                </li>
+                                <li>
+                                    <p class="sidebarSettingTitle">Header color</p>
+                                </li>
+                                <li class="theme-option">
+                                    <div class="theme-color header-theme">
+                                        <a href="#" data-theme="header-white">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="header-dark">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="header-blue">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="header-indigo">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="header-cyan">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="header-green">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                        <a href="#" data-theme="header-red">
+                                            <span class="head"></span><span class="cont"></span>
+                                        </a>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- end color quick setting -->
+            <!-- start page container -->
+            <div class="page-container">
+                <!-- start sidebar menu -->
+                <div class="sidebar-container">
+                    <div class="sidemenu-container navbar-collapse collapse fixed-menu">
+                        <div id="remove-scroll" class="left-sidemenu">
+                            <ul class="sidemenu  page-header-fixed slimscroll-style" data-keep-expanded="false"
+                                data-auto-scroll="true" data-slide-speed="200" style="padding-top: 20px">
+
+
+                                <li class="sidebar-toggler-wrapper hide">
+                                    <div class="sidebar-toggler">
+                                        <span></span>
+                                    </div>
+                                </li>
+
+                                @await Component.InvokeAsync("Navigation")
+                                <li class="position-fixed bottom-0">
+                                    <span class="alert">
+                                        Version:
+                                        <span class="btn btn-sm p-0 m-0 text-light" data-bs-toggle="modal"
+                                              data-bs-target="#versionModal">
+                                            @BuildInfo.ShortDisplay
+                                        </span>
+                                    </span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <!-- end sidebar menu -->
+                <!-- start page content -->
+                <div class="page-content-wrapper">
+                    <div class="page-content" style="background:darkslategray !important">
+                        <div class="page-bar"></div>
+                        <div class="row">
+                            @RenderBody()
+                        </div>
+                    </div>
+                </div>
+                <!-- end page content -->
+                <!-- start chat sidebar -->
+                <div class="chat-sidebar-container" data-close-on-body-click="false">
+                    <div class="chat-sidebar">
+                        <ul class="nav nav-tabs">
+                            <li class="nav-item">
+                                <a href="#quick_sidebar_tab_1" class="nav-link active tab-icon" data-bs-toggle="tab">
+                                    <i class="material-icons">chat</i>Chat
+                                    <span class="badge badge-danger">0</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="#quick_sidebar_tab_3" class="nav-link tab-icon" data-bs-toggle="tab">
+                                    <i class="material-icons">settings</i>
+                                    Settings
+                                </a>
+                            </li>
+                        </ul>
+                        <div class="tab-content">
+                            <!-- Start Doctor Chat -->
+                            <div class="tab-pane active chat-sidebar-chat in active show" role="tabpanel"
+                                 id="quick_sidebar_tab_1">
+                                <div class="chat-sidebar-list">
+                                    <div class="chat-sidebar-chat-users slimscroll-style" data-rail-color="#ddd"
+                                         data-wrapper-class="chat-sidebar-list">
+                                        <div class="chat-header">
+                                            <h5 class="list-heading">Online</h5>
+                                        </div>
+                                        <ul class="media-list list-items">
+                                            <li class="media">
+                                                <img class="media-object" src="~/lib/Theme/smart/assets/img/user/user5.jpg"
+                                                     width="35" height="35" alt="...">
+                                                <div class="media-body">
+                                                    <h5 class="media-heading">Rajesh</h5>
+                                                    <div class="media-heading-sub">Ortho Surgeon</div>
+                                                </div>
+                                            </li>
+                                            <li class="media">
+                                                <div class="media-status">
+                                                    <span class="badge badge-success">0</span>
+                                                </div> <img class="media-object"
+                                                            src="~/lib/Theme/smart/assets/img/user/user1.jpg" width="35" height="35"
+                                                            alt="...">
+                                                <div class="media-body">
+                                                    <h5 class="media-heading">Jacob Ryan</h5>
+                                                    <div class="media-heading-sub">Ortho Surgeon</div>
+                                                </div>
+                                            </li>
+                                            <li class="media">
+                                                <img class="media-object" src="~/lib/Theme/smart/assets/img/user/user4.jpg"
+                                                     width="35" height="35" alt="...">
+                                                <div class="media-body">
+                                                    <h5 class="media-heading">Sarah Smith</h5>
+                                                    <div class="media-heading-sub">Anatomy</div>
+                                                </div>
+                                            </li>
+                                            <li class="media">
+                                                <div class="media-status">
+                                                    <span class="badge badge-danger">0</span>
+                                                </div> <img class="media-object"
+                                                            src="~/lib/Theme/smart/assets/img/user/user2.jpg" width="35" height="35"
+                                                            alt="...">
+                                                <div class="media-body">
+                                                    <h5 class="media-heading">John Deo</h5>
+                                                    <div class="media-heading-sub">Dentist</div>
+                                                </div>
+                                            </li>
+                                            <li class="media">
+                                                <img class="media-object" src="~/lib/Theme/smart/assets/img/user/user3.jpg"
+                                                     width="35" height="35" alt="...">
+                                                <div class="media-body">
+                                                    <h5 class="media-heading">Genelia James</h5>
+                                                    <div class="media-heading-sub">Cardiology</div>
+                                                </div>
+                                            </li>
+                                        </ul>
+                                        <div class="chat-header">
+                                            <h5 class="list-heading">Offline</h5>
+                                        </div>
+                                        <ul class="media-list list-items">
+                                            <li class="media">
+                                                <div class="media-status">
+                                                    <span class="badge badge-warning">0</span>
+                                                </div> <img class="media-object"
+                                                            src="~/lib/Theme/smart/assets/img/user/user6.jpg" width="35" height="35"
+                                                            alt="...">
+                                                <div class="media-body">
+                                                    <h5 class="media-heading">Jennifer Maklen</h5>
+                                                    <div class="media-heading-sub">Neurology</div>
+                                                    <div class="media-heading-small">Last seen 01:20 AM</div>
+                                                </div>
+                                            </li>
+                                            <li class="media">
+                                                <img class="media-object" src="~/lib/Theme/smart/assets/img/user/user7.jpg"
+                                                     width="35" height="35" alt="...">
+                                                <div class="media-body">
+                                                    <h5 class="media-heading">Lina Smith</h5>
+                                                    <div class="media-heading-sub">Ortho Surgeon</div>
+                                                    <div class="media-heading-small">Last seen 11:14 PM</div>
+                                                </div>
+                                            </li>
+                                            <li class="media">
+                                                <div class="media-status">
+                                                    <span class="badge badge-success">0</span>
+                                                </div> <img class="media-object"
+                                                            src="~/lib/Theme/smart/assets/img/user/user8.jpg" width="35" height="35"
+                                                            alt="...">
+                                                <div class="media-body">
+                                                    <h5 class="media-heading">Jeff Adam</h5>
+                                                    <div class="media-heading-sub">Anatomy</div>
+                                                    <div class="media-heading-small">Last seen 3:31 PM</div>
+                                                </div>
+                                            </li>
+                                            <li class="media">
+                                                <img class="media-object" src="~/lib/Theme/smart/assets/img/user/user9.jpg"
+                                                     width="35" height="35" alt="...">
+                                                <div class="media-body">
+                                                    <h5 class="media-heading">Anjelina Cardella</h5>
+                                                    <div class="media-heading-sub">Physiology</div>
+                                                    <div class="media-heading-small">Last seen 7:45 PM</div>
+                                                </div>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- End Doctor Chat -->
+                            <!-- Start Setting Panel -->
+                            <div class="tab-pane chat-sidebar-settings" role="tabpanel" id="quick_sidebar_tab_3">
+                                <div class="chat-sidebar-settings-list slimscroll-style">
+                                    <div class="chat-header">
+                                        <h5 class="list-heading">Layout Settings</h5>
+                                    </div>
+                                    <div class="chatp">
+                                        <div class="settings-item">
+                                            <div class="settings-name">Sidebar Position</div>
+                                            <div class="settings-value">
+                                                <select class="sidebar-pos-option form-control input-inline input-sm input-small ">
+                                                    <option value="left" selected="selected">Left</option>
+                                                    <option value="right">Right</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="settings-item">
+                                            <div class="settings-name">Header Position</div>
+                                            <div class="settings-value">
+                                                <select class="page-header-option form-control input-inline input-sm input-small ">
+                                                    <option value="fixed" selected="selected">Fixed</option>
+                                                    <option value="default">Default</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="settings-item">
+                                            <div class="settings-name">Sidebar Style </div>
+                                            <div class="settings-value">
+                                                <select class="sidebar-style-option form-control input-inline input-sm input-small ">
+                                                    <option value="default" selected="selected">Default</option>
+                                                    <option value="compact">Compact</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="settings-item">
+                                            <div class="settings-name">Layout Type</div>
+                                            <div class="settings-value">
+                                                <select class="layout-option form-control input-inline input-sm input-small ">
+                                                    <option value="fluid" selected="selected">Fluid</option>
+                                                    <option value="boxed">Boxed</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="settings-item">
+                                            <div class="settings-name">Chat Type</div>
+                                            <div class="settings-value">
+                                                <select class="chat-option form-control input-inline input-sm input-small ">
+                                                    <option value="always">Always</option>
+                                                    <option value="never" selected="selected">Never</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="chat-header">
+                                        <h5 class="list-heading">Account Settings</h5>
+                                    </div>
+                                    <div class="chatp">
+                                        <div class="settings-item">
+                                            <div class="settings-name">Chat Notifications</div>
+                                            <div class="settings-value">
+                                                <input type="checkbox" class="js-switch" checked />
+                                            </div>
+                                        </div>
+                                        <div class="settings-item">
+                                            <div class="settings-name">Show Online Status</div>
+                                            <div class="settings-value">
+                                                <input type="checkbox" class="js-switch" checked />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="chat-header">
+                                        <h5 class="list-heading">Notification Settings</h5>
+                                    </div>
+                                    <div class="chatp">
+                                        <div class="settings-item">
+                                            <div class="settings-name">Show Notifications</div>
+                                            <div class="settings-value">
+                                                <input type="checkbox" class="js-switch" checked />
+                                            </div>
+                                        </div>
+                                        <div class="settings-item">
+                                            <div class="settings-name">Show Task Notifications</div>
+                                            <div class="settings-value">
+                                                <input type="checkbox" class="js-switch" checked />
+                                            </div>
+                                        </div>
+                                        <div class="settings-item">
+                                            <div class="settings-name">Show Email Notifications</div>
+                                            <div class="settings-value">
+                                                <input type="checkbox" class="js-switch" checked />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- end chat sidebar -->
+            </div>
+            <!-- end page container -->
+            <!-- start footer -->
+            <div class="page-footer text-bs-light">
+                <footer class="py-3 mt-auto">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center page-footer-inner">
+
+                        <!-- Part 1: Version -->
+                        <div class="footer-version text-start col-12 col-md-4 mb-2 mb-md-0">
+                            <strong>Version:</strong> @BuildInfo.ShortDisplay
+                        </div>
+
+                        <!-- Part 2: Institute Name -->
+                        <div class="footer-institute text-center col-12 col-md-4 mb-2 mb-md-0">
+                            <strong>Institute:</strong> @instituteName
+                        </div>
+
+                        <!-- Part 3: Developer Info -->
+                        <div class="footer-developer text-end col-12 col-md-4">
+                            @DateTime.Today.Year &copy; SchoolBD! Developed By
+                            <a href="http://hekzor.com/" target="_blank" rel="noopener noreferrer" class="text-decoration-none">HEKZOR</a>
+                        </div>
+
+                    </div>
+
+                    <!-- Optional Scroll to Top Button -->
+                    <div class="scroll-to-top position-absolute end-0 me-3 mb-3" style="cursor:pointer;">
+                        <i class="icon-arrow-up"></i>
+                    </div>
+                </footer>
+            </div>
+
+
+        </div>
+
+        <!-- Modal -->
+        <div class="modal fade" id="versionModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
+             aria-labelledby="staticBackdropLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h1 class="modal-title fs-5" id="staticBackdropLabel">Version Info</h1>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-flex flex-wrap align-items-baseline gap-2 mb-3">
+                            <span class="fs-5 fw-semibold">Version @BuildInfo.Version</span>
+                            @if (!string.IsNullOrWhiteSpace(ReleaseNotes.Date))
+                            {
+                                <span class="text-muted small">released @ReleaseNotes.Date</span>
+                            }
+                        </div>
+
+                        <h2 class="fs-6 fw-semibold text-uppercase text-muted mb-2">What's new in this version</h2>
+                        @if (ReleaseNotes.HasNotes)
+                        {
+                            foreach (var section in ReleaseNotes.Sections)
+                            {
+                                var badge = section.Heading switch
+                                {
+                                    "Added" => "bg-success",
+                                    "Fixed" => "bg-primary",
+                                    "Changed" => "bg-info text-dark",
+                                    "Removed" => "bg-danger",
+                                    "Security" => "bg-warning text-dark",
+                                    _ => "bg-secondary"
+                                };
+                                var label = section.Heading switch
+                                {
+                                    "Added" => "New features",
+                                    "Fixed" => "Bug fixes",
+                                    "Changed" => "Improvements",
+                                    _ => section.Heading
+                                };
+                                <div class="mb-3">
+                                    <span class="badge @badge mb-1">@label</span>
+                                    <ul class="mb-0 ps-3">
+                                        @foreach (var item in section.ItemsHtml)
+                                        {
+                                            <li class="mb-1">@Html.Raw(item)</li>
+                                        }
+                                    </ul>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted">No release notes recorded for this version.</p>
+                        }
+
+                        <details class="mt-3 border-top pt-2">
+                            <summary class="text-muted small" style="cursor:pointer">Technical details</summary>
+                            <dl class="row mb-0 mt-2 small">
+                                <dt class="col-5">Build</dt>
+                                <dd class="col-7">@(BuildInfo.IsOfficialBuild ? "Deployment build" : "Local build")</dd>
+
+                                <dt class="col-5">Commit</dt>
+                                <dd class="col-7"><code>@BuildInfo.Commit</code></dd>
+
+                                @if (!string.IsNullOrWhiteSpace(BuildInfo.BuiltUtc))
+                                {
+                                    <dt class="col-5">Built (UTC)</dt>
+                                    <dd class="col-7">@BuildInfo.BuiltUtc</dd>
+                                }
+
+                                <dt class="col-5">Institute</dt>
+                                <dd class="col-7">@instituteName</dd>
+
+                                <dt class="col-5">Components</dt>
+                                <dd class="col-7">
+                                    @foreach (var component in BuildInfo.ComponentCommits())
+                                    {
+                                        <div>@component.Name: <code>@component.Commit</code></div>
+                                    }
+                                </dd>
+                            </dl>
+                        </details>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <script>
+            // Remember the sidebar state across pages. The theme's own handler in layout.js
+            // does the toggling; this only records the result once that handler has run.
+            (function () {
+                var key = window.EIMS_SIDEBAR_KEY;
+                if (!key) { return; }
+
+                $(function () {
+                    // The pre-paint script could only reach <body>; .sidemenu exists by now
+                    // and the theme expects the same class on both.
+                    if (document.body.classList.contains("sidemenu-closed")) {
+                        $(".sidemenu").addClass("sidemenu-closed");
+                    }
+
+                    $("body").on("click", ".sidebar-toggler", function () {
+                        // Deferred so we read the class after the theme handler flips it,
+                        // whichever order the two handlers happen to be bound in.
+                        setTimeout(function () {
+                            try {
+                                localStorage.setItem(key, document.body.classList.contains("sidemenu-closed") ? "1" : "0");
+                            } catch (e) { /* storage blocked: state just is not remembered */ }
+                        }, 0);
+                    });
+                });
+            })();
+        </script>
+
+        @* In-app notification centre: real-time bell. Token is read by notifications.js for the
+           POST endpoints (mark all read); the full /Notifications page works without any of this. *@
+        @Html.AntiForgeryToken()
+        <script>
+            window.EIMS_NOTIF = {
+                hubUrl: "/hubs/notifications",
+                recentUrl: "/Notifications/Recent",
+                markAllUrl: "/Notifications/MarkAllRead",
+                openUrlBase: "/Notifications/Open/",
+                allUrl: "/Notifications",
+                token: (document.querySelector('input[name="__RequestVerificationToken"]') || {}).value
+            };
+        </script>
+        <script src="~/lib/signalr/signalr.min.js"></script>
+        <script src="~/js/notifications.js" asp-append-version="true"></script>
+
+        @await RenderSectionAsync("Scripts", required: false)
+    </body>
+
+</html>

@@ -1,0 +1,287 @@
+@model SMS_App.ViewModels.AcademicVM.AcademicExamVM
+
+@using System.Globalization
+
+@{
+    ViewData["Title"] = "Academic Exams";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+    string styleForCurrentTransaction = string.Empty;
+}
+@section Styles{
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css"
+          rel="stylesheet" />
+}
+
+<div class="">
+    <div class="col-md-12 text-end">
+        <button class="btn btn-primary" id="CreateId" data-bs-toggle="modal" data-bs-target="#createUpdateModal" onclick="examinationAddButtonClicked(0)"><i class="fa fa-plus"></i> Add</button>
+    </div>
+</div>
+<div class="accordion" id="sessionAccordion">
+    @foreach (var itemBySession in Model.ExamSessionVM)
+    {
+        int totalExamGroup = itemBySession.ExamGroupDtos.Count();
+
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="session_@itemBySession.Id">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_@itemBySession.Id" aria-expanded="false" aria-controls="collapse_@itemBySession.Id">
+                    Session @itemBySession.SessionName <span> (Total Exam Group: @totalExamGroup)</span>
+                </button>
+            </h2>
+            <div id="collapse_@itemBySession.Id" class="accordion-collapse collapse" aria-labelledby="session_@itemBySession.Id" data-bs-parent="#sessionAccordion">
+                <div class="accordion-body">
+                    @if (itemBySession.ExamGroupDtos.Count >= 0)
+                    {
+                        foreach (var itemByGroup in itemBySession.ExamGroupDtos)
+                        {
+                            <div class="accordion" id="examGroup_@itemByGroup.Id">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="@itemByGroup.Id _@itemBySession.Id">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_@itemByGroup.Id" aria-expanded="false" aria-controls="collapse_@itemByGroup.Id">
+                                            @itemByGroup.Name - (Total @itemByGroup.ExaminationDtos?.Sum(exam => exam.ExaminationDetailsDtos?.Count ?? 0) Exam/s)
+                                        </button>
+                                    </h2>
+                                    <div id="collapse_@itemByGroup.Id" class="accordion-collapse collapse" aria-labelledby="@itemByGroup.Id _@itemBySession.Id" data-bs-parent="#collapse_@itemBySession.Id">
+                                        <div class="accordion-body">
+                                            @foreach (var classGroup in itemByGroup.ExaminationDtos.OrderBy(s => s.ClassId).GroupBy(c => c.ClassName).OrderBy(s => s.FirstOrDefault().ClassId))
+                                            {
+                                                int exSL = 0;
+                                                <table class="table table-sm table-striped table-bordered table-responsive-sm" id="myTable">
+                                                    <thead class="table-info">
+                                                        <tr>
+                                                            <td colspan="9">@classGroup.Key</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <th class="text-center" style="width:2%">#</th>
+                                                            <th style="width:15%">Subject</th>
+                                                            <th style="width:15%">Exam Category</th>
+                                                            <th style="width:10%">Academic Section</th>
+                                                            <th style="width:10%">Teacher</th>
+                                                            <th style="width:10%">Total Students</th>
+                                                            <th style="width:10%">Total Marks</th>
+                                                            @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin"))
+                                                            {
+                                                                <th style="width:10%">Lock</th>
+                                                            }
+                                                            <th class="p-0 text-center" style="width:10%">
+                                                                @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin"))
+                                                                {
+                                                                    <button class="btn btn-primary" id="CreateId" data-bs-toggle="modal" data-bs-target="#createUpdateModal" onclick="examinationAddButtonClicked(@itemByGroup.Id)"><i class="fa fa-plus"></i> Add</button>
+                                                                }
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (var exam in classGroup) 
+                                                        {
+                                                            foreach (var row in exam.ExaminationDetailsDtos)
+                                                            {
+                                                                <tr style="@styleForCurrentTransaction">
+                                                                    <td class="text-center">@{exSL++;}@exSL</td>
+                                                                    <td><a asp-action="Details" asp-route-id="@row.Id">@row.SubjectName</a></td>
+                                                                    <td>@exam.ExamCategory</td>
+                                                                    <td>
+                                                                        @if (row.SectionName == null)
+                                                                        {
+                                                                            <span>All</span>
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            @row.SectionName
+                                                                        }
+                                                                    </td>
+                                                                    <td>@row.EmployeeName</td>
+                                                                    <td>@row.TotalStudents</td>
+                                                                    <td>@row.TotalMarks</td>
+                                                                    @if (User.IsInRole("SuperAdmin") || User.IsInRole("Admin"))
+                                                                    {
+                                                                        <td>
+                                                                            @(row.IsLocked ? "Locked" : "Unlocked")
+                                                                        </td>
+                                                                    }
+                                                                    <td>
+                                                                        <div class="btn-group btn-group-sm" role="group">
+                                                                            @if (User.IsInRole("Admin") || User.IsInRole("SuperAdmin"))
+                                                                            {
+                                                                            <a class="btn btn-sm examEditBtn" id="editBtn_@exam.Id" data-examid="@exam.Id" data-groupid="@itemByGroup.Id" data-classid="@exam.ClassId" data-subjectid="@row.SubjectId" data-sectionid="@row.SectionId" data-employeeid="@row.EmployeeId" data-status="@row.IsLocked" data-marks="@row.TotalMarks" data-category="@row.ExaminationDto?.ExamCategory" data-bs-toggle="modal" data-bs-target="#createUpdateModal" onclick="EditExamClick(@exam.Id)"><i class="fas fa-edit text-dark"></i> </a>
+                                                                            }
+                                                                            <a class="btn btn-sm mr-1" asp-action="Details" asp-route-id="@exam.Id" data-bs-toggle="tooltip" data-placement="top" title="Details"><i class="fas fa-info-circle text-info"></i> </a>
+@if (User.IsInRole("SuperAdmin"))
+                                                                             {
+                                                                                 <button type="button" class="btn btn-group-sm" data-id="@exam.Id" data-bs-toggle="tooltip" data-placement="right" title="Delete" onclick="DeleteExam(@exam.Id); return false;">
+                                                                                     <i class="fas fa-trash text-danger"></i>
+                                                                                 </button>
+                                                                             }
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            }
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <h2>!!! No examination held in this session</h2>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+</div>
+
+<!--Create Update Modal -->
+<div class="modal fade" id="createUpdateModal" tabindex="-1" role="dialog" aria-labelledby="createUpdateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header d-flex justify-content-between">
+                <h5 class="modal-title" id="createUpdateModalLabel">Add New Exam</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form asp-action="Edit" method="post">
+                    <input type="hidden" asp-for="Id" />
+                    <div class="form-group row">
+                        <label class="col-md-2 col-form-label text-md-end" asp-for="AcademicExamGroupId"></label>
+                        <div class="col-md-4">
+                            <select asp-for="AcademicExamGroupId" asp-items="Model.AcademicExamGroupList" class="form-control">
+                                <option selected disabled value="">Select Exam Group</option>
+                            </select>
+                            <span asp-validation-for="AcademicExamGroupId"></span>
+                        </div>
+                        <label class="col-md-2 col-form-label text-md-end" asp-for="AcademicClassId"></label>
+                        <div class="col-md-4">
+                            <select asp-for="AcademicClassId" asp-items="Model.AcademicClassList" class="form-control">
+                                <option selected disabled value="">Select Class</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-md-2 col-form-label text-md-end" asp-for="AcademicSubjectId"></label>
+                        <div class="col-md-4">
+                            <select asp-for="AcademicSubjectId" class="form-control" >
+                                <option selected disabled value="">Change Academic Class</option>
+                            </select>
+                        </div>
+                        <label class="col-md-2 col-form-label text-md-end" asp-for="AcademicSectionId"></label>
+                        <div class="col-md-4">
+                            <select id="AcademicSectionId" name="AcademicSectionId" multiple="multiple" class="form-control select2" data-placeholder="Select Section(s)">
+                                <option value="0">All Sections (Default)</option>
+                            </select>
+                            <small class="text-muted">Select specific sections or "All Sections"</small>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-md-2 col-form-label text-md-end" asp-for="EmployeeId"></label>
+                        <div class="col-md-4">
+                            <select asp-for="EmployeeId" class="form-control" asp-items="Model.TeacherList">
+                                <option selected disabled value="">Select Exam Teacher</option>
+                            </select>
+                            <span asp-validation-for="EmployeeId"></span>
+                        </div>
+
+                        <label class="col-md-2 col-form-label text-md-end" asp-for="TotalMarks"></label>
+                        <div class="col-md-4">
+                            <input asp-for="TotalMarks" max="100" min="0" class="form-control" />
+                            <span asp-validation-for="TotalMarks"></span>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <label class="col-md-2 col-form-label text-md-end" asp-for="ExamCategory"></label>
+                        <div class="col-md-4">
+                            @for (int i = 0; i < 1; i++)
+                            {
+                                <select asp-for="ExamCategory" class="form-control" asp-items="Model.ExamCategoryList">
+                                    <option selected disabled value="">Select Exam Category</option>
+                                </select>
+                                <span asp-validation-for="ExamCategory"></span>
+                            }
+                        </div>
+
+                        <label class="col-md-2 col-form-label text-md-end" asp-for="Status"></label>
+                        <div class="col-md-4">
+                            <input type="checkbox" class="btn-check" asp-for="Status" autocomplete="off">
+                            <label class="btn btn-outline-primary" asp-for="Status">Status</label>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="offset-md-3 col-md-9 text-md-end d-flex justify-content-end">
+                            <button type="button" class="btn btn-close btn-sm btn-secondary" data-bs-dismiss="modal" aria-label="Close">Close</button>
+                            <button type="button" class="btn btn-sm btn-primary" id="examAddBtn" onclick="ExamAddBtnClick()">Add Exam</button>
+                            <button type="submit" class="btn btn-sm btn-success" id="updateFormSubmitBtn" style="">Update</button>
+                        </div>
+                    </div>
+                </form>
+
+
+            </div>
+            <div class="modal-footer p-0" id="editupdatemodalfooter">
+                <div class="col-md-12">
+                    <form id="submitForm" asp-action="create" method="post">
+                        <table class="table table-dark table-hover table-striped table-responsive-sm" id="detailsTable">
+                            <thead>
+                                <tr>
+                                    <td>#</td>
+                                    <td>Subject</td>
+                                    <td>Exam Category</td>
+                                    <td>Class</td>
+                                    <td>Section</td>
+                                    <td>Teacher</td>
+                                    <td>Marks</td>
+                                    <td>Action</td>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBodyId">
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="8" class="text-end">
+                                        <span class="btn btn-sm btn-danger" onclick="ClearBtnClicked()">Clear</span>
+                                        <button class="btn btn-sm btn-light" id="submitBtn">Submit</button>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="loading" class="d-none position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-dark bg-opacity-75" style="z-index: 9999;">
+    <div class="text-center text-white">
+        <div class="spinner-border text-primary mb-4" style="width: 4rem; height: 4rem;" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <h4 class="mb-2">Creating Exam...</h4>
+        <p class="mb-3 text-light" id="loading-status">Please wait while we create exam records for students.</p>
+        <div class="progress w-50 mx-auto" style="height: 8px;">
+            <div id="loading-progress" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" style="width: 0%"></div>
+        </div>
+        <small class="mt-2 d-block" id="loading-count">0%</small>
+    </div>
+</div>
+@section Scripts{
+   
+    <script src="/js/AcademicExam/AcademicExam.js"></script>
+
+    <script src="~/js/AlertifyNotify/AlertifyNofify.js"></script>
+    <script>
+        var errorMessage = '@ViewBag.error';
+        var successMessage = '@TempData["success"]';
+        if (errorMessage) {
+            alertify.error(errorMessage);
+        }
+        if(successMessage)
+        {
+            alertify.success(successMessage);
+        }
+    </script>
+}

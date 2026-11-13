@@ -133,5 +133,9 @@ namespace SMS.Entities
 
         public List<Attendance> Attendances { get; set; }
         //public string LastAction { get; set; } = string.Empty;
+
+        [Display(Name = "Machine User ID")]
+        [StringLength(20)]
+        public string MachineUserId { get; set; }
     }
 }

@@ -1,0 +1,300 @@
+﻿@using Microsoft.AspNetCore.Identity;
+@using Microsoft.AspNetCore.Http;
+
+@inject SignInManager<ApplicationUser> _signInManager;
+@inject UserManager<ApplicationUser> _userManager;
+@inject IInstituteManager _instituteManager;
+@inject IEmployeeManager _employeeManager;
+@inject IStudentManager _studentManager;
+
+@{
+    var info = await _instituteManager.GetAllAsync();
+    if (info.Count() > 0)
+    {
+        GlobalUI.InstituteName = info.FirstOrDefault().Name;
+        GlobalUI.Logo = info.FirstOrDefault().Logo;
+    }
+    string instituteName = GlobalUI.InstituteName != null ? GlobalUI.InstituteName : "Institute Name";
+    string instituteLogo = !string.IsNullOrEmpty(GlobalUI.Logo) ? GlobalUI.Logo : "instituteLogo.png";
+}
+
+@{
+    var user = await _userManager.GetUserAsync(User);
+    var userName = _userManager.GetUserName(User);
+    string userImage = "";
+    if (_signInManager.IsSignedIn(User))
+    {
+        if (user.UserType == 's')
+        {
+            var stu = await _studentManager.GetStudentByUniqueIdAsync(user.ReferenceId.ToString());
+            if (stu != null && stu.Photo != null)
+            {
+                userImage = "/Images/Student/" + stu.Photo;
+            }
+            else
+            {
+                userImage = "/Images/noProfileImage.png";
+            }
+        }
+    }
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <!-- Meta, title, CSS, favicons, etc. -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    @if (ViewBag.Title != null)
+    {
+        <title>@ViewBag.Title :  @instituteName</title>
+    }
+    else
+    {
+        <title>@instituteName</title>
+    }
+
+    <!-- Bootstrap -->
+    <link href="~/lib/bootstrap/bootstrap-5.3.8-dist/css/bootstrap.min.css" rel="stylesheet" />
+
+    <!-- Font Awesome (all styles: solid/regular/brands - fontawesome.min.css alone defines no icons) -->
+    <link href="~/lib/fontawesome/css/all.min.css" rel="stylesheet" />
+    <!-- NProgress -->
+    <link href="~/lib/Theme/css/nprogress.css" rel="stylesheet" />
+
+    <!-- Alertify -->
+    <link href="~/lib/Alertify/css/themes/default.min.css" rel="stylesheet" />
+    <link href="~/lib/Alertify/css/alertify.min.css" rel="stylesheet" />
+
+    <!-- Custom Theme Style -->
+    <link href="~/css/custom.min.css" rel="stylesheet" />
+    <link href="~/css/site.css" rel="stylesheet" />
+    <!-- Overlay Style-->
+    <link href="~/css/userProfileOverLay.css" rel="stylesheet" />
+
+    <!-- Data Table Style-->
+    <link href="~/lib/DataTable/css/jquery.dataTables.min.css" rel="stylesheet" />
+</head>
+
+<body class="nav-md">
+    @if (Context.Session.GetString("ImpersonatorId") != null)
+    {
+        <div class="alert alert-warning text-center mb-0" role="alert" style="position:fixed;top:0;left:0;right:0;z-index:10060;">
+            <i class="fa fa-user-secret"></i> You are testing as another user. Actions count as them.
+            <a asp-controller="Accounts" asp-action="StopImpersonation" class="btn btn-sm btn-danger ms-2">Stop &amp; return to my account</a>
+        </div>
+    }
+    @await RenderSectionAsync("Styles", required: false)
+    @*<body class="nav-sm">*@
+    <div class="container body">
+        <div class="main_container">
+            <div class="col-md-3 left_col menu_fixed">
+                <div class="left_col scroll-view">
+
+                    <div class="navbar nav_title" style="overflow:hidden">
+                        <a asp-action="Profile" asp-controller="Students" asp-route-id="@user.ReferenceId" class="" style="font-size:20px;color:#fff;font-weight:bold;width:100%">
+                                <img class="img-circle img-fluid p-2" 
+                                src="~/Images/Institute/@instituteLogo" 
+                                alt="Logo" 
+                                style="width:60px;"
+                                 onerror="this.src='/images/institute/smslogo.png'" />
+                            @instituteName
+                            </a>
+                    </div>
+
+                    <div class="clearfix"></div>
+                    <!-- sidebar menu -->
+                    <div id="sidebar-menu" class="main_menu_side hidden-print main_menu">
+                        <div class="menu_section">
+                            @{
+                                var navUser = await _userManager.GetUserAsync(User);
+                            }
+                            <ul class="nav side-menu">
+                                <li>
+                                    <a asp-controller="Home" asp-action="Index"><i class="fas fa-home"></i> Dashboard </a>
+                                </li>
+                                @if (navUser != null && navUser.UserType == 's')
+                                {
+                                    <li>
+                                        <a asp-controller="Students" asp-action="Profile" asp-route-id="@navUser.ReferenceId"><i class="far fa-address-card"></i> My Profile </a>
+                                    </li>
+                                }
+                                @await Component.InvokeAsync("Navigation", new { viewName = "Gentelella" })
+                            </ul>
+                        </div>
+                        <div class="menu_section">
+
+                        </div>
+
+                    </div>
+                    <!-- /sidebar menu -->
+                    <!-- /menu footer buttons -->
+                    <div class="sidebar-footer hidden-small">
+                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="Settings">
+                            <i class="fa fa-cog" aria-hidden="true"></i>
+                        </a>
+                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="FullScreen" onclick="toggleFullScreen();return false;" href="#">
+                            <i class="fa fa-expand" aria-hidden="true"></i>
+                        </a>
+                        <a data-bs-toggle="tooltip" data-bs-placement="top" title="Lock" asp-action="LockScreen" asp-controller="Accounts">
+                            <i class="fa fa-lock" aria-hidden="true"></i>
+                        </a>
+                        @if (_signInManager.IsSignedIn(User))
+                        {
+                            <form asp-action="Logout" asp-controller="accounts" method="post">
+                                <button data-bs-toggle="tooltip" data-bs-placement="top" title="Logout" type="submit" style="background:none;border:none;color:inherit;">
+                                    <i class="fa fa-power-off" aria-hidden="true"></i>
+                                </button>
+                            </form>
+
+                        }
+                        else
+                        {
+
+                            <a data-bs-toggle="tooltip" data-bs-placement="top" title="Login" asp-action="login" asp-controller="Accounts">
+                                <i class="fa fa-sign-in-alt" aria-hidden="true"></i>
+                            </a>
+                        }
+
+                    </div>
+                    <!-- /menu footer buttons -->
+                </div>
+            </div>
+
+            <!-- top navigation -->
+            <div class="top_nav pb-3">
+                <div class="nav_menu">
+                    <div class="nav toggle">
+                        <a style="padding:5px;" id="menu_toggle">
+                            <i class="fa fa-bars"></i>
+                        </a>
+                    </div>
+                    <div class="nav d-flex justify-content-between">
+                        @if (_signInManager.IsSignedIn(User))
+                        {
+                            <span class="p-1 h5">@userName </span>
+                            <span class="float-right p-2" id="userProfileIcon">
+
+                            <img src="@userImage"
+                                     class="img-circle border border-info"
+                                    alt="Student Photo"
+                                    data-toggle="popover" 
+                                    data-placement="bottom"
+                                    style="width:25px"
+                                    onerror="this.src='/Images/Student/noimage.jpg'"
+                                    onclick="openNav()" />
+
+                            </span>
+                            <div id="myNav" class="overlay">
+                                <button class="btn btn-sm btn-danger btn-block closebtn" onclick="closeNav()">X</button>
+                                <div class="overlay-content">
+                                    @await Component.InvokeAsync("ProfileOverlay")
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                </div>
+                <text class="h5 text-light">@GlobalUI.PageTitle</text>
+
+            </div>
+            <!-- /top navigation -->
+            <!-- page content -->
+            <div class="right_col" role="main" style="background:#c7c7c7">
+                <div class="shadow rounded mt-4 bg-light p-2">
+                    @RenderBody()
+                </div>
+            </div>
+            <!-- /page content -->
+            <!-- footer content -->
+            <footer class="fixed-bottom">
+                <div class="pull-right">
+                    &copy; @DateTime.Today.Year Powered By <a href="https://hekzor.com/" target="_blank" rel="noopener">Hekzor Systems</a>
+                    <span class="text-muted ms-2">v@(BuildInfo.ShortDisplay)</span>
+                </div>
+                <div class="clearfix"></div>
+            </footer>
+            <!-- /footer content -->
+        </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="~/lib/Theme/js/jquery.min.js"></script>
+    <!-- Validation -->
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+
+    <!-- Bootstrap -->
+    <script src="~/lib/bootstrap/bootstrap-5.3.8-dist/js/bootstrap.bundle.min.js"></script>
+    <!-- FastClick -->
+    <script src="~/lib/Theme/js/fastclick.js"></script>
+    <!-- NProgress -->
+    <script src="~/lib/Theme/js/nprogress.js"></script>
+
+    <!-- User Profile Overlay -->
+    <script src="~/js/Accessories/userProfileOverLay.js"></script>
+
+    <!-- Alertify -->
+    <script src="~/lib/Alertify/alertify.min.js"></script>
+    <!-- Datatable script -->
+    <script src="~/lib/DataTable/js/jquery.dataTables.min.js"></script>
+
+    <!-- Custom Theme Scripts -->
+    @* <script src="~/js/custom.min.js"></script> *@
+    @await RenderSectionAsync("Scripts", required: false)
+    <script>
+        // $(function () {
+        //     $('[data-toggle="popover"]').popover()
+        // })
+
+        $(document).click(function (e) {
+            let sss1 = $(e.target).parents("#myNav").length === 0;
+            let sss2 = $(e.target).parents("#userProfileIcon").length === 0;
+            if (sss1 == true && sss2 == true) {
+                closeNav();
+            }
+        });
+
+        function menuToggle() {
+            if ($('body').hasClass('nav-md')) {
+                $("#sidebar-menu").find('li.active ul').hide();
+                $("#sidebar-menu").find('li.active').addClass('active-sm').removeClass('active');
+            } else {
+                $("#sidebar-menu").find('li.active-sm ul').show();
+                $("#sidebar-menu").find('li.active-sm').addClass('active').removeClass('active-sm');
+            }
+            $('body').toggleClass('nav-md nav-sm');
+            setHeight();
+        }
+
+        function setHeight() {
+            $('.right_col').css('min-height', $(window).height());
+            var bodyHeight = $('body').outerHeight();
+            var footerHeight = $('body').hasClass('footer_fixed') ? -10 : $('footer').height();
+            var leftColHeight = $('.left_col').eq(1).height() + $('.sidebar-footer').height();
+            var contentHeight = bodyHeight < leftColHeight ? leftColHeight : bodyHeight;
+            contentHeight -= $('.nav_menu').height() + footerHeight;
+            $('.right_col').css('min-height', contentHeight);
+        }
+
+
+
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(function () { });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        $(document).ready(function () {
+            menuToggle();
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.forEach(function (el) { new bootstrap.Tooltip(el); });
+        });
+    </script>
+</body>
+</html>

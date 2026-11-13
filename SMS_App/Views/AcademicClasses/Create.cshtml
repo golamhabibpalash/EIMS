@@ -1,0 +1,65 @@
+﻿@model SMS.Entities.AcademicClass
+
+@{
+    ViewData["Title"] = "Create Academic Class";
+    GlobalUI.PageTitle = ViewBag.Title;
+}
+
+<div class="row">
+    <div class="col-md-10 offset-1 shadow pt-2">
+        <form method="post" asp-controller="AcademicClasses" asp-action="Create">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group row">
+                <label asp-for="Name" class="text-right col-md-2 control-label col-form-label"></label>
+                <div class="col-md-6">
+                    <input asp-for="Name"  class="form-control " placeholder="Ex: Class 6 (Six)" />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+                <div class="col-md-4">
+                    @if (ViewBag.msg != null)
+                    {
+                        <label class="col-form-label"><span id="warningMsg" class="text-danger">@ViewBag.msg</span></label>
+                        
+                    }
+                </div>
+
+            </div>
+
+            <div class="form-group row">
+                @Html.LabelFor(c=>c.Description, new {@class= "col-md-2 col-form-label text-right control-label" })
+                <div class="col-md-6">
+                    <textarea asp-for="Description" class="form-control " rows="2" ></textarea>
+                    <span asp-validation-for="Description" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="ClassSerial" class="col-md-2 col-form-label text-right control-label"></label>
+                <div class="col-md-4">
+                    <input asp-for="ClassSerial" class="form-control " placeholder="1/2/3/..../12" />
+                    <span asp-validation-for="ClassSerial" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label class="form-check-label offset-2 col-md-4">
+                    <input class="" asp-for="Status" /> @Html.DisplayNameFor(model => model.Status)
+                </label>
+            </div>
+
+            <div class="form-group row">
+                <div class="col-md-8 offset-2">
+                    <partial name="_Create_Back" />
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+<script>
+    $(document).ready(function () {
+        $('#warningMsg').fadeOut(6000);
+    });
+</script>
+}

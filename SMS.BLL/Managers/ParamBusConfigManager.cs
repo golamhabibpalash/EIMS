@@ -10,21 +10,21 @@ namespace SMS.BLL.Managers
 {
     public class ParamBusConfigManager : Manager<ParamBusConfig>, IParamBusConfigManager
     {
-        private readonly IParamBusConfigRepository _repository;
+        private readonly IParamBusConfigRepository _paramRepository;
 
         public ParamBusConfigManager(IParamBusConfigRepository repository) : base(repository)
         {
-            _repository = repository;
+            _paramRepository = repository;
         }
 
         public async Task<ParamBusConfig> GetByParamSL(int paramSL)
         {
-            return await _repository.Table.FirstOrDefaultAsync(s => s.ParamSL == paramSL);
+            return await _paramRepository.Table.FirstOrDefaultAsync(s => s.ParamSL == paramSL);
         }
 
         public async Task<string> GetValueByParamSL(int paramSL)
         {
-            return await _repository.Table
+            return await _paramRepository.Table
                 .Where(s => s.ParamSL ==paramSL)
                 .Select(s => s.ParamValue)
                 .FirstOrDefaultAsync();

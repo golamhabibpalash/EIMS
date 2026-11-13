@@ -1,0 +1,29 @@
+@model SMS.Entities.AttendanceMachine
+
+@{
+    ViewData["Title"] = "Delete Machine";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+}
+
+<div class="row">
+    <div class="col-md-6 offset-3">
+        <div class="card shadow border-danger">
+            <div class="card-header bg-danger text-white"><i class="fa fa-trash"></i> Delete Confirmation</div>
+            <div class="card-body">
+                <h5>Are you sure you want to delete this machine?</h5>
+                <table class="table table-borderless mt-2">
+                    <tr><th width="30%">Name</th><td>@Model.Name</td></tr>
+                    <tr><th>IP : Port</th><td>@Model.IPAddress:@Model.Port</td></tr>
+                    <tr><th>Serial Number</th><td>@(Model.SerialNumber ?? "-")</td></tr>
+                </table>
+                <form asp-action="Delete">
+                    <input type="hidden" asp-for="Id" />
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                        <a asp-action="Index" class="btn btn-outline-dark">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

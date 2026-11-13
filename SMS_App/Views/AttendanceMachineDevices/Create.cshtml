@@ -1,0 +1,85 @@
+@model SMS.Entities.AttendanceMachine
+
+@{
+    ViewData["Title"] = "Add Attendance Machine";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+}
+
+<div class="row">
+    <div class="col-md-8 offset-2 shadow p-3">
+        <form asp-action="Create">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group row">
+                <label asp-for="Name" class="control-label col-form-label text-right col-md-3"></label>
+                <div class="col-md-9">
+                    <input asp-for="Name" class="form-control" placeholder="Main Gate, Library..." />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="IPAddress" class="control-label col-form-label text-right col-md-3"></label>
+                <div class="col-md-5">
+                    <input asp-for="IPAddress" class="form-control" placeholder="192.168.1.201" />
+                    <span asp-validation-for="IPAddress" class="text-danger"></span>
+                </div>
+                <label asp-for="Port" class="control-label col-form-label text-right col-md-1">Port</label>
+                <div class="col-md-3">
+                    <input asp-for="Port" class="form-control" />
+                    <span asp-validation-for="Port" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="SerialNumber" class="control-label col-form-label text-right col-md-3"></label>
+                <div class="col-md-9">
+                    <input asp-for="SerialNumber" class="form-control" placeholder="From machine menu: System Info > Device Serial" />
+                    <span asp-validation-for="SerialNumber" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="Model" class="control-label col-form-label text-right col-md-3"></label>
+                <div class="col-md-4">
+                    <input asp-for="Model" class="form-control" placeholder="K40, K50A..." />
+                    <span asp-validation-for="Model" class="text-danger"></span>
+                </div>
+                <label asp-for="Brand" class="control-label col-form-label text-right col-md-2"></label>
+                <div class="col-md-3">
+                    <select asp-for="Brand" class="form-control" asp-items="ViewBag.BrandList"></select>
+                    <span asp-validation-for="Brand" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="Location" class="control-label col-form-label text-right col-md-3"></label>
+                <div class="col-md-9">
+                    <input asp-for="Location" class="form-control" />
+                    <span asp-validation-for="Location" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="Username" class="control-label col-form-label text-right col-md-3"></label>
+                <div class="col-md-4">
+                    <input asp-for="Username" class="form-control" />
+                    <span asp-validation-for="Username" class="text-danger"></span>
+                </div>
+                <label asp-for="Password" class="control-label col-form-label text-right col-md-2"></label>
+                <div class="col-md-3">
+                    <input asp-for="Password" type="password" class="form-control" />
+                    <span asp-validation-for="Password" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group form-check offset-3">
+                <label class="form-check-label">
+                    <input class="form-check-input" asp-for="IsActive" /> @Html.DisplayNameFor(model => model.IsActive)
+                </label>
+            </div>
+            <div class="form-group row">
+                <div class="col-md-12 text-center">
+                    <partial name="_Create_Back" />
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -14,6 +14,14 @@ namespace SMS.Entities
 
         [Display(Name = "Emp. Name (Bangla)"),Required,StringLength(100)]
         public string EmployeeNameBangla { get; set; }
+
+#pragma warning disable CS8632
+        [Display(Name = "Father's Name"),StringLength(100)]
+        public string? FatherName { get; set; }
+
+        [Display(Name = "Mother's Name"),StringLength(100)]
+        public string? MotherName { get; set; }
+#pragma warning restore CS8632
 
         [DataType(DataType.Date)]
         [Required, Display(Name ="Date of Birth")]
@@ -116,5 +124,9 @@ namespace SMS.Entities
         public BloodGroup BloodGroup { get; set; }
 
         public List<Attendance> Attendances { get; set; }
+
+        [Display(Name = "Machine User ID")]
+        [StringLength(20)]
+        public string MachineUserId { get; set; }
     }
 }

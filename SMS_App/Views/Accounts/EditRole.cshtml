@@ -1,0 +1,79 @@
+﻿@model SMS_App.ViewModels.AdministrationVM.EditRoleVM
+@{
+    ViewBag.Title = "Role Edit";
+    int sl = 0;
+}
+
+<div class="row">
+    <div class="offset-md-1">
+        <table class="table table-responsive">
+            <tr>
+                <td>Role Name</td>
+                <td>:</td>
+                <td class="h4 showTd">@Model.RoleName</td>
+                <td id="formTd" style="display:none">
+                    <form asp-action="EditRole" asp-controller="Accounts" method="post">
+                        <input type="hidden" asp-for="Id" value="@Model.Id" />
+                        <div class="input-group mb-3">
+                            <input asp-for="RoleName" class="form-control" />
+                            <div class="input-group-append">
+                                <input type="submit" class="btn btn-sm btn-info" value="update" />
+                            </div>
+                        </div>
+                    </form>
+                </td>
+                <td class="showId"> <button id="editBtnId" type="button" data-toggle="tooltip" data-placement="right" title="Edit Name" class="btn btn-sm btn-sm"><i class="fa fa-edit"></i></button> </td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+@if (Model.ApplicationUsers!=null && Model.ApplicationUsers.Count != 0)
+{
+    <div class="row">
+        <div class="offset-md-1">
+
+            <span>All of the users list of this Role</span><br />
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Users</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in Model.ApplicationUsers)
+                    {
+                        
+                        <tr>
+                            <td>@(++sl)</td>
+                            <td>@user</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div>
+                <a asp-controller="Accounts" asp-action="AddOrRemoveUser" asp-route-id="@Model.Id" class="btn btn-info btn-sm">Add or Remove User</a><a asp-action="RoleList" class="btn btn-info btn-sm rounded-1 ml-2" data-toggle="tooltip" data-placement="top" title="Back to List"><i class="fa fa-list"></i></a>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="offset-md-1">
+        <span>No user assigned yet! </span><a asp-controller="Accounts" asp-action="AddOrRemoveUser" asp-route-id="@Model.Id" class="btn btn-sm btn-round btn-outline-info">Add User</a><a asp-action="RoleList" class="btn btn-info btn-sm rounded-1 ml-2" data-toggle="tooltip" data-placement="top" title="Back to List"><i class="fa fa-list"></i></a>
+    </div>    
+}
+
+@section Scripts
+{
+    <script>
+        $(document).ready(function () {
+            $('#editBtnId').on('click', function () {
+                $('#formTd').css('display', 'block');
+                $('.showTd').css('display', 'none');
+                $(this).css('display', 'none');
+            });
+        });
+    </script>
+}

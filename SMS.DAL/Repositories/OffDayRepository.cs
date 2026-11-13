@@ -27,7 +27,7 @@ namespace SMS.DAL.Repositories
             DateTime dateTime = new(a, b,1);
             List<DateTime> monthlyHolidays = new();
             List<OffDay> holidays = new();
-            holidays= await _context.OffDays.Where(m =>m.OffDayStartingDate.Month==dateTime.Month).ToListAsync();
+            holidays= await _context.OffDays.Where(m =>m.OffDayStartingDate.Month==dateTime.Month && m.OffDayStartingDate.Year == dateTime.Year).ToListAsync();
             if (holidays!=null)
             {
                 foreach (var holiday in holidays)

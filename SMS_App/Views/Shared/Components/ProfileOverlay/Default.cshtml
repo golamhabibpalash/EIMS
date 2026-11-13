@@ -1,0 +1,75 @@
+﻿
+@inject UserManager<ApplicationUser> _userManager;
+@inject SignInManager<ApplicationUser> _signInManager;
+
+@inject IEmployeeManager _employeeManager;
+@inject IStudentManager _studentManager;
+
+@{
+    var userName = _userManager.GetUserName(User);
+
+    string userImage = "";
+    if (_signInManager.IsSignedIn(User))
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user.UserType == 's')
+        {
+            var stu = await _studentManager.GetStudentByUniqueIdAsync(user.ReferenceId.ToString());
+            if (stu == null)
+            {
+                userName = "Unknown Student";
+                userImage = "/Images/noProfileImage.png";
+                return;
+            }
+            userName = stu.Name;
+            if (stu.Photo != null)
+            {
+                userImage = "/Images/Student/" + stu.Photo;
+
+            }
+            else
+            {
+                userImage = "/Images/noProfileImage.png";
+            }
+        }
+        if (user.UserType == 'e')
+        {
+            var emp = await _employeeManager.GetByIdAsync(user.ReferenceId);
+            userName = emp.EmployeeName;
+            if (emp.Image != null)
+            {
+                userImage = "/Images/Employee/Photo/" + emp.Image;
+            }
+            else
+            {
+                userImage = "/Images/noProfileImage.png";
+            }
+        }
+    }
+}
+
+<div class="row">
+    <div class="col-md-12 text-center" >
+        <img src="@userImage" alt="profile Image" class="img-circle" style="width:50%;"
+             onerror="this.src='/Images/Student/noimage.jpg'" />
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-12 text-center p-2">
+        <span class="alert text-light"> @userName </span>
+    </div>
+</div>
+<ul class="list-group list-group-flush border-light">
+    <li class="list-group-item"><a class="" href="#"><span class="badge badge-light userProfileIcon"><i class="fa fa-cog"></i></span> Setting</a></li>
+    <li class="list-group-item">
+        <a class="" href="#"><span class="badge badge-light userProfileIcon"><i class="fa fa-question-circle"></i></span> Help</a>
+    </li>
+    <li class="list-group-item">
+        <a class="" href="#"><span class="badge badge-light userProfileIcon"><i class="fa fa-universal-access userProfileIcon"></i></span> Accessibility</a>
+    </li>
+    <li class="list-group-item p-0">
+        <form asp-action="Logout" asp-controller="Accounts">
+            <button style="width:100%;height:100%" type="submit" class="border-0 btn btn-block btn-danger text-left pl-4" asp-action="LogOut" asp-controller="Accounts"><span class="badge badge-light userProfileIcon"><i class="fa fa-sign-out"></i></span> Log Out</button>
+        </form>
+    </li>
+</ul>

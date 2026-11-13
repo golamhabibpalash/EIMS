@@ -1,0 +1,24 @@
+@model AdmissionLandingVM
+@{
+    var s = Model.Session;
+    ViewData["Title"] = "Guidelines - " + s.Title;
+}
+<partial name="_SessionHeader" model="Model" />
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card adm-card"><div class="card-body">
+            <div class="d-flex justify-content-between align-items-baseline">
+                <h2 class="h5">Admission policy &amp; guidelines / ভর্তি নীতিমালা</h2>
+                <span class="small text-muted">Version @s.PolicyVersion</span>
+            </div>
+            <div class="prewrap">@s.PolicyContent</div>
+            @if (!string.IsNullOrEmpty(s.OfflinePaymentInstructions) && s.PaymentStage != AdmissionPaymentStage.NotRequired)
+            {
+                <h3 class="h6 mt-3">Payment instructions</h3>
+                <div class="prewrap">@s.OfflinePaymentInstructions</div>
+            }
+            <p class="small text-muted mt-3 mb-0">You will be asked to confirm that you have read these guidelines before you submit. The version you accepted is recorded with your application.</p>
+        </div></div>
+    </div>
+    <div class="col-lg-4"><partial name="_ApplyBox" model="Model" /></div>
+</div>

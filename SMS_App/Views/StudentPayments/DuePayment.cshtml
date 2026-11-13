@@ -1,0 +1,375 @@
+﻿@model SMS_App.ViewModels.PaymentVM.DuePaymentVM
+@{
+    int sl = 0;
+    string sectionName = string.Empty;
+    ViewBag.ClassName = string.Empty;
+    string activeInactiveClass = string.Empty;
+}
+@section Styles{
+    @* <link href="~/lib/DataTable/css/cdn.datatables.net_buttons_2.0.0_css_buttons.dataTables.min.css" rel="stylesheet" /> *@
+    @* <link href="~/lib/DataTable/css/cdn.datatables.net_1.11.5_css_jquery.dataTables.min.css" rel="stylesheet" /> *@
+    <style>
+        .dataTables_length, .dataTables_filter
+        {
+            margin-left: 10px;
+            float: right;
+        }
+
+        .dt-buttons
+        {
+            float: right;
+        }
+
+        .inActiveStudent
+        {
+            color: red;
+        }
+
+        .activeStudent
+        {
+            color: #000;
+        }
+    </style>
+}
+<div class="row">
+    <div class="col-md-3">
+        <div class="row">
+            <div class="col-md-12">
+                <fieldset class="border-primary p-2 border">
+                    <legend  class="float-none w-auto text-primary px-2"
+                        style="font-size: 1.1rem; position: relative;">Select Criteria</legend>
+                    <form id="studentInfoForm" asp-action="DuePayment">
+                        <div class="form-group row">
+                            <label asp-for="AcademicClassId" class="col-md-4 col-form-label text-md-end">Academic Class :</label>
+                            <div class="col-md-8">
+                                <select class="form-control" asp-for="AcademicClassId" asp-items="Model.AcademicClassList">
+                                    <option selected disabled value="">Select Academic Class</option>
+                                    <option value="0">All Class</option>
+                                </select>
+                                <span asp-validation-for="AcademicClassId" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label asp-for="AcademicSectionId" class="col-md-4 col-form-label text-md-end">Section :</label>
+                            <div class="col-md-8">
+                                <select class="form-control" asp-for="AcademicSectionId" asp-items="Model.AcademicSectionList">
+                                    <option selected disabled value="">Select Academic Section</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label asp-for="ResidentialStatus" class="col-md-4 col-form-label text-md-end">Is Residential :</label>
+                            <div class="col-md-8">
+                                <select class="form-control" name="isResidential" asp-items="@Model.StudentCategorySelectList">
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <label asp-for="StudentStatus" class="col-md-4 col-form-label text-md-end">Status :</label>
+                            <div class="col-md-8">
+                                <select class="form-control" name="status" asp-items="@Model.StudentStatusSelectList">
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group row">
+                            <div class="col-md-6 offset-md-6 text-right">
+                                <button type="submit" id="LoadButton" class="btn btn-sm btn-info" onclick="onSubmitAction()">Get List</button><br />
+                                @{
+                                    if (Model.ShowCount != null)
+                                    {
+                                        <span>Total Found @Model.ShowCount</span><br/>
+                                        @if (ViewBag.totalExecuteTime!=null)
+                                        {
+                                            <span>@ViewBag.totalExecuteTime</span>
+                                        }
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </form>
+                </fieldset><br />
+                <div class="row m-2" id="exportPortion" style="visibility:hidden">
+                    <div class="col-md-3 offset-md-9 text-md-end">
+                        <!-- Add a button to trigger the export -->
+                        @*<button id="exportPdfButton">Export to PDF</button>*@
+
+                        <!-- Add a button to trigger the export -->
+                        <button class=" btn btn-sm btn-success" id="exportExcelButton">Export <i class="fas fa-file-excel"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12" id="InvalidForm" style="display:none">
+                <div><h2 class="text-danger"> Please Select all the field</h2></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-9 p-3 bg-blue-sky" id="iframe-container" style="overflow:scroll;height:800px">
+        @if (Model.DuePayments != null && Model.DuePayments.Count() > 0)
+        {
+            <table class="table table-hover table-bordered table-striped display" id="myTable" style="width:100%;">
+                <thead>
+                    <tr>
+                        <td colspan="7" class="text-center pb-0 mb-0">
+
+                            <div class="row">
+                                <div class="col-md-5 text-md-end">
+                                    <img src="~/Images/Institute/@Model.Institute.Logo" 
+                                        alt="Alternate Text"
+                                        style="width:100px" 
+                                        onerror="this.onerror=null;this.src='/images/institute/smslogo.png';" />
+                                </div>
+                                <div class="col-md-7 text-md-start">
+                                    <h2 class="text-info font-weight-bolder"> @Model.Institute.Name</h2>
+                                    <h5 class="h5">@Model.Institute.Address</h5>
+                                    <h6 class="font-italic" style="text-decoration:underline">Due Payment (Current)</h6>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 text-md-start">
+                                    @if (Model.AcademicClass != null)
+                                    {
+                                        @Model.AcademicClass.Name
+                                        ViewBag.ClassName = @Model.AcademicClass.Name;
+                                    }
+                                    else
+                                    {
+                                        <span>All Class</span>
+                                        ViewBag.ClassName = "All Class";
+                                    }
+                                </div>
+                                <div class="col-md-6 text-md-end"><span>Date:@DateTime.Now.ToString("dd MMM yyyy")</span> </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th class="no-sort">#</th>
+                        <th>Class Roll</th>
+                        <th>Student Name</th>
+                        <th>Academic Section</th>
+                        <th>Phone No</th>
+                        <th class="text-right">Due Amount</th>
+                        <th class="text-center action no-sort" id="action">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.DuePayments.OrderBy(s => s.Student.ClassRoll))
+                    {
+                        activeInactiveClass = item.Student.Status ? "activeStudent" : "inActiveStudent";
+                        <tr>
+                            <td>@(++sl)</td>
+                            <td>@item.Student.ClassRoll</td>
+
+
+                            @if (item.Student.Status == true)
+                            {
+                                <td>@item.Student.Name <span>
+    @if (item.Student.IsResidential)
+    {
+        <span class="badge badge-info"><i class="fas fa-home"></i></span>
+    }
+</span></td>
+                            }
+                            else
+                            {
+                        <td class="" style="color:red">
+                            @item.Student.Name
+                            @if (item.Student.IsResidential)
+                            {
+                                <span class="badge badge-info"><i class="fas fa-home"></i></span>
+                            }
+
+                        </td>
+                            }
+
+                            @if (item.Student.AcademicSection == null)
+                            {
+                                <td>N/A</td>
+                            }
+                            else
+                            {
+                                <td>@item.Student.AcademicSection.Name</td>
+                            }
+                            <td>@item.Student.GuardianPhone?.PadLeft(11,'0')</td>
+                            <td class="text-right">@item.TotalDue</td>
+                            <td class="text-center action">
+                                <span class="btn-group-sm">
+                                    <a class="btn btn-sm btn-group-sm btn-info" asp-action="StudentPaymentInfoExport" asp-controller="Reports" asp-route-reportType="pdf" asp-route-fileName="payment_report_@item.Student.ClassRoll" asp-route-classRoll="@item.Student.ClassRoll" asp-route-fromDate="@item.Student.AdmissionDate.ToString("yyyy-MM-dd")" asp-route-toDate="@DateTime.Today.ToString("yyyy-MM-dd")" target="_blank">
+                                        <span class="fa fa-file"></span> Pay Slip
+                                    </a>
+                                    <a class="btn btn-sm btn-group-sm btn-primary" asp-action="Details" asp-controller="Students" asp-fragment="financials" asp-route-tabName="financials" asp-route-id="@item.Student.Id">details</a>
+                                    <a class="btn btn-sm btn-group-sm btn-success" asp-action="Payment" asp-controller="StudentPayments" asp-route-stRoll="@item.Student.ClassRoll">Pay</a>
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+        }
+        else
+        {
+            if (ViewBag.isFromPost)
+            {
+                <div class="well">
+                    <h3>Data not found</h3>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+
+
+@section Scripts{
+    @* <script src="~/lib/DataTable/js/jquery-3.7.0.js"></script> *@
+    @* <script src="~/lib/DataTable/js/jquery.dataTables.min.js"></script> *@
+    @* <script src="~/lib/DataTable/js/dataTables.buttons.min.js"></script> *@
+    @* <script src="~/lib/DataTable/js/jszip.min.js"></script>
+    <script src="~/lib/DataTable/js/pdfmake.min.js"></script>
+    <script src="~/lib/DataTable/js/vfs_fonts.js"></script>
+    <script src="~/lib/DataTable/js/buttons.html5.min.js"></script> *@
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.4/xlsx.full.min.js"></script>
+    <script>
+        @* $(document).ready(function () {
+            $('#myTable').dataTable({
+                "lengthMenu": [[25, 50, 100, -1], [25, 50, 100, "All"]],
+                "dom": 'lBfrtip',
+                'columnDefs': [{
+                    'targets': '.no-sort', // column index (start from 0)
+                    'orderable': false, // set orderable false for selected columns
+                }],
+                buttons: ['copy', 'excel', 'pdf'],
+            });
+            let myTable = $('#myTable').DataTable();
+
+            new $.fn.dataTable.Buttons(myTable, {
+                buttons: [
+                    {
+                        extend: 'copy',
+                        exportOptions: {
+                            columns: ':not(.action)'
+                        }
+                    },
+                    {
+                        extend: 'excel',
+                        exportOptions: {
+                            columns: ':not(.action)' // Exclude columns with the 'noExport' class
+                        }
+                    },
+                    {
+                        extend: 'pdf',
+                        exportOptions: {
+                            columns: ':not(.action)' // Exclude columns with the 'noExport' class
+                        }
+                    },
+                    {
+                        extend: 'print',
+                        exportOptions: {
+                            columns: ':not(.action)'
+                        }
+                    }
+                ]
+            });
+        }); *@
+
+        document.getElementById('exportExcelButton').addEventListener('click', function () {
+            // Get the table element
+            const table = document.getElementById('myTable');
+
+            // Clone the table to modify it without affecting the original table
+            const clonedTable = table.cloneNode(true);
+
+            // Remove the 'action' column
+            const columnToRemove = 'action';
+            const columnIndex = Array.from(clonedTable.querySelectorAll('th')).findIndex(th => th.id === columnToRemove);
+            const rows = Array.from(clonedTable.querySelectorAll('tr'));
+            rows.forEach(row => {
+                const cells = Array.from(row.querySelectorAll('td, th'));
+                if (columnIndex >= 0) {
+                    cells.splice(columnIndex, 1); // Remove the cell for the 'action' column
+                }
+                row.innerHTML = cells.map(cell => cell.outerHTML).join('');
+            });
+
+            // Remove the <thead> element from the cloned table
+            const thead = clonedTable.querySelector('thead');
+            if (thead) {
+                thead.remove();
+            }
+            // Add a custom header row
+            const headerRow = document.createElement('tr');
+            const headers = ["SL", "Class Roll", "Student Name", "Class Section", "Phone", "Due Amount"];
+            headers.forEach(headerText => {
+                const th = document.createElement('th');
+                th.textContent = headerText;
+                headerRow.appendChild(th);
+            });
+
+            // Insert the header row at the top of the table body
+            const tbody = clonedTable.querySelector('tbody');
+            if (tbody) {
+                tbody.insertBefore(headerRow, tbody.firstChild);
+            } else {
+                const newTbody = document.createElement('tbody');
+                newTbody.appendChild(headerRow);
+                clonedTable.appendChild(newTbody);
+            }
+
+            // Create the workbook from the modified table
+            const wb = XLSX.utils.table_to_book(clonedTable);
+
+            // Save the workbook as an Excel file
+            XLSX.writeFile(wb, `Due Payment ${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}_ClassName.xlsx`);
+        });
+
+
+
+        let isPost = '@ViewBag.isFromPost';
+
+        const ePortion = document.getElementById('exportPortion');
+        if (isPost == 'True') {
+            ePortion.style.visibility = 'visible';
+        }
+        else {
+            ePortion.style.visibility = 'hidden';
+        }
+
+
+        $('#AcademicClassId').change(function () {
+            let id = $('#AcademicClassId option:selected').val();
+            let sessionId = $('#AcademicSessionId option:selected').val();
+
+            $.ajax({
+                url: "/api/academicsections/getbyclasswithsessionId?classId=" + id + "&sessionId=" + sessionId,
+                dataType: "JSON",
+                type: "POST",
+                cache: false,
+                success: function (data) {
+                    $('#AcademicSectionId').empty();
+
+                    if (data != null || data != '') {
+                        var o = '<option disabled selected>Select Section Name</option>';
+                        var o2 = '<option value="0">All Section</option>';
+                        $('#AcademicSectionId').append(o);
+                        $('#AcademicSectionId').append(o2);
+                        $.each(data, function (i, obj) {
+                            var op = '<option value="' + obj.id + '">' + obj.name + '</option>';
+                            $('#AcademicSectionId').append(op);
+                        });
+                    }
+                    else {
+                        var o = '<option disabled selected>Section Not Found</option>';
+                        $('#AcademicSectionId').append(o);
+                    }
+                },
+                error: function (err) {
+                    console.log(err);
+                }
+            });
+        });
+    </script>
+}

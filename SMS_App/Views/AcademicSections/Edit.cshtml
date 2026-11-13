@@ -1,0 +1,75 @@
+﻿@model SMS.Entities.AcademicSection
+
+@{
+    ViewData["Title"] = "Edit";
+    GlobalUI.PageTitle = ViewBag.Title + " Academic Section (" + Model.Name + ") for "+Model.AcademicClass.Name+" ("+Model.AcademicSession.Name+")";
+}
+
+<div class="row">
+    <div class="col-md-6 offset-3 shadow p-2">
+        <form asp-action="Edit" method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="Id" />
+            <div class="form-group row">
+                <label asp-for="Name" class="col-form-label col-md-2 text-md-end text-sm-left"></label>
+                <div class="col-md-10">
+                    <input asp-for="Name" class="form-control rounded" placeholder="Ex: Section A" />
+                    <span asp-validation-for="Name" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <label asp-for="AcademicSessionId" class="col-form-label col-md-2 text-md-end text-sm-left ">Session</label>
+                <div class="col-md-4">
+                    <input asp-for="AcademicSessionId"  hidden/>
+                    <input asp-for="AcademicSession.Name" class="form-control rounded" readonly />
+                    <span asp-validation-for="AcademicSessionId" class="text-danger"></span>
+                </div>
+
+                <label asp-for="AcademicClassId" class="col-form-label col-md-2 text-md-end text-sm-left "></label>
+                <div class="col-md-4">
+                    <input asp-for="AcademicClassId" hidden />
+                    <input asp-for="AcademicClass.Name" class="form-control rounded" readonly/>
+                    <span asp-validation-for="AcademicClassId" class="text-danger"></span>
+                </div>
+            </div>
+
+            <div class="checkbox offset-2">
+                <label><input class="" asp-for="Status" /> @Html.DisplayNameFor(model => model.Status)</label>
+            </div>
+            <div class="form-group row">
+                <div class="col-md-12 text-center">
+                    <partial name="_Update_Back" model="@Model.Id" />
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    <script>
+            $(document).ready(function () {
+
+                $(function () {
+                    let saved = '@TempData["saved"]';
+                    let deleted = '@TempData["deleted"]';
+                    let edited = '@TempData["edited"]';
+                    let failed = '@TempData["failed"]'
+                    if (saved != "") {
+                        alertify.success("Saved Successfully");
+                    }
+                    if (deleted != "") {
+                        alertify.error("Deleted Successfully");
+                    }
+                    if (edited != "") {
+                        alertify.message('Updated Successfully');
+                    }
+                    if (failed != "") {
+                        alertify.error(failed);
+                    }
+                });
+            });
+    </script>
+}

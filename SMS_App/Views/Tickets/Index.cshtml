@@ -1,0 +1,114 @@
+@model SMS_App.ViewModels.Tickets.TicketListVM
+@{
+    ViewData["Title"] = "Tickets";
+    GlobalUI.PageTitle = "Tickets";
+}
+
+<partial name="_Alerts" />
+
+<div class="row g-2 mb-3">
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0">
+            <div class="card-body py-2">
+                <div class="text-muted small">Pending</div>
+                <div class="h4 mb-0">@Model.PendingCount</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0">
+            <div class="card-body py-2">
+                <div class="text-muted small">Working</div>
+                <div class="h4 mb-0 text-primary">@Model.WorkingCount</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0">
+            <div class="card-body py-2">
+                <div class="text-muted small">Solved</div>
+                <div class="h4 mb-0 text-success">@Model.SolvedCount</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm border-0">
+            <div class="card-body py-2">
+                <div class="text-muted small">Rejected</div>
+                <div class="h4 mb-0 text-danger">@Model.RejectedCount</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form asp-action="Index" method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-md-3">
+        <label asp-for="SearchText" class="form-label mb-1 small"></label>
+        <input asp-for="SearchText" name="searchText" class="form-control form-control-sm" placeholder="Title or description" />
+    </div>
+    <div class="col-md-2">
+        <label asp-for="StatusFilter" class="form-label mb-1 small"></label>
+        <select asp-for="StatusFilter" name="statusFilter" asp-items="Model.StatusList" class="form-control form-control-sm">
+            <option value="">All statuses</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label asp-for="TypeFilter" class="form-label mb-1 small"></label>
+        <select asp-for="TypeFilter" name="typeFilter" asp-items="Model.TypeList" class="form-control form-control-sm">
+            <option value="">All types</option>
+        </select>
+    </div>
+    <div class="col-md-2">
+        <div class="form-check mt-4">
+            <input asp-for="MineOnly" name="mineOnly" class="form-check-input" value="true" />
+            <label asp-for="MineOnly" class="form-check-label small"></label>
+        </div>
+    </div>
+    <div class="col-md-3 text-end">
+        <button type="submit" class="btn btn-sm btn-primary">Filter</button>
+        <a asp-action="Index" class="btn btn-sm btn-outline-secondary">Reset</a>
+        <a asp-action="Create" class="btn btn-sm btn-info"><i class="fa fa-plus"></i> Raise Ticket</a>
+    </div>
+</form>
+
+<table class="table table-responsive-sm table-striped shadow" id="myTable">
+    <thead class="table-info">
+        <tr>
+            <th class="no-sort no-search">#</th>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Raised</th>
+            <th>Raised By</th>
+            <th>Assigned To</th>
+            <th class="no-sort no-search">Activity</th>
+            <th class="no-sort no-search">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        @{ int sl = 0; }
+        @foreach (var item in Model.Tickets)
+        {
+            <tr>
+                <td>@(++sl)</td>
+                <td class="text-nowrap">@item.Title</td>
+                <td>@item.TicketType</td>
+                <td><partial name="_StatusBadge" model="item.Status" /></td>
+                <td class="text-nowrap">@item.RaiseDate.ToString("dd MMM yyyy")</td>
+                <td>@item.RaisedByName</td>
+                <td>@item.AssignedToName</td>
+                <td class="text-nowrap">
+                    <span class="badge bg-light text-dark" title="Comments"><i class="fa fa-comment"></i> @item.CommentCount</span>
+                    <span class="badge bg-light text-dark" title="Attachments"><i class="fa fa-paperclip"></i> @item.AttachmentCount</span>
+                </td>
+                <td class="text-nowrap">
+                    <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-primary">Open</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@section Scripts {
+    <script src="~/js/DataTable/dataTable.js"></script>
+}

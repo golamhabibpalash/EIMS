@@ -1,0 +1,25 @@
+@model GuardianOtpVM
+@{
+    ViewData["Title"] = "Verify mobile";
+}
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-5">
+        <h1 class="h3">Verify your mobile / মোবাইল যাচাই</h1>
+        <p class="text-muted small">Enter the 6-digit code sent by SMS to <strong>@Model.MaskedMobile</strong>. The code expires in 10 minutes.</p>
+        <div class="card adm-card"><div class="card-body">
+            <form asp-action="VerifyMobile" asp-route-returnUrl="@ViewBag.ReturnUrl" method="post">
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small" role="alert"></div>
+                <div class="mb-3">
+                    <label asp-for="Code" class="form-label"></label>
+                    <input asp-for="Code" class="form-control form-control-lg text-center" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+                    <span asp-validation-for="Code" class="text-danger small"></span>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Verify</button>
+            </form>
+            <form asp-action="ResendCode" asp-route-returnUrl="@ViewBag.ReturnUrl" method="post" class="mt-2 text-center">
+                <button type="submit" class="btn btn-link btn-sm">Didn't get it? Send a new code</button>
+            </form>
+        </div></div>
+    </div>
+</div>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

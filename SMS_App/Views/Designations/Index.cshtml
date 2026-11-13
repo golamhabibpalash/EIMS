@@ -1,0 +1,62 @@
+﻿@model IEnumerable<SMS.Entities.Designation>
+
+@{
+    ViewData["Title"] = "Designations";
+    GlobalUI.PageTitle = ViewBag.Title;
+    int sl = 0;
+}
+
+
+<table class="table table-responsive-sm">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>
+                @Html.DisplayNameFor(model => model.DesignationName)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.DesignationTypeId)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.EmpTypeId)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.SortingOrder)
+            </th>
+            <th>
+                <a class="btn-sm rounded-pill btn-info p-2" asp-action="Create"><i class="fa fa-plus"></i> Add New</a>
+            </th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>
+            <td>@(++sl).</td>
+            <td>
+                @Html.DisplayFor(modelItem => item.DesignationName)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.DesignationType.DesignationTypeName)
+            </td>
+            <td>
+                @if (item.EmpType == null)
+                {
+                    <span class="text-danger">Not Assigned</span>
+                }
+                else{
+                <span>
+                        @Html.DisplayFor(modelItem => item.EmpType.Name)
+                </span>                        
+                }
+                
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.SortingOrder)
+            </td>
+            <td>
+                <partial name="_Edit_Details_Delete" model="@item.Id" />
+            </td>
+        </tr>
+}
+    </tbody>
+</table>

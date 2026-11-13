@@ -1,0 +1,507 @@
+﻿using GHPEncryptDecript;
+using Hangfire;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using SMS_App.Utilities.Jwt;
+using System.Security.Claims;
+using Hangfire.PostgreSql;
+using Hangfire.SqlServer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using SMS.DB;
+using SMS.Entities;
+using SMS_App.Configurations;
+using SMS_App.Utilities.Automation.Hangfire;
+using SMS_App.Utilities.ShortMessageService;
+using SMS_App.Utilities.AutoMapperConfiguration;
+using SMS_App.Utilities.LoggerService;
+using SMS_App.ViewModels.ModuleSubModuleVM;
+using Microsoft.AspNetCore.RateLimiting;
+using SMS_App.Utilities.OnlineAdmission;
+using SMS_App.MultiTenancy;
+using System;
+using System.IO;
+using System.Text;
+using System.Threading.RateLimiting;
+
+var builder = WebApplication.CreateBuilder(args);
+
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
+// Database provider selection
+string dbProvider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "SqlServer";
+
+// Multi-tenant mode (one deployment, many schools, database per school) is opt-in. When it is
+// off, everything below behaves exactly as before: one school, DefaultConnection.
+bool multiTenant = builder.Configuration.GetValue<bool>("MultiTenancy:Enabled");
+
+// Connection string (single-tenant mode only; in multi-tenant mode each school's connection
+// comes from the platform registry per request)
+var rawConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+string connectionString;
+
+if (multiTenant)
+{
+    connectionString = null;
+}
+else if (dbProvider == "PostgreSQL")
+{
+    connectionString = rawConnectionString;
+}
+else
+{
+    string aesKey = Environment.GetEnvironmentVariable("AES_KEY") ?? "1234567890123456";
+    string aesIv = Environment.GetEnvironmentVariable("AES_IV") ?? "1234567890123456";
+    byte[] key = Encoding.UTF8.GetBytes(aesKey);
+    byte[] iv = Encoding.UTF8.GetBytes(aesIv);
+
+    connectionString = AesEncryptionHelper.Decrypt(rawConnectionString, key, iv);
+}
+
+// Hangfire configuration
+bool hangfireEnabled = builder.Configuration.GetValue<bool>("Hangfire:IsEnabled");
+string dashboardPath = builder.Configuration.GetValue<string>("Hangfire:DashboardPath") ?? "/hangfire";
+int workerCount = builder.Configuration.GetValue<int>("Hangfire:WorkerCount");
+
+// Tenancy + school DB context (per-request provider/connection; see TenancyServiceCollectionExtensions)
+builder.AddSchoolBdTenancy(dbProvider, connectionString);
+
+if (multiTenant && hangfireEnabled)
+{
+    // Hangfire jobs do not carry a school yet (Phase B), and its storage is a single database.
+    // Running them here would execute one school's jobs against nobody's (or the wrong) database.
+    Console.WriteLine("[STARTUP WARNING] Hangfire is not supported in multi-tenant mode yet; it has been disabled.");
+    hangfireEnabled = false;
+}
+
+// HTTP Client
+builder.Services.AddHttpClient();
+
+// Conditional Hangfire
+if (hangfireEnabled)
+{
+    builder.Services.AddHangfire(config =>
+    {
+        config.SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+             .UseSimpleAssemblyNameTypeSerializer()
+             .UseRecommendedSerializerSettings();
+
+        if (dbProvider == "PostgreSQL")
+        {
+            config.UsePostgreSqlStorage(c =>
+                c.UseNpgsqlConnection(connectionString),
+                new PostgreSqlStorageOptions
+                {
+                    SchemaName = "hangfire"
+                }
+            );
+        }
+        else
+        {
+            config.UseSqlServerStorage(connectionString,
+                new SqlServerStorageOptions
+                {
+                    SchemaName = "hangfire",
+                    QueuePollInterval = TimeSpan.FromSeconds(10)
+                }
+            );
+        }
+    });
+
+    builder.Services.AddHangfireServer(options =>
+    {
+        options.WorkerCount = workerCount;
+    });
+}
+
+// Identity Configuration
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+{
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequireUppercase = false;
+    options.Password.RequireNonAlphanumeric = false;
+    options.Password.RequiredLength = 5;
+})
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultUI()
+.AddDefaultTokenProviders();
+
+// FIX: Huge-claims 400s. Identity's default factory bakes every permission
+// claim into the login cookie; ~250 of them overflow IIS header limits.
+// AppClaimsPrincipalFactory keeps the cookie to id/name/roles/stamp only,
+// and PermissionClaimsTransformation rehydrates permissions from the DB per
+// request (memory-cached), so the cookie stays ~1 KB for everyone.
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, AppClaimsPrincipalFactory>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Authentication.IClaimsTransformation, PermissionClaimsTransformation>();
+
+// Online Admission guardian portal: its own cookie scheme, independent of staff/student
+// Identity logins (see GuardianPortalAuth).
+builder.Services.AddAuthentication()
+    .AddCookie(GuardianPortalAuth.Scheme, options =>
+    {
+        options.Cookie.Name = GuardianPortalAuth.CookieName;
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.ExpireTimeSpan = TimeSpan.FromHours(2);
+        options.SlidingExpiration = true;
+        options.LoginPath = "/AdmissionPortal/Login";
+        options.AccessDeniedPath = "/AdmissionPortal/Login";
+        // A guardian cookie issued by another school is rejected.
+        options.Events.OnValidatePrincipal = context => SMS_App.MultiTenancy.TenantClaims.ValidateCookieAsync(context);
+    });
+
+// JWT bearer for the mobile API (scheme "Bearer"), alongside the cookie schemes.
+// The default scheme stays the Identity cookie, so the web app is unaffected;
+// API endpoints opt in with [Authorize(AuthenticationSchemes = "Bearer")] and
+// the global policy below also accepts it.
+builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
+if (string.IsNullOrWhiteSpace(jwtSettings.Key) || Encoding.UTF8.GetByteCount(jwtSettings.Key) < 32)
+{
+    // Fail at startup with an actionable message instead of throwing IDX10703 from
+    // JwtBearerOptions on every request (which surfaced as a blank HTTP 500).
+    throw new InvalidOperationException(
+        "Jwt:Key is missing or shorter than 32 characters. Add a \"Jwt\" section with a Key of at least 32 characters to appsettings.json " +
+        "(see Resources/deployment/unityschoolbd/appsettings.json.template).");
+}
+builder.Services.AddAuthentication().AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+{
+    options.MapInboundClaims = false; // keep claim types exactly as issued
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = jwtSettings.Issuer,
+        ValidateAudience = true,
+        ValidAudience = jwtSettings.Audience,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key)),
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.FromMinutes(1),
+        NameClaimType = ClaimTypes.Name,
+        RoleClaimType = ClaimTypes.Role,
+    };
+    // Rehydrate permission claims onto the bearer principal, reusing the exact
+    // same cached logic as the web request pipeline, so policy checks
+    // (RequireClaim "View X") work for the mobile API without baking ~250
+    // claims into the token.
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            // Refresh tokens share this signing key, issuer and audience, so they
+            // would otherwise pass validation here and act as 30-day bearer tokens
+            // (skipping the security-stamp check that /API/Auth/refresh does).
+            // Only short-lived access tokens may call the API.
+            var tokenType = context.Principal?.FindFirst(JwtTokenService.TokenTypeClaim)?.Value;
+            if (!string.Equals(tokenType, JwtTokenService.AccessTokenType, StringComparison.Ordinal))
+            {
+                context.Fail("Only access tokens are accepted.");
+                return;
+            }
+
+            // The token must have been issued by the school this request is for.
+            var tenantContext = context.HttpContext.RequestServices.GetRequiredService<SMS.BLL.MultiTenancy.ITenantContext>();
+            if (!SMS_App.MultiTenancy.TenantClaims.Matches(context.Principal, tenantContext))
+            {
+                context.Fail("Token was issued for another institute.");
+                return;
+            }
+
+            var transformer = context.HttpContext.RequestServices
+                .GetRequiredService<Microsoft.AspNetCore.Authentication.IClaimsTransformation>();
+            context.Principal = await transformer.TransformAsync(context.Principal);
+        }
+    };
+});
+
+// CORS for the mobile app when it runs in a browser (Flutter web). Native
+// Android/iOS ignore CORS. Bearer tokens (not cookies) mean no credentials, so
+// any-origin is safe here.
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("MobileApi", policy =>
+        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+});
+
+// Rate limits for the public admission endpoints (sign-in, OTP, tracking), per client IP.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(AdmissionRateLimits.Auth, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    options.AddPolicy(AdmissionRateLimits.Upload, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    // Mobile app sign-in, per client IP. Looser than the admission limit because a
+    // whole school's Wi-Fi or a mobile carrier's NAT can share one IP.
+    options.AddPolicy(MobileApiRateLimits.Login, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+});
+
+// Fix Auto Logout Issue
+builder.Services.Configure<SecurityStampValidatorOptions>(options =>
+{
+    options.ValidationInterval = TimeSpan.FromHours(48);
+});
+
+// MVC + JSON
+builder.Services.AddControllers()
+    .AddNewtonsoftJson(opt =>
+        opt.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore);
+
+// Global Authorization. Accept BOTH the Identity cookie and the mobile JWT
+// bearer scheme, so the site-wide "must be authenticated" filter doesn't block
+// bearer-authenticated API calls (which otherwise evaluate only the cookie).
+builder.Services.AddMvc(options =>
+{
+    var policy = new AuthorizationPolicyBuilder(
+            IdentityConstants.ApplicationScheme,
+            JwtBearerDefaults.AuthenticationScheme)
+        .RequireAuthenticatedUser()
+        .Build();
+
+    options.Filters.Add(new AuthorizeFilter(policy));
+});
+
+// SESSION (Fixed)
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromHours(24);      // Session length
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.MaxAge = TimeSpan.FromHours(24);    // Important!
+    options.Cookie.SameSite = SameSiteMode.Lax;        // Fix Chrome issues
+});
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // safer for hosting
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.ExpireTimeSpan = TimeSpan.FromHours(24);
+    options.SlidingExpiration = true;
+
+    options.LoginPath = "/Accounts/Login";
+    options.AccessDeniedPath = "/Accounts/AccessDenied";
+
+    // Reject a cookie issued by another school, then the usual security-stamp refresh.
+    options.Events.OnValidatePrincipal = async context =>
+    {
+        if (await SMS_App.MultiTenancy.TenantClaims.ValidateCookieAsync(context))
+        {
+            await SecurityStampValidator.ValidatePrincipalAsync(context);
+        }
+    };
+
+    // Avoid chunked cookies if possible
+    options.Cookie.Name = ".AspNetCore.Identity.Application";  
+});
+
+
+
+
+// Authorization Policies
+builder.Services.AddAuthorization(o =>
+{
+    AuthorizationPolicies.ConfigureAuthorization(o);
+});
+
+// MVC / Views / Automapper
+builder.Services.AddControllersWithViews();
+builder.Services.AddRazorPages();
+builder.Services.AddSignalR(); // real-time in-app notifications (NotificationHub)
+	builder.Services.AddAutoMapper(cfg => {
+		cfg.AddProfile<AutoMapperProfile>();
+	});
+builder.Services.Addservices();
+
+// SiteMap loader
+builder.Services.AddSingleton<SiteMap>(provider =>
+{
+    var filePath = Path.Combine(builder.Environment.ContentRootPath, "SiteMap.Config");
+    return SiteMapLoader.Load(filePath);
+});
+
+// FIX: Persist Data Protection Keys (required for shared hosting)
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(
+        Path.Combine(builder.Environment.ContentRootPath, "Keys")
+    ))
+    .SetApplicationName("SMS_App");
+
+var app = builder.Build();
+
+SchoolManagementSystem.GlobalUI.Configure(app.Services.GetRequiredService<IHttpContextAccessor>());
+
+// `SMS_App platform ...` runs a tenant-registry command (create schools, domains, databases) and exits.
+if (SMS_App.MultiTenancy.PlatformCli.IsInvocation(args))
+{
+    return await SMS_App.MultiTenancy.PlatformCli.RunAsync(app.Services, args);
+}
+
+// Single-tenant: auto-create database schema and seed on startup, as before.
+// Multi-tenant: nothing touches a school database at startup, so one school's broken database can
+// never stop the platform (schools are initialised with `platform tenant-init`).
+if (!multiTenant)
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    try
+    {
+        var canConnect = await dbContext.Database.CanConnectAsync();
+        if (!canConnect)
+            throw new Exception($"Cannot reach the database. Check the connection string.");
+
+        await dbContext.Database.EnsureCreatedAsync();
+
+        await DbSeeder.SeedAsync(dbContext, scope.ServiceProvider);
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"[STARTUP ERROR] Database initialization failed: {ex.Message}");
+        throw;
+    }
+}
+
+// Ensure the ticket attachment folder exists at startup, unlike Images/Student/Photo etc. it is
+// never created at deploy time, so this surfaces a permission/ownership problem in the startup
+// log instead of the first real user's upload failing with a 500 (see TicketsController).
+try
+{
+    if (!multiTenant) // per-school folders are created by TenantFileStorage
+        Directory.CreateDirectory(Path.Combine(app.Environment.WebRootPath, "Uploads", "Tickets"));
+}
+catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+{
+    Console.Error.WriteLine($"[STARTUP WARNING] Could not create wwwroot/Uploads/Tickets: {ex.Message}. Ticket attachments will be rejected until this is fixed.");
+}
+
+// Same for admission uploads (stored privately under App_Data, never under wwwroot).
+try
+{
+    if (!multiTenant)
+        Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "App_Data", "AdmissionFiles"));
+}
+catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+{
+    Console.Error.WriteLine($"[STARTUP WARNING] Could not create App_Data/AdmissionFiles: {ex.Message}. Admission uploads will fail until this is fixed.");
+}
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
+// Plain-text build stamp ("<version> <commit>") so the deploy workflow can confirm each instance
+// is really running the build it just shipped, and a liveness probe for nginx/Docker. Answered
+// here, before tenancy and authentication, so they work on any host and never open a school
+// database (auth handlers construct Identity, which needs one).
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path;
+    if (path.Equals("/build-info", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.ContentType = "text/plain";
+        await context.Response.WriteAsync($"{SchoolManagementSystem.BuildInfo.Version} {SchoolManagementSystem.BuildInfo.Commit}");
+        return;
+    }
+    if (path.Equals("/health", StringComparison.OrdinalIgnoreCase))
+    {
+        // Multi-tenant mode also checks that the platform registry is reachable.
+        var healthy = !multiTenant || await context.RequestServices
+            .GetRequiredService<SMS.DAL.Platform.IPlatformRepository>().CanConnectAsync(context.RequestAborted);
+        context.Response.StatusCode = healthy ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable;
+        context.Response.ContentType = "text/plain";
+        await context.Response.WriteAsync(healthy ? "ok" : "platform database unreachable");
+        return;
+    }
+    await next();
+});
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+    app.UseHsts();
+}
+
+// Binds the request to one school from the Host header (registry lookup); unknown or suspended
+// hosts are answered here and never reach MVC or a school database. Placed after the exception
+// handler so its re-executed /Error request is bound to the same school.
+app.UseMiddleware<SMS_App.MultiTenancy.TenantResolutionMiddleware>();
+
+// Sits inside the error-page handler above, so it sees every unhandled exception
+// first, records it in the Logs table (visible at /Logs), then rethrows and lets
+// the handler render the page exactly as before.
+app.UseMiddleware<ExceptionLoggingMiddleware>();
+
+app.UseHttpsRedirection();
+app.UseTenantStaticFiles(); // /Images, /Uploads from the current school's folder (multi-tenant only)
+app.UseStaticFiles();
+
+// ORDER IS IMPORTANT
+app.UseSession();      // Session BEFORE routing
+app.UseRouting();
+app.UseRateLimiter();
+
+// CORS must sit between routing and auth (for the Flutter web client).
+app.UseCors("MobileApi");
+
+// Auth middlewares
+app.UseAuthentication();
+app.UseAuthorization();
+
+// Hangfire Dashboard
+if (hangfireEnabled)
+{
+    var dashboardOptions = new DashboardOptions
+    {
+        Authorization = new[] { new HangfireAuthorizationFilter() }
+    };
+
+    app.UseHangfireDashboard(dashboardPath, dashboardOptions);
+}
+else
+{
+    Console.WriteLine("Hangfire Disabled by configuration.");
+}
+
+// API controllers (attribute-routed)
+app.MapControllers();
+
+// Real-time notifications hub (groups keyed by the signed-in user's id)
+app.MapHub<SMS_App.Hubs.NotificationHub>("/hubs/notifications");
+
+// AREA routing
+app.MapControllerRoute(
+    name: "areas",
+    pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+
+// default MVC routing
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
+
+app.MapRazorPages();
+
+app.Run();
+return 0;
