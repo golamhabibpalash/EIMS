@@ -19,13 +19,16 @@ namespace SMS_App.Utilities.Notifications
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IHubContext<NotificationHub> _hub;
         private readonly IAppLogger _appLogger;
+        private readonly SMS.BLL.MultiTenancy.ITenantContext _tenant;
 
         public NotificationService(
             IUserNotificationManager userNotificationManager,
             UserManager<ApplicationUser> userManager,
             IHubContext<NotificationHub> hub,
-            IAppLogger appLogger)
+            IAppLogger appLogger,
+            SMS.BLL.MultiTenancy.ITenantContext tenant)
         {
+            _tenant = tenant;
             _userNotificationManager = userNotificationManager;
             _userManager = userManager;
             _hub = hub;
@@ -134,7 +137,7 @@ namespace SMS_App.Utilities.Notifications
 
             try
             {
-                await _hub.Clients.Group(NotificationHub.GroupFor(recipientUserId))
+                await _hub.Clients.Group(NotificationHub.GroupFor(_tenant, recipientUserId))
                     .SendAsync(NotificationHub.ReceiveNotification, payload);
             }
             catch (Exception ex)

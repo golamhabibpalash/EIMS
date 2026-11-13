@@ -26,8 +26,11 @@ public class InstitutesController : Controller
     private const long MaxImageBytes = 5 * 1024 * 1024;
     private static readonly string[] AllowedImageExtensions = { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".bmp" };
 
-    public InstitutesController(IInstituteManager instituteManager, IWebHostEnvironment host, ILogger<InstitutesController> logger)
+    private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
+
+    public InstitutesController(IInstituteManager instituteManager, IWebHostEnvironment host, ILogger<InstitutesController> logger, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles)
     {
+        _tenantFiles = tenantFiles;
         _logger = logger;
         _instituteManager = instituteManager;
         _host = host;
@@ -72,7 +75,7 @@ public class InstitutesController : Controller
                 if (banner != null)
                 {
                     string banarName = "";
-                    string root = _host.WebRootPath;
+                    string root = _tenantFiles.WebRootPath;
                     string folder = "Images/Institute";
                     banarName = "instituteBanner_" + Guid.NewGuid() + Path.GetExtension(banner.FileName);
                     var pathCombine = Path.Combine(root, folder, banarName);
@@ -85,7 +88,7 @@ public class InstitutesController : Controller
                 if (logo != null)
                 {
                     string logoName = "";
-                    string root = _host.WebRootPath;
+                    string root = _tenantFiles.WebRootPath;
                     string folder = "Images/Institute";
                     logoName = "instituteLogo_" + Guid.NewGuid() + Path.GetExtension(logo.FileName);
                     var pathCombine = Path.Combine(root, folder, logoName);
@@ -150,7 +153,7 @@ public class InstitutesController : Controller
         }
 
         var fileName = prefix + Guid.NewGuid() + ext;
-        var directory = Path.Combine(_host.WebRootPath, ImageFolder);
+        var directory = Path.Combine(_tenantFiles.WebRootPath, ImageFolder);
         try
         {
             Directory.CreateDirectory(directory);

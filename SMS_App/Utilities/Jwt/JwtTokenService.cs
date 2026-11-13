@@ -34,10 +34,12 @@ public class JwtTokenService : IJwtTokenService
     public const string RefreshStampClaim = "stamp";
 
     private readonly JwtSettings _settings;
+    private readonly SMS.BLL.MultiTenancy.ITenantContext _tenant;
 
-    public JwtTokenService(IOptions<JwtSettings> options)
+    public JwtTokenService(IOptions<JwtSettings> options, SMS.BLL.MultiTenancy.ITenantContext tenant)
     {
         _settings = options.Value;
+        _tenant = tenant;
     }
 
     private SigningCredentials Credentials() =>
@@ -53,6 +55,7 @@ public class JwtTokenService : IJwtTokenService
         {
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new(TokenTypeClaim, AccessTokenType),
+            SMS_App.MultiTenancy.TenantClaims.For(_tenant),
         };
 
         var token = new JwtSecurityToken(_settings.Issuer, _settings.Audience, all, now, expires, Credentials());
@@ -71,6 +74,7 @@ public class JwtTokenService : IJwtTokenService
             new(RefreshStampClaim, securityStamp ?? ""),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new(TokenTypeClaim, RefreshTokenType),
+            SMS_App.MultiTenancy.TenantClaims.For(_tenant),
         };
 
         var token = new JwtSecurityToken(_settings.Issuer, _settings.Audience, claims, now, expires, Credentials());
@@ -98,7 +102,8 @@ public class JwtTokenService : IJwtTokenService
         {
             var principal = handler.ValidateToken(token, parameters, out _);
             var type = principal.FindFirst(TokenTypeClaim)?.Value;
-            return type == RefreshTokenType ? principal : null;
+            // A refresh token issued by another school is worthless here.
+            return type == RefreshTokenType && SMS_App.MultiTenancy.TenantClaims.Matches(principal, _tenant) ? principal : null;
         }
         catch
         {

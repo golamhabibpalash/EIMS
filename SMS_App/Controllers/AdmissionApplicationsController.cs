@@ -39,6 +39,8 @@ public class AdmissionApplicationsController : Controller
     private readonly IWebHostEnvironment _host;
     private readonly IAppLogger _appLogger;
 
+    private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
+
     public AdmissionApplicationsController(
         IAdmissionApplicationManager applicationManager,
         IAdmissionSetupManager setupManager,
@@ -48,8 +50,9 @@ public class AdmissionApplicationsController : Controller
         AdmissionFileStore fileStore,
         AdmissionNotifier notifier,
         IWebHostEnvironment host,
-        IAppLogger appLogger)
+        IAppLogger appLogger, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles)
     {
+        _tenantFiles = tenantFiles;
         _applicationManager = applicationManager;
         _setupManager = setupManager;
         _paymentManager = paymentManager;
@@ -317,7 +320,7 @@ public class AdmissionApplicationsController : Controller
             try
             {
                 var photoName = _applicationManager.BuildStudentPhotoFileName(application, uniqueId, Path.GetExtension(application.PhotoFileName));
-                var destination = Path.Combine(_host.WebRootPath, "Images", "Student", photoName);
+                var destination = Path.Combine(_tenantFiles.WebRootPath, "Images", "Student", photoName);
                 if (_fileStore.CopyTo(id, application.PhotoFileName, destination))
                     await _applicationManager.SetStudentPhotoAsync(studentId, photoName);
                 else

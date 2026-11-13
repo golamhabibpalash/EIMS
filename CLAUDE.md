@@ -36,7 +36,7 @@ dotnet run --project SMS_App/SMS_App.csproj
 dotnet ef database update
 ```
 
-**Tests**: there is no automated test project in the solution (`SchoolManagementSystem.sln` has the 6 layer projects only). The remote `TestProject_ForTestingPurpose` branch is not merged. Verify changes by building and running the app.
+**Tests**: `SMS.Tests/` (xUnit, in the solution) holds the multi-tenancy isolation tests; run `dotnet test SMS.Tests/SMS.Tests.csproj`. CI publishes only `SMS_App.csproj`, so tests are never deployed. Most features still have no tests: verify them by building and running the app.
 
 The SQL Server migration history lives in `SMS.DB/Migrations_SqlServer/`. The PostgreSQL
 database is provisioned from a dump (see `Resources/docker/setup-eims-postgres.ps1`), not from
@@ -98,11 +98,21 @@ SMS.Frameworks   → Shared utilities, tag helpers, encryption
 ### ZKTeco Attendance Machines
 `Controllers/IClockController.cs` serves the `/iclock/*` ADMS push endpoints that terminal firmware has hard-coded, so those routes can't be renamed or moved into an area. It is `[AllowAnonymous]` and trusts only a registered device serial (`SN`); responses must stay plain text. Direct-socket device access lives in `SMS.BLL/ZKTeco/ZkClient.cs`.
 
+### Multi-Tenancy (database per school, opt-in)
+`MultiTenancy:Enabled=true` turns one deployment into the SchoolBD platform; off (default) = the old one-school behaviour on `DefaultConnection`, which all current instances use. Design: `docs/MULTI_TENANT_ARCHITECTURE.md`.
+- The school comes **only** from the Host header matched against `SchoolBD_PlatformDB` (`TenantResolutionMiddleware` → `ITenantCatalog`). Never read a tenant from query/headers/cookies, and never enable `ForwardedHeaders.XForwardedHost`.
+- `ApplicationDbContext` is scoped and built from `ITenantContext.Current` per scope (`SMS_App/MultiTenancy/TenancyServiceCollectionExtensions.cs`); no pooling. Code outside a request (jobs, CLI) must call `ITenantContext.Set(tenant)` in its own scope first.
+- Anything cached, grouped or stored per school must include the tenant: use `tenant.Scoped(key)` / `TenantInfo.Key`. Uploaded files go through `ITenantFileStorage.WebRootPath` / `PrivatePath(...)`, **not** `IWebHostEnvironment.WebRootPath` (that is only for shipped assets such as `Reports/*.rdlc`).
+- Logins carry the `schoolbd_tenant` claim (`TenantClaims`); any new auth scheme must add and validate it.
+- `GlobalUI` is per-request now (backed by `HttpContext.Items`); keep using it as before.
+- Onboarding is the `platform` CLI (`dotnet SMS_App.dll platform help`); the registry schema is `Resources/sql/Platform_{SqlServer,PostgreSQL}.sql`. `/health` and `/build-info` are answered before tenancy/auth in `Program.cs`.
+- Not supported yet in multi-tenant mode: Hangfire (forced off), ZKTeco devices addressed by IP, central identity.
+
 ### Real-Time Notifications (SignalR)
 In-app notifications are split deliberately across layers because Identity and the hub are presentation concerns:
 - `UserNotificationManager` (BLL) **only persists** `UserNotification` rows — it does not resolve recipients or push.
 - `SMS_App/Utilities/Notifications/NotificationService.cs` (presentation) is the orchestrator: it resolves recipients (e.g. all `SuperAdmin`s via `UserManager`), calls the manager to persist, then pushes over SignalR. **Persist first, push best-effort** — a stored row is the guaranteed floor; the live push is a bonus and its failure is swallowed/logged, never fatal.
-- The hub is `SMS_App/Hubs/NotificationHub.cs`, mapped at `/hubs/notifications` in `Program.cs` (`AddSignalR()` + `MapHub`). It is receive-only (no hub methods); each connection joins a per-user group `user:{Context.UserIdentifier}` so pushes target a user across all their tabs/devices.
+- The hub is `SMS_App/Hubs/NotificationHub.cs`, mapped at `/hubs/notifications` in `Program.cs` (`AddSignalR()` + `MapHub`). It is receive-only (no hub methods); each connection joins a per-user group `NotificationHub.GroupFor(tenant, userId)` (`t:{school}:user:{id}`) so pushes target a user across all their tabs/devices, within their school.
 - Client script: `SMS_App/wwwroot/js/notifications.js`; vendored lib under `wwwroot/lib/signalr/`.
 - `INotificationService` is registered in `DependencyInjectionConfiguration.cs` alongside the manager/repository, not in `Program.cs`.
 - **Naming trap**: `SMS.Entities/StudentHub.cs` is a domain entity (student enrollment), unrelated to SignalR.
@@ -217,6 +227,8 @@ Persisted to `SMS_App/Keys/` for shared hosting stability. App name: `"SMS_App"`
 | `Resources/deployment/` | Linux deploy assets: `deploy.sh`, `eims-instance.service` (systemd), `nginx-school.conf`, `EncryptConnString/` (connection-string encryptor) |
 | `README.md` | Partly stale: it says migrations run from `SMS_App/` and that reports are RDLC; trust this file instead |
 | `Resources/sql*`, `Resources/StudentMigrationScripts/` | Raw SQL — stored procs, views, functions, data-migration scripts run outside EF |
+| `SMS_App/MultiTenancy/`, `SMS.BLL/MultiTenancy/` | Tenant resolution, per-school DbContext/files, tenant claims, `platform` CLI |
+| `docs/` | Multi-tenant audit, architecture, migration, security, roadmap |
 | `SchoolManagementSystem.sln` | Solution file (the only one) |
 
 ## Reference Documentation

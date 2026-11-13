@@ -22,9 +22,10 @@ namespace SMS_App.Utilities.ShortMessageService
         private static readonly Dictionary<string, DateTime> _claimed = new();
         private static readonly TimeSpan ClaimTtl = TimeSpan.FromMinutes(5);
 
-        public static bool TryClaim(string mobileNumber, string smsType)
+        /// <param name="scope">The school (tenant key): a parent with children in two schools must get both schools' SMS.</param>
+        public static bool TryClaim(string mobileNumber, string smsType, string scope = null)
         {
-            string key = $"{smsType?.Trim()}|{(mobileNumber ?? string.Empty).Trim()}|{DateTime.Today:yyyyMMdd}";
+            string key = $"{scope}|{smsType?.Trim()}|{(mobileNumber ?? string.Empty).Trim()}|{DateTime.Today:yyyyMMdd}";
             lock (_lock)
             {
                 if (_claimed.TryGetValue(key, out var claimedAt) && DateTime.UtcNow - claimedAt < ClaimTtl)

@@ -43,8 +43,11 @@ public class EmployeesController : Controller
     private readonly ILogManager _logManager;
     private readonly IAppLogger _appLogger;
 
-    public EmployeesController(IWebHostEnvironment host, IEmployeeManager employeeManager, IGenderManager genderManager, IReligionManager religionManager, IMapper mapper, INationalityManager nationalityManager, IEmpTypeManager empTypeManager, IDesignationManager designationManager, IDivisionManager divisionManager, IDistrictManager districtManager, IUpazilaManager upazilaManager, IBloodGroupManager bloodGroupManager, UserManager<ApplicationUser> userManager, IPhoneSMSManager phoneSMSManager, IInstituteManager instituteManager, ILogManager logManager, IAppLogger appLogger)
+    private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
+
+    public EmployeesController(IWebHostEnvironment host, IEmployeeManager employeeManager, IGenderManager genderManager, IReligionManager religionManager, IMapper mapper, INationalityManager nationalityManager, IEmpTypeManager empTypeManager, IDesignationManager designationManager, IDivisionManager divisionManager, IDistrictManager districtManager, IUpazilaManager upazilaManager, IBloodGroupManager bloodGroupManager, UserManager<ApplicationUser> userManager, IPhoneSMSManager phoneSMSManager, IInstituteManager instituteManager, ILogManager logManager, IAppLogger appLogger, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles)
     {
+        _tenantFiles = tenantFiles;
         _host = host;
         _employeeManager = employeeManager;
         _genderManager = genderManager;
@@ -303,7 +306,7 @@ public class EmployeesController : Controller
 
             if (empImage != null)
             {
-                string root = _host.WebRootPath;
+                string root = _tenantFiles.WebRootPath;
                 if (string.IsNullOrEmpty(root))
                 {
                     root = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
@@ -318,7 +321,7 @@ public class EmployeesController : Controller
 
             if (nidCard != null)
             {
-                string root = _host.WebRootPath;
+                string root = _tenantFiles.WebRootPath;
                 string folder = "Images/Employee/NID";
 
                 string fileExtension = Path.GetExtension(nidCard.FileName);
@@ -605,7 +608,7 @@ public class EmployeesController : Controller
         // Normalize folder (no leading slash)
         folder = folder.TrimStart('/', '\\');
 
-        string root = _host.WebRootPath;
+        string root = _tenantFiles.WebRootPath;
         if (string.IsNullOrEmpty(root))
             root = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
 

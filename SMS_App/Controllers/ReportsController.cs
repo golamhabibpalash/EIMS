@@ -59,8 +59,11 @@ public class ReportsController : Controller
     #endregion properties
 
     #region Constructor
-    public ReportsController(IWebHostEnvironment host, IStudentManager studentManager, IReportManager reportManager, IAcademicClassManager academicClassManager, IAttendanceMachineManager attendanceMachineManager, IOffDayManager dayManager, IAcademicSessionManager academicSessionManager, IAcademicSectionManager academicSectionManager, IInstituteManager instituteManager, IAcademicExamDetailsManager academicExamDetailsManager, IAcademicExamManager academicExamManager, IGradingTableManager gradingTableManager, IAcademicExamGroupManager academicExamGroupManager, IStudentFeeHeadManager studentFeeHeadManager, IExamResultManager examResultManager, IAppLogger appLogger)
+    private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
+
+    public ReportsController(IWebHostEnvironment host, IStudentManager studentManager, IReportManager reportManager, IAcademicClassManager academicClassManager, IAttendanceMachineManager attendanceMachineManager, IOffDayManager dayManager, IAcademicSessionManager academicSessionManager, IAcademicSectionManager academicSectionManager, IInstituteManager instituteManager, IAcademicExamDetailsManager academicExamDetailsManager, IAcademicExamManager academicExamManager, IGradingTableManager gradingTableManager, IAcademicExamGroupManager academicExamGroupManager, IStudentFeeHeadManager studentFeeHeadManager, IExamResultManager examResultManager, IAppLogger appLogger, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles)
     {
+        _tenantFiles = tenantFiles;
         _host = host;
         _studentManager = studentManager;
         _reportManager = reportManager;
@@ -115,7 +118,7 @@ public class ReportsController : Controller
         string logoBase64 = "";
         if (!string.IsNullOrEmpty(institute.Logo))
         {
-            var imagePath = Path.Combine(_host.WebRootPath, "Images", "Institute", institute.Logo);
+            var imagePath = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", institute.Logo);
             if (System.IO.File.Exists(imagePath))
                 logoBase64 = Convert.ToBase64String(await System.IO.File.ReadAllBytesAsync(imagePath));
         }
@@ -326,7 +329,7 @@ public class ReportsController : Controller
 
     private async Task<string> GetBase64LogoAsync(string logoFileName)
     {
-        var path = Path.Combine(_host.WebRootPath, "Images", "Institute", logoFileName);
+        var path = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", logoFileName);
 
         if (!System.IO.File.Exists(path))
             return string.Empty;
@@ -645,7 +648,7 @@ public class ReportsController : Controller
         using var report = new LocalReport();
 
         // 1️⃣ Cross-platform image path
-        var imagePath = Path.Combine(_host.WebRootPath, "Images", "Institute", institute.Logo);
+        var imagePath = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", institute.Logo);
 
         // 2️⃣ Check if file exists
         string imageParam = string.Empty;
@@ -720,7 +723,7 @@ public class ReportsController : Controller
         var monthlyLogoBase64 = string.Empty;
         if (!string.IsNullOrEmpty(institute.Logo))
         {
-            var mImgPath = Path.Combine(_host.WebRootPath, "Images", "Institute", institute.Logo);
+            var mImgPath = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", institute.Logo);
             if (System.IO.File.Exists(mImgPath))
                 monthlyLogoBase64 = Convert.ToBase64String(await System.IO.File.ReadAllBytesAsync(mImgPath));
         }
@@ -742,7 +745,7 @@ public class ReportsController : Controller
         var reportPath = Path.Combine(_host.WebRootPath, "Reports", "ExamResult", "Rpt_Subject_Wise_MarkSheet.rdlc");
 
         string imageParam = "";
-        var instituteLogoPath = Path.Combine(_host.WebRootPath, "Images", "Institute", institute.Logo);
+        var instituteLogoPath = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", institute.Logo);
 
         // 2️⃣ Check if file exists
         if (!System.IO.File.Exists(instituteLogoPath))
@@ -793,7 +796,7 @@ public class ReportsController : Controller
         var reportPath = _host.WebRootPath + "\\Reports\\Rpt_Student_Wise_MarkSheet.rdlc";
 
         string imageParam = "";
-        var instituteLogoPath = _host.WebRootPath + "\\Images\\Institute\\" + institute.Logo;
+        var instituteLogoPath = _tenantFiles.WebRootPath + "\\Images\\Institute\\" + institute.Logo;
 
         
         if (System.IO.File.Exists(instituteLogoPath))
@@ -812,7 +815,7 @@ public class ReportsController : Controller
 
         var gradingTables = (await _gradingTableManager.GetAllAsync()).ToList();
         var academicExamGroup = await _academicExamGroupManager.GetByIdAsync(examGroupId);
-        string signaturePath2 = Path.Combine(_host.WebRootPath, "Images", "Institute", "signature.jpg");
+        string signaturePath2 = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", "signature.jpg");
         string signatureParam2 = System.IO.File.Exists(signaturePath2)
             ? Convert.ToBase64String(await System.IO.File.ReadAllBytesAsync(signaturePath2))
             : string.Empty;
@@ -886,7 +889,7 @@ public class ReportsController : Controller
         Institute institute = await _instituteManager.GetFirstOrDefaultAsync();
         string imageParam = await LoadInstituteLogoAsync(institute.Logo);
 
-        string signaturePath = Path.Combine(_host.WebRootPath, "Images", "Institute", "signature.jpg");
+        string signaturePath = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", "signature.jpg");
         string signatureParam = System.IO.File.Exists(signaturePath)
             ? Convert.ToBase64String(await System.IO.File.ReadAllBytesAsync(signaturePath))
             : string.Empty;
@@ -963,7 +966,7 @@ public class ReportsController : Controller
         string logoBase64 = "";
         if (!string.IsNullOrEmpty(institute.Logo))
         {
-            var imagePath = Path.Combine(_host.WebRootPath, "Images", "Institute", institute.Logo);
+            var imagePath = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", institute.Logo);
             if (System.IO.File.Exists(imagePath))
             {
                 byte[] imageBytes = await System.IO.File.ReadAllBytesAsync(imagePath);
@@ -1034,7 +1037,7 @@ public class ReportsController : Controller
         string logoBase64 = "";
         if (!string.IsNullOrEmpty(institute.Logo))
         {
-            var imagePath = Path.Combine(_host.WebRootPath, "Images", "Institute", institute.Logo);
+            var imagePath = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", institute.Logo);
             if (System.IO.File.Exists(imagePath))
             {
                 byte[] imageBytes = await System.IO.File.ReadAllBytesAsync(imagePath);
@@ -1072,7 +1075,7 @@ public class ReportsController : Controller
 
         string imageParam = "";
         var imagePath = Path.Combine(
-            _host.WebRootPath,
+            _tenantFiles.WebRootPath,
             "Images",
             "Institute",
             "institute.jpeg"
@@ -1164,17 +1167,17 @@ public class ReportsController : Controller
             ? defaultInstituteLogo
             : institute.Logo;
 
-        string logoPath = Path.Combine(_host.WebRootPath, "Images", "Institute", logoFileName);
+        string logoPath = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", logoFileName);
 
         if (!System.IO.File.Exists(logoPath))
         {
             await _appLogger.InfoAsync($"Institute logo not found");
-            logoPath = Path.Combine(_host.WebRootPath, "Images", "Institute", defaultInstituteLogo);
+            logoPath = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", defaultInstituteLogo);
         }
 
         string imageParam = ConvertImageToBase64(logoPath);
 
-        string signaturePath = Path.Combine(_host.WebRootPath, "Images", "Institute", "signature.jpg");
+        string signaturePath = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", "signature.jpg");
         string signatureParam = System.IO.File.Exists(signaturePath)
             ? Convert.ToBase64String(await System.IO.File.ReadAllBytesAsync(signaturePath))
             : string.Empty;
@@ -1448,7 +1451,7 @@ public class ReportsController : Controller
     /// </summary>
     private async Task<string> LoadInstituteLogoAsync(string imageName)
     {
-        var imageDirectory = Path.Combine(_host.WebRootPath, "Images", "Institute");
+        var imageDirectory = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute");
 
         var candidates = new[]
         {

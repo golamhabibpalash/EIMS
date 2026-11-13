@@ -42,13 +42,16 @@ public class TicketsController : Controller
     private readonly IAppLogger _appLogger;
     private readonly INotificationService _notificationService;
 
+    private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
+
     public TicketsController(
         ITicketManager ticketManager,
         UserManager<ApplicationUser> userManager,
         IWebHostEnvironment host,
         IAppLogger appLogger,
-        INotificationService notificationService)
+        INotificationService notificationService, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles)
     {
+        _tenantFiles = tenantFiles;
         _ticketManager = ticketManager;
         _userManager = userManager;
         _host = host;
@@ -468,7 +471,7 @@ public class TicketsController : Controller
 
     #region helpers
 
-    private string AttachmentFolder() => Path.Combine(_host.WebRootPath, "Uploads", "Tickets");
+    private string AttachmentFolder() => Path.Combine(_tenantFiles.WebRootPath, "Uploads", "Tickets");
 
     /// <summary>
     /// Saves the uploaded files and returns a message for each one that was

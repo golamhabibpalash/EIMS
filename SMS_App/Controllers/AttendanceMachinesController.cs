@@ -33,8 +33,11 @@ public class AttendanceMachinesController : Controller
     private readonly IAcademicSectionManager _academicSectionManager;
     private readonly IWebHostEnvironment _host;
 
-    public AttendanceMachinesController(IHttpContextAccessor contextAccessor, IAttendanceMachineManager attendanceMachineManager, IEmployeeManager employeeManager, IStudentManager studentManager, IDesignationManager designationManager, IAcademicClassManager academicClassManager, IAcademicSessionManager academicSessionManager, IPhoneSMSManager phoneSMSManager, IInstituteManager instituteManager, IAcademicSectionManager academicSectionManager, IWebHostEnvironment host, IParamBusConfigManager paramBusConfigManager = null)
+    private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
+
+    public AttendanceMachinesController(IHttpContextAccessor contextAccessor, IAttendanceMachineManager attendanceMachineManager, IEmployeeManager employeeManager, IStudentManager studentManager, IDesignationManager designationManager, IAcademicClassManager academicClassManager, IAcademicSessionManager academicSessionManager, IPhoneSMSManager phoneSMSManager, IInstituteManager instituteManager, IAcademicSectionManager academicSectionManager, IWebHostEnvironment host, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles, IParamBusConfigManager paramBusConfigManager = null)
     {
+        _tenantFiles = tenantFiles;
         _contextAccessor = contextAccessor;
         _attendanceMachineManager = attendanceMachineManager;
         _employeeManager = employeeManager;
@@ -119,7 +122,7 @@ public class AttendanceMachinesController : Controller
         byte[] logo = null;
         if (!string.IsNullOrEmpty(institute?.Logo))
         {
-            var logoPath = Path.Combine(_host.WebRootPath, "Images", "Institute", Path.GetFileName(institute.Logo));
+            var logoPath = Path.Combine(_tenantFiles.WebRootPath, "Images", "Institute", Path.GetFileName(institute.Logo));
             if (System.IO.File.Exists(logoPath))
                 logo = await System.IO.File.ReadAllBytesAsync(logoPath);
         }

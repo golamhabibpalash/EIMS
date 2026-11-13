@@ -35,9 +35,10 @@ public class AccountsController : Controller
     private readonly ILogManager _logManager;
     private readonly IAppLogger _appLogger;
     private readonly IMemoryCache _cache;
+    private readonly SMS.BLL.MultiTenancy.ITenantContext _tenant;
     //private readonly ApplicationDbContext _context;
 
-    public AccountsController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IStudentManager studentManager, IEmployeeManager employeeManager, RoleManager<IdentityRole> roleManager, IPhoneSMSManager phoneSMSManager, IInstituteManager instituteManager, ILogger<AccountsController> logger, ILogManager logManager, IMemoryCache cache, IAppLogger appLogger = null)
+    public AccountsController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IStudentManager studentManager, IEmployeeManager employeeManager, RoleManager<IdentityRole> roleManager, IPhoneSMSManager phoneSMSManager, IInstituteManager instituteManager, ILogger<AccountsController> logger, ILogManager logManager, IMemoryCache cache, SMS.BLL.MultiTenancy.ITenantContext tenant, IAppLogger appLogger = null)
     {
         _signInManager = signInManager;
         _userManager = userManager;
@@ -49,6 +50,7 @@ public class AccountsController : Controller
         _logger = logger;
         _logManager = logManager;
         _cache = cache;
+        _tenant = tenant;
         _appLogger = appLogger;
     }
 
@@ -847,7 +849,7 @@ public class AccountsController : Controller
                 // Role membership feeds the request principal via
                 // PermissionClaimsTransformation: drop the cached set so the
                 // change applies on the user's next request, no re-login.
-                _cache.Remove(PermissionClaimsTransformation.CacheKey(
+                _cache.Remove(PermissionClaimsTransformation.CacheKey(_tenant,
                     user.Id, await _userManager.GetSecurityStampAsync(user)));
                 if (i < (model.Count - 1))
                 {

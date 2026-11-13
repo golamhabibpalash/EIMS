@@ -47,6 +47,7 @@ namespace SMS_App.Utilities.ShortMessageService
         private readonly IPhoneSMSManager _phoneSMSManager;
         private readonly IAttendanceMachineManager _attendanceMachineManager;
         private readonly ILogger<AttendanceSmsNotifier> _logger;
+        private readonly SMS.BLL.MultiTenancy.ITenantContext _tenant;
 
         public AttendanceSmsNotifier(
             IStudentManager studentManager,
@@ -55,8 +56,10 @@ namespace SMS_App.Utilities.ShortMessageService
             ISetupMobileSMSManager setupMobileSMSManager,
             IPhoneSMSManager phoneSMSManager,
             IAttendanceMachineManager attendanceMachineManager,
-            ILogger<AttendanceSmsNotifier> logger)
+            ILogger<AttendanceSmsNotifier> logger,
+            SMS.BLL.MultiTenancy.ITenantContext tenant)
         {
+            _tenant = tenant;
             _studentManager = studentManager;
             _employeeManager = employeeManager;
             _instituteManager = instituteManager;
@@ -149,7 +152,7 @@ namespace SMS_App.Utilities.ShortMessageService
             if (string.IsNullOrWhiteSpace(mobileNumber))
                 return AttendanceSmsResult.Skip($"{name} has no contact number on file");
 
-            var alreadySent = !SmsSendGate.TryClaim(mobileNumber, attendanceType) || await _phoneSMSManager.IsSMSSendForAttendance(
+            var alreadySent = !SmsSendGate.TryClaim(mobileNumber, attendanceType, _tenant.Current?.Key) || await _phoneSMSManager.IsSMSSendForAttendance(
                 mobileNumber, attendanceType, DateTime.Now.ToString("yyyyMMdd"));
 
             if (alreadySent)
