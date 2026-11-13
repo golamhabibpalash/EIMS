@@ -203,6 +203,17 @@ builder.Services.AddAuthentication().AddJwtBearer(JwtBearerDefaults.Authenticati
     {
         OnTokenValidated = async context =>
         {
+            // Refresh tokens share this signing key, issuer and audience, so they
+            // would otherwise pass validation here and act as 30-day bearer tokens
+            // (skipping the security-stamp check that /API/Auth/refresh does).
+            // Only short-lived access tokens may call the API.
+            var tokenType = context.Principal?.FindFirst(JwtTokenService.TokenTypeClaim)?.Value;
+            if (!string.Equals(tokenType, JwtTokenService.AccessTokenType, StringComparison.Ordinal))
+            {
+                context.Fail("Only access tokens are accepted.");
+                return;
+            }
+
             var transformer = context.HttpContext.RequestServices
                 .GetRequiredService<Microsoft.AspNetCore.Authentication.IClaimsTransformation>();
             context.Principal = await transformer.TransformAsync(context.Principal);
@@ -231,6 +242,12 @@ builder.Services.AddRateLimiter(options =>
         RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions { PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    // Mobile app sign-in, per client IP. Looser than the admission limit because a
+    // whole school's Wi-Fi or a mobile carrier's NAT can share one IP.
+    options.AddPolicy(MobileApiRateLimits.Login, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
 
 // Fix Auto Logout Issue
