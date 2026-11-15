@@ -300,9 +300,10 @@ public class StudentPaymentRepository : Repository<StudentPayment>, IStudentPaym
                 .Include(s => s.AcademicClass)
                 .Include(s => s.AcademicSection)
                 .Include(s => s.AcademicSession)
-                .Where(s => s.Status)
                 .ToListAsync();
 
+            // Active and inactive students are both returned; callers filter on Status. (This used
+            // to keep only active students, so the "Inactive" filter could never match anything.)
             var uniqueIds = students.Select(s => s.UniqueId).ToList();
 
             var allocations = await _context.StudentFeeAllocations
@@ -317,12 +318,18 @@ public class StudentPaymentRepository : Repository<StudentPayment>, IStudentPaym
                 .Select(g => new { UniqueId = g.Key, TotalPaid = g.Sum(p => p.TotalPayment) })
                 .ToListAsync();
 
+            var payableByUniqueId = allocations.ToDictionary(a => a.UniqueId, a => a.TotalPayable);
+            var paidByUniqueId = payments.Where(p => p.UniqueId != null)
+                .ToDictionary(p => p.UniqueId, p => p.TotalPaid);
+
             var result = students.Select(s =>
             {
-                var alloc = allocations.FirstOrDefault(a => a.UniqueId == s.UniqueId);
-                var pay = payments.FirstOrDefault(p => p.UniqueId == s.UniqueId);
-                var payable = alloc?.TotalPayable ?? 0;
-                var paid = pay?.TotalPaid ?? 0;
+                double payable = 0, paid = 0;
+                if (s.UniqueId != null)
+                {
+                    payableByUniqueId.TryGetValue(s.UniqueId, out payable);
+                    paidByUniqueId.TryGetValue(s.UniqueId, out paid);
+                }
 
                 return new PreviouisPaymentDetailsDto
                 {

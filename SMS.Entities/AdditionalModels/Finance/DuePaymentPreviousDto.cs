@@ -9,6 +9,8 @@ public class DuePaymentPreviousDto
     public int AcademicSectionId { get; set; }
     public int StudentId { get; set; }
     public string Status { get; set; }
+    /// <summary>When true, students whose balance is zero or in advance are left out of the list.</summary>
+    public bool DueOnly { get; set; } = true;
 
     public AcademicClass AcademicClass { get; set; }
     public AcademicSection AcademicSection { get; set; }
@@ -24,6 +26,8 @@ public class DuePaymentPreviousDto
 public class DuePayment
 {
     public Student Student { get; set; }
+    public double PayableAmount { get; set; }
+    public double PaidAmount { get; set; }
     public double TotalDue { get; set; }
 }
 public class PreviouisPaymentDetailsDto

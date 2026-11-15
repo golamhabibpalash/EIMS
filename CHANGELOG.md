@@ -25,6 +25,25 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-15
+
+### Added
+- **Sort and export on Due Payment (Previous)**: click any column heading to sort the due
+  list, and use the search box to find a student by name, roll, ID or phone. The new
+  **Export** button downloads the list as Excel, CSV or PDF in the same order and with the
+  same search you see on screen, and **Print** prints every matching student.
+- **More detail on Due Payment (Previous)**: the list now shows each student's unique ID,
+  class, contact number, status, and total payable and paid next to the due amount, with
+  totals at the top and bottom that update as you search.
+- **Only students with a due**: a new switch (on by default) hides students who have
+  nothing left to pay; turn it off to see everyone.
+
+### Fixed
+- **Inactive students on Due Payment (Previous)**: choosing status "Inactive" now lists
+  inactive students' dues instead of always showing nothing.
+- **Report heading on Due Payment (Previous)**: the heading now names the class, section
+  and student you chose instead of always saying "All Class".
+
 ## [1.4.0] - 2026-11-14
 
 ### Added

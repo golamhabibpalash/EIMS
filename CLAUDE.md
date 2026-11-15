@@ -36,7 +36,7 @@ dotnet run --project SMS_App/SMS_App.csproj
 dotnet ef database update
 ```
 
-**Tests**: `SMS.Tests/` (xUnit, in the solution) holds the multi-tenancy isolation tests; run `dotnet test SMS.Tests/SMS.Tests.csproj`. CI publishes only `SMS_App.csproj`, so tests are never deployed. Most features still have no tests: verify them by building and running the app.
+**Tests**: `SMS.Tests/` (xUnit, in the solution) holds the multi-tenancy isolation tests; run `dotnet test SMS.Tests/SMS.Tests.csproj`, or a single class/test with `--filter "FullyQualifiedName~TenantIsolationTests"`. They need no database: `SMS.Tests/MultiTenancy/TestPlatform.cs` provides an in-memory `FakePlatformRepository` (e.g. `TwoSchools()`), and the project references `SMS_App` directly. CI publishes only `SMS_App.csproj`, so tests are never deployed. Most features still have no tests: verify them by building and running the app.
 
 The SQL Server migration history lives in `SMS.DB/Migrations_SqlServer/`. The PostgreSQL
 database is provisioned from a dump (see `Resources/docker/setup-eims-postgres.ps1`), not from
@@ -105,7 +105,7 @@ SMS.Frameworks   → Shared utilities, tag helpers, encryption
 - Anything cached, grouped or stored per school must include the tenant: use `tenant.Scoped(key)` / `TenantInfo.Key`. Uploaded files go through `ITenantFileStorage.WebRootPath` / `PrivatePath(...)`, **not** `IWebHostEnvironment.WebRootPath` (that is only for shipped assets such as `Reports/*.rdlc`).
 - Logins carry the `schoolbd_tenant` claim (`TenantClaims`); any new auth scheme must add and validate it.
 - `GlobalUI` is per-request now (backed by `HttpContext.Items`); keep using it as before.
-- Onboarding is the `platform` CLI (`dotnet SMS_App.dll platform help`); the registry schema is `Resources/sql/Platform_{SqlServer,PostgreSQL}.sql`. `/health` and `/build-info` are answered before tenancy/auth in `Program.cs`.
+- Onboarding is the `platform` CLI (`dotnet SMS_App.dll platform help`); the registry schema is `Resources/sql/Platform_{SqlServer,PostgreSQL}.sql`. On the VPS the platform runs as its own systemd service (`schoolbd-platform`, port 5100, secrets in `/etc/schoolbd/platform.env`), installed by `Resources/deployment/multitenant/install-platform.sh` from the publish dir `eims-deploy.sh` leaves behind; `new-school.sh <code> "<name>" <admin-email>` provisions a school (PG role + DB, registry row, `<code>.schoolbd.net`). `deploy.yml` does **not** update this service; re-run `install-platform.sh` after a release. `/health` and `/build-info` are answered before tenancy/auth in `Program.cs`.
 - Not supported yet in multi-tenant mode: Hangfire (forced off), ZKTeco devices addressed by IP, central identity.
 
 ### Real-Time Notifications (SignalR)
@@ -206,7 +206,7 @@ Persisted to `SMS_App/Keys/` for shared hosting stability. App name: `"SMS_App"`
 - Every deploy is verified against the anonymous `/build-info` endpoint (`<version> <commit>`, mapped in `Program.cs`); the job fails if the instance isn't running the released commit.
 - Deploys never touch `appsettings*.json`, `Keys/`, `logs/`, `App_Data/`, `wwwroot/Uploads/` or `wwwroot/Images/` — per-client config is edited on each server. Schema scripts in `Resources/sql/` must be run on every instance before pushing a release that needs them. Setup, secrets and adding a client: `Resources/deployment/CICD.md`.
 - The product version is `VersionPrefix` in `Directory.Build.props` (bumped by hand); CI appends build number, commit, and timestamp, and `SMS_App/BuildInfo.cs` reads them back for the UI footer. Local builds show build `0` / commit `local`.
-- **Every shipped change bumps the version** (SemVer: MAJOR = breaking/needs a schema script or user notice, MINOR = new feature, PATCH = fixes/UI/perf/CI only) and adds an entry to `CHANGELOG.md` (shown to users in the Version dialog via `SMS_App/ReleaseNotes.cs`, so write it in plain language per task; prefix pipeline-only entries with `CI` to hide them). Bump once per release, not once per commit: if `[Unreleased]`/the current version hasn't been deployed yet, add to it and raise the bump level only if the new change is bigger.
+- **Every shipped change bumps the version** (SemVer: MAJOR = breaking/needs a schema script or user notice, MINOR = new feature, PATCH = fixes/UI/perf/CI only) and adds an entry to `CHANGELOG.md` (shown to users in the Version dialog via `SMS_App/ReleaseNotes.cs`, so write it in plain language per task; prefix pipeline-only entries with `CI` to hide them). `ReleaseNotes.cs` parses the file, so keep headings as `## [x.y.z] - yyyy-mm-dd`, groups as `### Added` / `### Fixed` / `### Changed`, and one `- ` bullet per task with continuation lines indented two spaces. Bump once per release, not once per commit: if `[Unreleased]`/the current version hasn't been deployed yet, add to it and raise the bump level only if the new change is bigger.
 - `Resources/deployment/unityschoolbd/` holds the manual Windows fallback (`publish-windows.sh`, `DEPLOY.md`) and the `web.config` template CI uses when a server has none. For a manual Linux deploy run `eims-deploy.sh` on the box; the app runs as `www-data`, and `rsync -a` from a Mac rewrites ownership, so use `--no-owner --no-group` there.
 
 ## Notable Files

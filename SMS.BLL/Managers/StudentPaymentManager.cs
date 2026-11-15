@@ -1,4 +1,4 @@
-using BLL.Managers.Base;
+﻿using BLL.Managers.Base;
 using SMS.BLL.Contracts;
 using SMS.DAL.Contracts;
 using SMS.Entities;
@@ -404,35 +404,39 @@ public class StudentPaymentManager : Manager<StudentPayment>, IStudentPaymentMan
         return fee;
     }
 
-    public async Task<List<DuePayment>> GetPreviousDuesAsync(int? studentId, int? sectionId, int academicClassId, bool? status)
+    public async Task<List<DuePayment>> GetPreviousDuesAsync(int? studentId, int? sectionId, int academicClassId, bool? status, bool dueOnly = false)
     {
         var allSummery = await _studentPaymentRepository.GetAllStudentsPaymentSummeryAsync();
-        var allClass = await _academicClassManager.GetAllAsync();
-        var allStudents = await _studentManager.GetAllAsync();
+        IEnumerable<PreviouisPaymentDetailsDto> query = allSummery;
 
-        if (academicClassId>0)
-        {
-            allSummery = allSummery.Where(s => s.CurrentClassId == academicClassId).ToList();
-        }
-        if (sectionId!=null && sectionId>0)
-        {
-            allSummery = allSummery.Where(s => s.AcademicSectionId == sectionId).ToList();
-        }
-        if (studentId!=null && studentId>0)
-        {
-            allSummery = allSummery.Where(s => s.StudentId == studentId).ToList();
-        }
-        if(status!=null)
-        {
-            allSummery = allSummery.Where(s => s.Status == status).ToList();
-        }
-        var duePayments = allSummery.Select(s => new DuePayment
-        {
-            Student = allStudents.FirstOrDefault(st => st.Id == s.StudentId),
-            TotalDue = s.DueAmount
-        }).ToList();
+        if (academicClassId > 0)
+            query = query.Where(s => s.CurrentClassId == academicClassId);
+        if (sectionId is > 0)
+            query = query.Where(s => s.AcademicSectionId == sectionId);
+        if (studentId is > 0)
+            query = query.Where(s => s.StudentId == studentId);
+        if (status != null)
+            query = query.Where(s => s.Status == status);
+        if (dueOnly)
+            query = query.Where(s => s.DueAmount > 0);
 
-        return duePayments;
+        var filtered = query.ToList();
+        if (filtered.Count == 0)
+            return new List<DuePayment>();
+
+        // One lookup instead of scanning the full student list once per row.
+        var studentsById = (await _studentManager.GetAllAsync()).ToDictionary(st => st.Id);
+
+        return filtered
+            .Where(s => studentsById.ContainsKey(s.StudentId))
+            .Select(s => new DuePayment
+            {
+                Student = studentsById[s.StudentId],
+                PayableAmount = s.PayableAmount,
+                PaidAmount = s.PaidAmount,
+                TotalDue = s.DueAmount
+            })
+            .ToList();
     }
 
     public async Task<ProfilePayment> GetProfilePaymentAsync(int studentId)
