@@ -1,375 +1,247 @@
-﻿@model SMS_App.ViewModels.PaymentVM.DuePaymentVM
+﻿@using SMS.BLL.Managers;
+@using SMS.Entities;
+@using SMS_App.ViewModels.PaymentVM;
+@model DuePaymentVM
 @{
-    int sl = 0;
-    string sectionName = string.Empty;
-    ViewBag.ClassName = string.Empty;
-    string activeInactiveClass = string.Empty;
+    ViewData["Title"] = "Due Payment";
+    bool isFromPost = ViewBag.isFromPost ?? false;
+    bool hasRows = Model.DuePayments.Count > 0;
+    var today = DateTime.Today;
+    string Iso(DateTime? d) => d?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "";
+
+    var results = new DueListResultsVM
+    {
+        Rows = Model.DuePayments,
+        Institute = Model.Institute,
+        ReportTitle = "Due Payments (session)",
+        ScopeLines = Model.DescribeFilters(),
+        IsFromPost = isFromPost,
+        DueOnly = Model.DueOnly,
+        EmptyHint = "Leave the dates empty for the whole session, or pick a fee period such as \"Up to this month\"."
+    };
 }
-@section Styles{
-    @* <link href="~/lib/DataTable/css/cdn.datatables.net_buttons_2.0.0_css_buttons.dataTables.min.css" rel="stylesheet" /> *@
-    @* <link href="~/lib/DataTable/css/cdn.datatables.net_1.11.5_css_jquery.dataTables.min.css" rel="stylesheet" /> *@
+@section Styles {
+    <link rel="stylesheet" href="~/css/due-list.css" asp-append-version="true" />
     <style>
-        .dataTables_length, .dataTables_filter
-        {
-            margin-left: 10px;
-            float: right;
-        }
-
-        .dt-buttons
-        {
-            float: right;
-        }
-
-        .inActiveStudent
-        {
-            color: red;
-        }
-
-        .activeStudent
-        {
-            color: #000;
-        }
+        .period-presets .btn { white-space: nowrap; font-size: .8rem; }
     </style>
 }
-<div class="row">
-    <div class="col-md-3">
-        <div class="row">
-            <div class="col-md-12">
-                <fieldset class="border-primary p-2 border">
-                    <legend  class="float-none w-auto text-primary px-2"
-                        style="font-size: 1.1rem; position: relative;">Select Criteria</legend>
-                    <form id="studentInfoForm" asp-action="DuePayment">
-                        <div class="form-group row">
-                            <label asp-for="AcademicClassId" class="col-md-4 col-form-label text-md-end">Academic Class :</label>
-                            <div class="col-md-8">
-                                <select class="form-control" asp-for="AcademicClassId" asp-items="Model.AcademicClassList">
-                                    <option selected disabled value="">Select Academic Class</option>
-                                    <option value="0">All Class</option>
-                                </select>
-                                <span asp-validation-for="AcademicClassId" class="text-danger"></span>
-                            </div>
-                        </div>
-                        <div class="form-group row">
-                            <label asp-for="AcademicSectionId" class="col-md-4 col-form-label text-md-end">Section :</label>
-                            <div class="col-md-8">
-                                <select class="form-control" asp-for="AcademicSectionId" asp-items="Model.AcademicSectionList">
-                                    <option selected disabled value="">Select Academic Section</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group row">
-                            <label asp-for="ResidentialStatus" class="col-md-4 col-form-label text-md-end">Is Residential :</label>
-                            <div class="col-md-8">
-                                <select class="form-control" name="isResidential" asp-items="@Model.StudentCategorySelectList">
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group row">
-                            <label asp-for="StudentStatus" class="col-md-4 col-form-label text-md-end">Status :</label>
-                            <div class="col-md-8">
-                                <select class="form-control" name="status" asp-items="@Model.StudentStatusSelectList">
-                                </select>
-                            </div>
-                        </div>
-                        <div class="form-group row">
-                            <div class="col-md-6 offset-md-6 text-right">
-                                <button type="submit" id="LoadButton" class="btn btn-sm btn-info" onclick="onSubmitAction()">Get List</button><br />
-                                @{
-                                    if (Model.ShowCount != null)
-                                    {
-                                        <span>Total Found @Model.ShowCount</span><br/>
-                                        @if (ViewBag.totalExecuteTime!=null)
-                                        {
-                                            <span>@ViewBag.totalExecuteTime</span>
-                                        }
-                                    }
-                                }
-                            </div>
-                        </div>
-                    </form>
-                </fieldset><br />
-                <div class="row m-2" id="exportPortion" style="visibility:hidden">
-                    <div class="col-md-3 offset-md-9 text-md-end">
-                        <!-- Add a button to trigger the export -->
-                        @*<button id="exportPdfButton">Export to PDF</button>*@
 
-                        <!-- Add a button to trigger the export -->
-                        <button class=" btn btn-sm btn-success" id="exportExcelButton">Export <i class="fas fa-file-excel"></i></button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-md-12" id="InvalidForm" style="display:none">
-                <div><h2 class="text-danger"> Please Select all the field</h2></div>
+<div class="card shadow-sm mb-3 no-print">
+    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <h5 class="mb-0"><i class="fa fa-money-bill-wave me-2"></i> Due Payment</h5>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="printBtn" @(hasRows ? "" : "disabled")
+                    title="Print the list as shown">
+                <i class="fa fa-print"></i> Print
+            </button>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"
+                        id="exportBtn" @(hasRows ? "" : "disabled")
+                        title="@(hasRows ? "Download the list in its current order and search" : "Load a list first")">
+                    <i class="fa fa-download"></i> Export
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="exportBtn">
+                    <li><a class="dropdown-item export-link" href="#" data-format="xlsx"><i class="fa fa-file-excel text-success me-2"></i> Excel (.xlsx)</a></li>
+                    <li><a class="dropdown-item export-link" href="#" data-format="csv"><i class="fa fa-file-csv text-primary me-2"></i> CSV</a></li>
+                    <li><a class="dropdown-item export-link" href="#" data-format="pdf"><i class="fa fa-file-pdf text-danger me-2"></i> PDF</a></li>
+                </ul>
             </div>
         </div>
     </div>
-    <div class="col-md-9 p-3 bg-blue-sky" id="iframe-container" style="overflow:scroll;height:800px">
-        @if (Model.DuePayments != null && Model.DuePayments.Count() > 0)
-        {
-            <table class="table table-hover table-bordered table-striped display" id="myTable" style="width:100%;">
-                <thead>
-                    <tr>
-                        <td colspan="7" class="text-center pb-0 mb-0">
 
-                            <div class="row">
-                                <div class="col-md-5 text-md-end">
-                                    <img src="~/Images/Institute/@Model.Institute.Logo" 
-                                        alt="Alternate Text"
-                                        style="width:100px" 
-                                        onerror="this.onerror=null;this.src='/images/institute/smslogo.png';" />
-                                </div>
-                                <div class="col-md-7 text-md-start">
-                                    <h2 class="text-info font-weight-bolder"> @Model.Institute.Name</h2>
-                                    <h5 class="h5">@Model.Institute.Address</h5>
-                                    <h6 class="font-italic" style="text-decoration:underline">Due Payment (Current)</h6>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 text-md-start">
-                                    @if (Model.AcademicClass != null)
-                                    {
-                                        @Model.AcademicClass.Name
-                                        ViewBag.ClassName = @Model.AcademicClass.Name;
-                                    }
-                                    else
-                                    {
-                                        <span>All Class</span>
-                                        ViewBag.ClassName = "All Class";
-                                    }
-                                </div>
-                                <div class="col-md-6 text-md-end"><span>Date:@DateTime.Now.ToString("dd MMM yyyy")</span> </div>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th class="no-sort">#</th>
-                        <th>Class Roll</th>
-                        <th>Student Name</th>
-                        <th>Academic Section</th>
-                        <th>Phone No</th>
-                        <th class="text-right">Due Amount</th>
-                        <th class="text-center action no-sort" id="action">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var item in Model.DuePayments.OrderBy(s => s.Student.ClassRoll))
-                    {
-                        activeInactiveClass = item.Student.Status ? "activeStudent" : "inActiveStudent";
-                        <tr>
-                            <td>@(++sl)</td>
-                            <td>@item.Student.ClassRoll</td>
-
-
-                            @if (item.Student.Status == true)
-                            {
-                                <td>@item.Student.Name <span>
-    @if (item.Student.IsResidential)
-    {
-        <span class="badge badge-info"><i class="fas fa-home"></i></span>
-    }
-</span></td>
-                            }
-                            else
-                            {
-                        <td class="" style="color:red">
-                            @item.Student.Name
-                            @if (item.Student.IsResidential)
-                            {
-                                <span class="badge badge-info"><i class="fas fa-home"></i></span>
-                            }
-
-                        </td>
-                            }
-
-                            @if (item.Student.AcademicSection == null)
-                            {
-                                <td>N/A</td>
-                            }
-                            else
-                            {
-                                <td>@item.Student.AcademicSection.Name</td>
-                            }
-                            <td>@item.Student.GuardianPhone?.PadLeft(11,'0')</td>
-                            <td class="text-right">@item.TotalDue</td>
-                            <td class="text-center action">
-                                <span class="btn-group-sm">
-                                    <a class="btn btn-sm btn-group-sm btn-info" asp-action="StudentPaymentInfoExport" asp-controller="Reports" asp-route-reportType="pdf" asp-route-fileName="payment_report_@item.Student.ClassRoll" asp-route-classRoll="@item.Student.ClassRoll" asp-route-fromDate="@item.Student.AdmissionDate.ToString("yyyy-MM-dd")" asp-route-toDate="@DateTime.Today.ToString("yyyy-MM-dd")" target="_blank">
-                                        <span class="fa fa-file"></span> Pay Slip
-                                    </a>
-                                    <a class="btn btn-sm btn-group-sm btn-primary" asp-action="Details" asp-controller="Students" asp-fragment="financials" asp-route-tabName="financials" asp-route-id="@item.Student.Id">details</a>
-                                    <a class="btn btn-sm btn-group-sm btn-success" asp-action="Payment" asp-controller="StudentPayments" asp-route-stRoll="@item.Student.ClassRoll">Pay</a>
-                                </span>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-
-        }
-        else
-        {
-            if (ViewBag.isFromPost)
-            {
-                <div class="well">
-                    <h3>Data not found</h3>
+    <div class="card-body py-3">
+        <form id="dueForm" asp-action="DuePayment" method="post" novalidate>
+            <div class="row g-2 align-items-end">
+                <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
+                    <label for="AcademicSessionId" class="form-label mb-1 small text-muted">Session</label>
+                    <select class="form-select form-select-sm" asp-for="AcademicSessionId">
+                        @foreach (var s in Model.AcademicSessionList)
+                        {
+                            <option value="@s.Value" selected="@s.Selected"
+                                    data-year="@DuePeriodRules.SessionYear(new AcademicSession { Name = s.Text }, today)">@s.Text</option>
+                        }
+                    </select>
                 </div>
-            }
-        }
+                <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
+                    <label for="AcademicClassId" class="form-label mb-1 small text-muted">Class</label>
+                    <select class="form-select form-select-sm" asp-for="AcademicClassId" asp-items="Model.AcademicClassList">
+                        <option value="0">All classes</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
+                    <label for="AcademicSectionId" class="form-label mb-1 small text-muted">Section</label>
+                    <select class="form-select form-select-sm" asp-for="AcademicSectionId" asp-items="Model.AcademicSectionList"
+                            disabled="@(Model.AcademicClassId > 0 ? null : "disabled")">
+                        <option value="0">All sections</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
+                    <label for="Category" class="form-label mb-1 small text-muted">Category</label>
+                    <select class="form-select form-select-sm" asp-for="Category">
+                        <option value="all">All</option>
+                        <option value="residential">Residential</option>
+                        <option value="nonResidential">Non-residential</option>
+                    </select>
+                </div>
+                <div class="col-xl-2 col-lg-4 col-md-4 col-sm-6">
+                    <label for="Status" class="form-label mb-1 small text-muted">Student status</label>
+                    <select class="form-select form-select-sm" asp-for="Status">
+                        <option value="2">All</option>
+                        <option value="1">Active</option>
+                        <option value="0">Inactive</option>
+                    </select>
+                </div>
+            </div>
+
+            <fieldset class="row g-2 align-items-end mt-1">
+                <legend class="visually-hidden">Fee period</legend>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+                    <label for="FromDate" class="form-label mb-1 small text-muted">Fee period from</label>
+                    <input type="date" class="form-control form-control-sm" id="FromDate" name="FromDate" value="@Iso(Model.FromDate)"
+                           min="@Model.SessionYear-01-01" max="@Model.SessionYear-12-31" />
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+                    <label for="ToDate" class="form-label mb-1 small text-muted">to</label>
+                    <input type="date" class="form-control form-control-sm" id="ToDate" name="ToDate" value="@Iso(Model.ToDate)"
+                           min="@Model.SessionYear-01-01" max="@Model.SessionYear-12-31" aria-describedby="periodHelp" />
+                </div>
+                <div class="col-xl-3 col-lg-3 col-md-6 col-sm-6">
+                    <div class="form-check form-switch mb-1">
+                        <input class="form-check-input" type="checkbox" role="switch" asp-for="DueOnly">
+                        <label class="form-check-label small" for="DueOnly">Only students with a due</label>
+                    </div>
+                </div>
+                <div class="col-xl-2 col-lg-3 col-md-6 col-sm-6 text-end">
+                    <button type="submit" id="loadBtn" class="btn btn-primary btn-sm w-100">
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                        <span class="btn-label"><i class="fa fa-search"></i> Get list</span>
+                    </button>
+                </div>
+                <div class="col-12">
+                    <span asp-validation-for="ToDate" class="text-danger small d-block"></span>
+                    <div class="d-flex flex-wrap align-items-center gap-1 period-presets" role="group" aria-label="Quick fee periods">
+                        <span class="small text-muted me-1">Quick period:</span>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" data-preset="month">This month</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" data-preset="upto">Up to this month</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" data-preset="last3">Last 3 months</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" data-preset="all">Whole session</button>
+                    </div>
+                    <div id="periodHelp" class="form-text mt-1">
+                        Fees are charged by month: any month the period touches is included, with only the payments made
+                        against those fees. Leave both dates empty for the whole session.
+                    </div>
+                </div>
+            </fieldset>
+        </form>
     </div>
 </div>
 
+<partial name="_DueListResults" model="results" />
 
-
-@section Scripts{
-    @* <script src="~/lib/DataTable/js/jquery-3.7.0.js"></script> *@
-    @* <script src="~/lib/DataTable/js/jquery.dataTables.min.js"></script> *@
-    @* <script src="~/lib/DataTable/js/dataTables.buttons.min.js"></script> *@
-    @* <script src="~/lib/DataTable/js/jszip.min.js"></script>
-    <script src="~/lib/DataTable/js/pdfmake.min.js"></script>
-    <script src="~/lib/DataTable/js/vfs_fonts.js"></script>
-    <script src="~/lib/DataTable/js/buttons.html5.min.js"></script> *@
-
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.4/xlsx.full.min.js"></script>
+@section Scripts {
+    <script src="~/js/due-list.js" asp-append-version="true"></script>
     <script>
-        @* $(document).ready(function () {
-            $('#myTable').dataTable({
-                "lengthMenu": [[25, 50, 100, -1], [25, 50, 100, "All"]],
-                "dom": 'lBfrtip',
-                'columnDefs': [{
-                    'targets': '.no-sort', // column index (start from 0)
-                    'orderable': false, // set orderable false for selected columns
-                }],
-                buttons: ['copy', 'excel', 'pdf'],
-            });
-            let myTable = $('#myTable').DataTable();
+        (function () {
+            const sectionsUrl = '/api/academicsections/getbyclasswithsessionId';
+            const exportUrl = '@Url.Action("DuePaymentExport", "StudentPayments")';
 
-            new $.fn.dataTable.Buttons(myTable, {
-                buttons: [
-                    {
-                        extend: 'copy',
-                        exportOptions: {
-                            columns: ':not(.action)'
-                        }
-                    },
-                    {
-                        extend: 'excel',
-                        exportOptions: {
-                            columns: ':not(.action)' // Exclude columns with the 'noExport' class
-                        }
-                    },
-                    {
-                        extend: 'pdf',
-                        exportOptions: {
-                            columns: ':not(.action)' // Exclude columns with the 'noExport' class
-                        }
-                    },
-                    {
-                        extend: 'print',
-                        exportOptions: {
-                            columns: ':not(.action)'
-                        }
-                    }
-                ]
-            });
-        }); *@
+            // Filters the CURRENT list was loaded with (not the live form, which the user may have
+            // changed without reloading), so an export always matches the rows on screen.
+            const applied = {
+                academicSessionId: '@Model.AcademicSessionId',
+                academicClassId: '@Model.AcademicClassId',
+                academicSectionId: '@Model.AcademicSectionId',
+                category: '@Model.Category',
+                status: '@Model.Status',
+                fromDate: '@Iso(Model.FromDate)',
+                toDate: '@Iso(Model.ToDate)',
+                dueOnly: '@Model.DueOnly.ToString().ToLowerInvariant()'
+            };
 
-        document.getElementById('exportExcelButton').addEventListener('click', function () {
-            // Get the table element
-            const table = document.getElementById('myTable');
+            const $session = $('#AcademicSessionId'), $class = $('#AcademicClassId'), $section = $('#AcademicSectionId');
+            const $from = $('#FromDate'), $to = $('#ToDate');
 
-            // Clone the table to modify it without affecting the original table
-            const clonedTable = table.cloneNode(true);
-
-            // Remove the 'action' column
-            const columnToRemove = 'action';
-            const columnIndex = Array.from(clonedTable.querySelectorAll('th')).findIndex(th => th.id === columnToRemove);
-            const rows = Array.from(clonedTable.querySelectorAll('tr'));
-            rows.forEach(row => {
-                const cells = Array.from(row.querySelectorAll('td, th'));
-                if (columnIndex >= 0) {
-                    cells.splice(columnIndex, 1); // Remove the cell for the 'action' column
-                }
-                row.innerHTML = cells.map(cell => cell.outerHTML).join('');
-            });
-
-            // Remove the <thead> element from the cloned table
-            const thead = clonedTable.querySelector('thead');
-            if (thead) {
-                thead.remove();
-            }
-            // Add a custom header row
-            const headerRow = document.createElement('tr');
-            const headers = ["SL", "Class Roll", "Student Name", "Class Section", "Phone", "Due Amount"];
-            headers.forEach(headerText => {
-                const th = document.createElement('th');
-                th.textContent = headerText;
-                headerRow.appendChild(th);
-            });
-
-            // Insert the header row at the top of the table body
-            const tbody = clonedTable.querySelector('tbody');
-            if (tbody) {
-                tbody.insertBefore(headerRow, tbody.firstChild);
-            } else {
-                const newTbody = document.createElement('tbody');
-                newTbody.appendChild(headerRow);
-                clonedTable.appendChild(newTbody);
+            function resetSelect($el, allText, disabled) {
+                $el.empty().append($('<option>').val('0').text(allText)).prop('disabled', disabled);
             }
 
-            // Create the workbook from the modified table
-            const wb = XLSX.utils.table_to_book(clonedTable);
+            function loadSections() {
+                const classId = $class.val();
+                resetSelect($section, 'All sections', true);
+                if (!classId || classId === '0') return;
+                $section.find('option').first().text('Loading…');
+                const p = new URLSearchParams({ classId: classId, sessionId: $session.val() || '0' });
+                $.ajax({ url: sectionsUrl + '?' + p.toString(), type: 'POST', dataType: 'json', cache: false })
+                    .done(function (data) {
+                        resetSelect($section, 'All sections', false);
+                        $.each(data || [], function (_, s) { $section.append($('<option>').val(s.id).text(s.name)); });
+                    })
+                    .fail(function () { resetSelect($section, 'Could not load sections', false); });
+            }
 
-            // Save the workbook as an Excel file
-            XLSX.writeFile(wb, `Due Payment ${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}_ClassName.xlsx`);
-        });
+            // ----- Fee period -------------------------------------------------------------
+            const pad = function (n) { return String(n).padStart(2, '0'); };
+            const iso = function (y, m, d) { return y + '-' + pad(m) + '-' + pad(d); };
+            const lastDay = function (y, m) { return new Date(y, m, 0).getDate(); }; // m is 1-12
+            const sessionYear = function () { return parseInt($session.find('option:selected').data('year'), 10) || new Date().getFullYear(); };
 
+            function applySessionBounds() {
+                const y = sessionYear();
+                const min = iso(y, 1, 1), max = iso(y, 12, 31);
+                $from.add($to).attr({ min: min, max: max }).each(function () {
+                    if (this.value && (this.value < min || this.value > max)) this.value = '';
+                });
+                // "This month" style presets only make sense for the session that contains today.
+                const isCurrentYear = y === new Date().getFullYear();
+                $('[data-preset="month"], [data-preset="upto"], [data-preset="last3"]')
+                    .prop('disabled', !isCurrentYear)
+                    .attr('title', isCurrentYear ? '' : 'Available for the session that includes today');
+                markPreset();
+            }
 
-
-        let isPost = '@ViewBag.isFromPost';
-
-        const ePortion = document.getElementById('exportPortion');
-        if (isPost == 'True') {
-            ePortion.style.visibility = 'visible';
-        }
-        else {
-            ePortion.style.visibility = 'hidden';
-        }
-
-
-        $('#AcademicClassId').change(function () {
-            let id = $('#AcademicClassId option:selected').val();
-            let sessionId = $('#AcademicSessionId option:selected').val();
-
-            $.ajax({
-                url: "/api/academicsections/getbyclasswithsessionId?classId=" + id + "&sessionId=" + sessionId,
-                dataType: "JSON",
-                type: "POST",
-                cache: false,
-                success: function (data) {
-                    $('#AcademicSectionId').empty();
-
-                    if (data != null || data != '') {
-                        var o = '<option disabled selected>Select Section Name</option>';
-                        var o2 = '<option value="0">All Section</option>';
-                        $('#AcademicSectionId').append(o);
-                        $('#AcademicSectionId').append(o2);
-                        $.each(data, function (i, obj) {
-                            var op = '<option value="' + obj.id + '">' + obj.name + '</option>';
-                            $('#AcademicSectionId').append(op);
-                        });
-                    }
-                    else {
-                        var o = '<option disabled selected>Section Not Found</option>';
-                        $('#AcademicSectionId').append(o);
-                    }
-                },
-                error: function (err) {
-                    console.log(err);
+            function presetRange(preset) {
+                const y = sessionYear(), now = new Date(), m = now.getMonth() + 1;
+                switch (preset) {
+                    case 'month': return [iso(y, m, 1), iso(y, m, lastDay(y, m))];
+                    case 'upto': return [iso(y, 1, 1), iso(y, m, lastDay(y, m))];
+                    case 'last3': { const s = Math.max(1, m - 2); return [iso(y, s, 1), iso(y, m, lastDay(y, m))]; }
+                    default: return ['', ''];
                 }
+            }
+
+            function markPreset() {
+                $('[data-preset]').each(function () {
+                    const r = presetRange($(this).data('preset'));
+                    const on = !this.disabled && $from.val() === r[0] && $to.val() === r[1];
+                    $(this).toggleClass('active', on).attr('aria-pressed', on);
+                });
+            }
+
+            $('[data-preset]').on('click', function () {
+                const r = presetRange($(this).data('preset'));
+                $from.val(r[0]); $to.val(r[1]);
+                markPreset();
             });
-        });
+            $from.add($to).on('change input', markPreset);
+
+            $session.on('change', function () { applySessionBounds(); loadSections(); });
+            $class.on('change', loadSections);
+
+            $('#dueForm').on('submit', function (e) {
+                if ($from.val() && $to.val() && $from.val() > $to.val()) {
+                    e.preventDefault();
+                    $('[data-valmsg-for="ToDate"]').text("The 'To' date must be on or after the 'From' date.");
+                    $to.addClass('is-invalid').trigger('focus');
+                    return false;
+                }
+                $to.removeClass('is-invalid');
+            });
+            // Disabled selects are not posted; the model binder then treats them as 0 ("all").
+            DueList.busyOnSubmit('#dueForm', '#loadBtn');
+
+            applySessionBounds();
+            DueList.init({ exportUrl: exportUrl, applied: applied });
+        })();
     </script>
 }

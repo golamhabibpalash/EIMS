@@ -7,7 +7,7 @@ using Xunit;
 
 namespace SMS.Tests.StudentPayments
 {
-    public class PreviousDueExportTests
+    public class DueListExportTests
     {
         private static DuePayment Due(int roll, string name, double payable, double paid, string section = null, bool active = true) => new()
         {
@@ -34,21 +34,21 @@ namespace SMS.Tests.StudentPayments
         [Fact]
         public void Default_sort_is_highest_due_first()
         {
-            var sorted = PreviousDueExport.Sort(Rows, null, null);
+            var sorted = DueListExport.Sort(Rows, null, null);
             Assert.Equal(new[] { 2, 3, 1 }, sorted.Select(r => r.Student.ClassRoll));
         }
 
         [Fact]
         public void Text_columns_sort_case_insensitively()
         {
-            var sorted = PreviousDueExport.Sort(Rows, "name", "asc");
+            var sorted = DueListExport.Sort(Rows, "name", "asc");
             Assert.Equal(new[] { "alice", "Bob", "Charlie" }, sorted.Select(r => r.Student.Name));
         }
 
         [Fact]
         public void Numeric_columns_sort_by_value_in_requested_direction()
         {
-            var sorted = PreviousDueExport.Sort(Rows, "paid", "desc");
+            var sorted = DueListExport.Sort(Rows, "paid", "desc");
             Assert.Equal(2500, sorted.First().PaidAmount);
             Assert.Equal(new[] { 2, 3 }, sorted.Skip(1).Select(r => r.Student.ClassRoll)); // tie broken by roll
         }
@@ -56,30 +56,30 @@ namespace SMS.Tests.StudentPayments
         [Fact]
         public void Unknown_sort_key_falls_back_to_default()
         {
-            var sorted = PreviousDueExport.Sort(Rows, "nonsense", "asc");
+            var sorted = DueListExport.Sort(Rows, "nonsense", "asc");
             Assert.Equal(new[] { 1, 3, 2 }, sorted.Select(r => r.Student.ClassRoll)); // due, ascending
         }
 
         [Fact]
         public void Search_matches_any_column_ignoring_case()
         {
-            Assert.Equal(new[] { "Bob" }, PreviousDueExport.Search(Rows, "BOB").Select(r => r.Student.Name));
-            Assert.Equal(new[] { 1 }, PreviousDueExport.Search(Rows, "500").Select(r => r.Student.ClassRoll)); // due 500
-            Assert.Single(PreviousDueExport.Search(Rows, "inactive"));
-            Assert.Equal(3, PreviousDueExport.Search(Rows, "  ").Count());
+            Assert.Equal(new[] { "Bob" }, DueListExport.Search(Rows, "BOB").Select(r => r.Student.Name));
+            Assert.Equal(new[] { 1 }, DueListExport.Search(Rows, "500").Select(r => r.Student.ClassRoll)); // due 500
+            Assert.Single(DueListExport.Search(Rows, "inactive"));
+            Assert.Equal(3, DueListExport.Search(Rows, "  ").Count());
         }
 
         [Fact]
         public void Rows_follow_header_order_and_format_amounts()
         {
-            var headers = PreviousDueExport.Headers;
-            var row = PreviousDueExport.Rows(new[] { Due(7, "Dina", 12500.5, 500) }).Single();
+            var headers = DueListExport.Headers;
+            var row = DueListExport.Rows(new[] { Due(7, "Dina", 12500.5, 500) }).Single();
 
             Assert.Equal(headers.Count, row.Count);
             Assert.Equal("7", row[headers.ToList().IndexOf("Class Roll")]);
             Assert.Equal("N/A", row[headers.ToList().IndexOf("Section")]);
             Assert.Equal("12,000.5", row[headers.ToList().IndexOf("Due")]);
-            Assert.Equal(3, PreviousDueExport.AmountColumnIndexes.Count);
+            Assert.Equal(3, DueListExport.AmountColumnIndexes.Count);
         }
     }
 }

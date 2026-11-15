@@ -25,6 +25,23 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-15
+
+### Added
+- **Due by date range on Due Payment**: you can now choose a fee period (From and To dates)
+  to see who owes for those months only, for example "Up to this month" or "March to May".
+  Quick buttons fill in This month, Up to this month, Last 3 months or Whole session. Leave
+  the dates empty to see the whole session as before.
+- **Sort, search and export on Due Payment**: click any column heading to sort, search by
+  name, roll, ID or phone, and download the list as Excel, CSV or PDF in the same order and
+  with the same search you see on screen. **Print** prints every matching student.
+- **More detail on Due Payment**: each student now shows unique ID, class, contact number,
+  status, and payable and paid next to the due, with totals that update as you search. You
+  can also pick the session, and a switch (on by default) hides students with nothing to pay.
+
+### Fixed
+- **Due Payment (Previous)**: the **Get list** button was cut off on wide screens.
+
 ## [1.5.0] - 2026-11-15
 
 ### Added

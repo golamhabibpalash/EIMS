@@ -24,7 +24,9 @@ namespace SMS.BLL.Contracts
         Task<StudentPaymentDetailVM> GetAllDetailPaymentByUniqueId(string studentUniqueId);
         Task<List<DuePayment>> GetPreviousDuesAsync(int? studentId, int? sectionId, int academicClassId, bool? status, bool dueOnly = false);
         Task<ProfilePayment> GetProfilePaymentAsync(int studentId);
-        Task<List<DuePaymentDetails>> GetBulkDuePaymentsAsync(int sessionId, List<Student> students);
+        /// <param name="fromDate">Optional start of a fee period; with <paramref name="toDate"/>, limits the
+        /// list to fees falling due in that range and payments made against them. Both null = whole session.</param>
+        Task<List<DuePaymentDetails>> GetBulkDuePaymentsAsync(int sessionId, List<Student> students, DateTime? fromDate = null, DateTime? toDate = null);
     }
 }
 
@@ -32,5 +34,7 @@ public class DuePaymentDetails
 {
     public int StudentId { get; set; }
     public Student Student { get; set; }
+    public double PayableAmount { get; set; }
+    public double PaidAmount { get; set; }
     public double TotalDue { get; set; }
 }

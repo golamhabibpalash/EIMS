@@ -494,92 +494,33 @@ public class StudentPaymentManager : Manager<StudentPayment>, IStudentPaymentMan
         return profilePayment;
     }
 
-    public async Task<List<DuePaymentDetails>> GetBulkDuePaymentsAsync(int sessionId, List<Student> students)
+    public async Task<List<DuePaymentDetails>> GetBulkDuePaymentsAsync(int sessionId, List<Student> students, DateTime? fromDate = null, DateTime? toDate = null)
     {
         var studentIds = students.Select(s => s.Id).ToList();
         var bulkData = await _studentPaymentRepository.GetBulkDuePaymentsAsync(sessionId, studentIds);
-
-        var result = new List<DuePaymentDetails>();
-
-        foreach (var student in students)
+        if (bulkData.CurrentSession == null)
         {
-            double due = CalculateStudentDueInMemory(student, bulkData);
-            result.Add(new DuePaymentDetails
+            return students.Select(s => new DuePaymentDetails { StudentId = s.Id, Student = s }).ToList();
+        }
+
+        // Group once so each student's rows are a lookup, not a scan of every list.
+        var allocationsByStudent = bulkData.Allocations.ToLookup(a => a.UniqueId);
+        var paymentsByStudent = bulkData.Payments.ToLookup(p => p.UniqueId);
+        var today = DateTime.Today;
+
+        return students.Select(student =>
+        {
+            var schedule = DuePeriodRules.ScheduledFees(student, bulkData.CurrentSession, bulkData.ClassFees,
+                allocationsByStudent[student.UniqueId], today);
+            var amounts = DuePeriodRules.Calculate(schedule, paymentsByStudent[student.UniqueId], fromDate, toDate);
+            return new DuePaymentDetails
             {
                 StudentId = student.Id,
                 Student = student,
-                TotalDue = due
-            });
-        }
-
-        return result;
+                PayableAmount = amounts.Payable,
+                PaidAmount = amounts.Paid,
+                TotalDue = amounts.Due
+            };
+        }).ToList();
     }
-
-    private double CalculateStudentDueInMemory(Student student, DuePaymentBulkResult bulkData)
-    {
-        if (bulkData.CurrentSession == null) return 0;
-
-        var session = bulkData.CurrentSession;
-        var classFees = bulkData.ClassFees
-            .Where(c => c.AcademicClassId == student.AcademicClassId && c.StudentFeeHead.IsResidential == student.IsResidential)
-            .ToList();
-        var allocations = bulkData.Allocations
-            .Where(a => a.UniqueId == student.UniqueId)
-            .ToList();
-        var studentPayments = bulkData.Payments
-            .Where(p => p.UniqueId == student.UniqueId)
-            .ToList();
-
-        double totalScheduledFee = CalculateTotalScheduledFeeInMemory(student, session, classFees, allocations);
-        double totalPaid = studentPayments.Sum(p => p.TotalPayment);
-
-        return totalScheduledFee - totalPaid;
-    }
-
-    private double CalculateTotalScheduledFeeInMemory(Student student, AcademicSession session, List<ClassFeeList> classFees, List<StudentFeeAllocation> allocations)
-    {
-        double admissionOrSessionFee = CalculateAdmissionOrSessionFeeInMemory(student, session, classFees, allocations);
-        double monthlyFee = CalculateMonthlyFeeInMemory(student, classFees, allocations);
-        double otherFee = CalculateOtherFeeInMemory(student, classFees, allocations);
-
-        return admissionOrSessionFee + monthlyFee + otherFee;
-    }
-
-    private double CalculateAdmissionOrSessionFeeInMemory(Student student, AcademicSession session, List<ClassFeeList> classFees, List<StudentFeeAllocation> allocations)
-    {
-        bool isAdmission = student.AdmissionDate.Year.ToString() == session.Name[^4..];
-        int feeSl = isAdmission ? 0 : 13;
-        var classFee = classFees.FirstOrDefault(f => f.StudentFeeHead.SL == feeSl);
-        var allocation = allocations.FirstOrDefault(a => a.ClassFeeListId == classFee?.Id);
-
-        return classFee != null ? (allocation?.AllocatedAmount ?? classFee.Amount) : 0;
-    }
-
-    private double CalculateMonthlyFeeInMemory(Student student, List<ClassFeeList> classFees, List<StudentFeeAllocation> allocations)
-    {
-        var monthlyFees = classFees
-            .Where(c => c.StudentFeeHead.SL is >= 1 and <= 12 && ShouldIncludeFeeForMonthInMemory(c, student.AdmissionDate))
-            .ToList();
-        var monthlyAllocations = allocations.Where(a => a.StudentFeeHead.SL is >= 1 and <= 12).ToList();
-
-        return monthlyFees.Sum(fee => monthlyAllocations.FirstOrDefault(a => a.ClassFeeListId == fee.Id)?.AllocatedAmount ?? fee.Amount);
-    }
-
-    private double CalculateOtherFeeInMemory(Student student, List<ClassFeeList> classFees, List<StudentFeeAllocation> allocations)
-    {
-        var otherFees = classFees.Where(f => f.StudentFeeHead.SL > 13).ToList();
-        var otherAllocations = allocations.Where(a => a.StudentFeeHead.SL > 13).ToList();
-
-        return otherFees.Sum(fee => otherAllocations.FirstOrDefault(a => a.ClassFeeListId == fee.Id)?.AllocatedAmount ?? fee.Amount);
-    }
-
-    private bool ShouldIncludeFeeForMonthInMemory(ClassFeeList fee, DateTime admissionDate)
-    {
-        if (int.TryParse(fee.AcademicSession.Name[^4..], out int sessionYear) && sessionYear == admissionDate.Year)
-        {
-            return fee.SL >= admissionDate.Month;
-        }
-        return true;
-    }
-    
 }

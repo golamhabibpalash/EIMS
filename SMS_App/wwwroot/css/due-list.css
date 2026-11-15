@@ -1,0 +1,17 @@
+/* Shared by the due lists (Views/StudentPayments/_DueListResults.cshtml). */
+.due-summary .card { border-left: 4px solid var(--bs-primary); }
+.due-summary .card.due-paid { border-left-color: var(--bs-success); }
+.due-summary .card.due-total { border-left-color: var(--bs-danger); }
+.due-summary .due-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--bs-secondary-color, #6c757d); }
+.due-summary .due-value { font-size: 1.35rem; font-weight: 600; }
+#dueListTable_filter input { min-width: 260px; }
+#dueListTable td.amount, #dueListTable th.amount { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+#dueListTable tr.is-inactive td { color: var(--bs-secondary-color, #6c757d); }
+#dueListTable tfoot th { border-top: 2px solid currentColor; }
+#dueListTable .row-actions { white-space: nowrap; }
+.report-heading img { width: 64px; height: 64px; object-fit: contain; }
+
+@media print {
+    .no-print, .dataTables_length, .dataTables_filter, .dataTables_paginate, .dataTables_info { display: none !important; }
+    #dueListTable .row-actions { display: none; }
+}
