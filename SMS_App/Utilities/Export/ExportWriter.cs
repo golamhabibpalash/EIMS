@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -26,7 +27,12 @@ namespace SMS_App.Utilities.Export
             return Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
         }
 
-        public static byte[] ToXlsx(string sheetName, IReadOnlyList<string> headers, IEnumerable<IReadOnlyList<string>> rows)
+        /// <param name="numericColumns">
+        /// Optional zero-based column indexes whose cells are written as numbers (so Excel can sum
+        /// and sort them) when the text parses as one, e.g. "1,250.50". Other cells stay text.
+        /// </param>
+        public static byte[] ToXlsx(string sheetName, IReadOnlyList<string> headers, IEnumerable<IReadOnlyList<string>> rows,
+            ISet<int> numericColumns = null)
         {
             using var wb = new XLWorkbook();
             var ws = wb.Worksheets.Add(string.IsNullOrWhiteSpace(sheetName) ? "Sheet1" : sheetName);
@@ -39,7 +45,19 @@ namespace SMS_App.Utilities.Export
             foreach (var row in rows)
             {
                 for (int c = 0; c < row.Count; c++)
-                    ws.Cell(r, c + 1).Value = row[c] ?? string.Empty;
+                {
+                    var cell = ws.Cell(r, c + 1);
+                    if (numericColumns != null && numericColumns.Contains(c)
+                        && double.TryParse(row[c], NumberStyles.Number, CultureInfo.InvariantCulture, out var number))
+                    {
+                        cell.Value = number;
+                        cell.Style.NumberFormat.Format = "#,##0.00";
+                    }
+                    else
+                    {
+                        cell.Value = row[c] ?? string.Empty;
+                    }
+                }
                 r++;
             }
             ws.Columns().AdjustToContents();

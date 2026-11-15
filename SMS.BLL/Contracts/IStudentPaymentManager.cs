@@ -22,7 +22,7 @@ namespace SMS.BLL.Contracts
         Task<List<StudentPayment>> GetPaymentByStudentUniqueId(string uniqueId);
         Task<List<PaidAmountResult>> GetPaidAmountByFeeHeadAsync(string uniqueId, int sessionId, int isResidential, int classId, int feeHeadId);
         Task<StudentPaymentDetailVM> GetAllDetailPaymentByUniqueId(string studentUniqueId);
-        Task<List<DuePayment>> GetPreviousDuesAsync(int? studentId, int? sectionId, int academicClassId, bool? status);
+        Task<List<DuePayment>> GetPreviousDuesAsync(int? studentId, int? sectionId, int academicClassId, bool? status, bool dueOnly = false);
         Task<ProfilePayment> GetProfilePaymentAsync(int studentId);
         Task<List<DuePaymentDetails>> GetBulkDuePaymentsAsync(int sessionId, List<Student> students);
     }
