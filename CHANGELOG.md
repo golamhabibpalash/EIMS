@@ -25,6 +25,14 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-15
+
+### Fixed
+- A newly set-up school no longer opens with an empty menu. Setting up a school now also
+  creates its modules and permission list and gives the school's admin every permission,
+  so all menus show on first login. Running setup again on an existing school adds only
+  what is missing.
+
 ## [1.6.0] - 2026-11-15
 
 ### Added

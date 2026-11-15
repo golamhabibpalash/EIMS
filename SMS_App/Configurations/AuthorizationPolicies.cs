@@ -1,10 +1,51 @@
 ﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Infrastructure;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace SMS_App.Configurations;
 
 public class AuthorizationPolicies
 {
-    public static void ConfigureAuthorization(AuthorizationOptions options)
+    public static void ConfigureAuthorization(AuthorizationOptions options) => Register(new PolicyRegistrar(options));
+
+    /// <summary>
+    /// Every policy name with the claim type it requires, in declaration order. Used to grant a new
+    /// school's admin the full permission set (<see cref="PermissionSeeder"/>).
+    /// </summary>
+    public static IReadOnlyList<(string Policy, string ClaimType)> PolicyClaims
+    {
+        get
+        {
+            var registrar = new PolicyRegistrar(null);
+            Register(registrar);
+            return registrar.Policies;
+        }
+    }
+
+    /// <summary>
+    /// Forwards AddPolicy to the real <see cref="AuthorizationOptions"/> (when given) and records each
+    /// policy's required claim types, which AuthorizationOptions does not expose.
+    /// </summary>
+    public sealed class PolicyRegistrar
+    {
+        private readonly AuthorizationOptions _options;
+        public List<(string Policy, string ClaimType)> Policies { get; } = new();
+
+        public PolicyRegistrar(AuthorizationOptions options) => _options = options;
+
+        public void AddPolicy(string name, Action<AuthorizationPolicyBuilder> configure)
+        {
+            var builder = new AuthorizationPolicyBuilder();
+            configure(builder);
+            foreach (var requirement in builder.Requirements.OfType<ClaimsAuthorizationRequirement>())
+                Policies.Add((name, requirement.ClaimType));
+            _options?.AddPolicy(name, configure);
+        }
+    }
+
+    private static void Register(PolicyRegistrar options)
     {
         //Academic Class
         options.AddPolicy("IndexAcademicClassesPolicy", policy => policy.RequireClaim("View Academic Class"));

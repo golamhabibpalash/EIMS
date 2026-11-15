@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SMS.BLL.MultiTenancy;
 using SMS.DB;
+using SMS.Entities;
 using SMS.Entities.Platform;
 using SMS_App.Configurations;
 
@@ -27,7 +29,7 @@ namespace SMS_App.MultiTenancy
   platform server-add   --name N --provider SqlServer|PostgreSQL --host H [--port P] [--options ""k=v;...""]
   platform tenant-add   --code abc --name ""ABC School"" [--display ""ABC""]
   platform tenant-db    --code abc --server N --database abcDB --user U --password-env VAR
-  platform tenant-init  --code abc --admin-email E --admin-password-env VAR   (create schema if empty + seed admin)
+  platform tenant-init  --code abc --admin-email E --admin-password-env VAR   (create schema if empty + seed admin, menu and admin permissions; safe to re-run)
   platform domain-add   --code abc --domain abc.schoolbd.net [--primary]
   platform domain-verify --domain abcschool.edu.bd
   platform tenant-status --code abc --status Active|Suspended|Disabled
@@ -147,7 +149,17 @@ namespace SMS_App.MultiTenancy
             {
                 return AdminResult.Error("Schema ready, but the admin account was not created: " + string.Join("; ", seed.Errors.Select(e => e.Description)));
             }
-            return AdminResult.Success($"{resolution.Tenant}: schema {(created ? "created" : "already present")}, admin {adminEmail} ready.");
+
+            // Without modules + claims the school's menu is empty and every page is denied.
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var admin = await userManager.FindByEmailAsync(adminEmail);
+            if (admin == null)
+            {
+                return AdminResult.Error($"Schema ready, but admin {adminEmail} was not found after seeding.");
+            }
+            var permissions = await PermissionSeeder.SeedAsync(db, scope.ServiceProvider.GetRequiredService<ViewModels.ModuleSubModuleVM.SiteMap>(), userManager, admin);
+
+            return AdminResult.Success($"{resolution.Tenant}: schema {(created ? "created" : "already present")}, admin {adminEmail} ready; permissions {permissions}.");
         }
 
         private static Dictionary<string, string> ParseOptions(string[] args)
