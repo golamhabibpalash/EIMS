@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.Logging;
 using QuestPDF.Fluent;
 using SchoolManagementSystem;
 using SMS.BLL.Contracts;
+using SMS.BLL.Managers;
 using SMS.Entities;
 using SMS.Entities.AdditionalModels;
 using SMS.Entities.AdditionalModels.Finance;
@@ -334,70 +336,60 @@ public class StudentPaymentsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpGet]
     [Authorize(Policy = "DuePaymentStudentPaymentsPolicy")]
     public async Task<IActionResult> DuePayment()
     {
         GlobalUI.PageTitle = "Due Payment List";
-
-        DuePaymentVM duePaymentVM = new DuePaymentVM();
-        var classes = await _academicClassManager.GetAllAsync();
-        duePaymentVM.AcademicClassList = new SelectList(classes.Where(s => s.Status == true), "Id", "Name").ToList();
-        duePaymentVM.StudentStatusSelectList = new SelectList(GetActiveInActiveList(), "Id", "sName").ToList();
-        var studentCategory = new List<SelectListItem>
-        {
-            new() { Text = "all", Value = "all" },
-            new() { Text = "residential", Value = "residential" },
-            new() { Text = "nonResidential", Value = "nonResidential" }
-        };
-        duePaymentVM.StudentCategorySelectList = new SelectList(studentCategory.ToList(), "Value", "Text").ToList();
+        var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
+        var model = new DuePaymentVM { AcademicSessionId = currentSession?.Id ?? 0 };
+        await FillDuePaymentListsAsync(model);
         ViewBag.isFromPost = false;
-
-        return View(duePaymentVM);
+        return View(model);
     }
 
     [HttpPost]
+    [ValidateAntiForgeryToken]
     [Authorize(Policy = "DuePaymentStudentPaymentsPolicy")]
-    public async Task<IActionResult> DuePayment(int? aSessionId, int? academicClassId, int? academicSectionId, int studentId, int dueType, string isResidential, string status)
+    public async Task<IActionResult> DuePayment(DuePaymentVM filter)
     {
-        Stopwatch stopwatch = Stopwatch.StartNew();
         GlobalUI.PageTitle = "Due Payment List";
-
-        var currentSession = await _academicSessionManager.GetCurrentAcademicSessionAsync();
-        int sessionId = aSessionId ?? currentSession.Id;
-        int classId = academicClassId ?? 0;
-        int sectionId = academicSectionId ?? 0;
-
-        var students = await _studentManager.GetStudentsByClassSessionSectionAsync(sessionId, classId, sectionId);
-
-        students = FilterByResidentialStatus(students, isResidential);
-        students = FilterByStatus(students, status);
-
-        var duePayments = await _studentPaymentManager.GetBulkDuePaymentsAsync(sessionId, students);
-
-        var viewModel = new DuePaymentVM
-        {
-            ShowCount = students.Count,
-            AcademicClassId = classId,
-            AcademicClass = await _academicClassManager.GetByIdAsync(classId),
-            Institute = await _instituteManager.GetFirstOrDefaultAsync(),
-            AcademicClassList = await GetAcademicClassListAsync(classId),
-            AcademicSectionList = await GetSectionListAsync(classId, sessionId, sectionId),
-            StudentStatusSelectList = GetStudentStatusSelectList(status),
-            StudentCategorySelectList = GetStudentCategorySelectList(isResidential),
-            DuePayments = duePayments.Select(d => new DuePaymentDetailsVM
-            {
-                StudentId = d.StudentId,
-                Student = d.Student,
-                TotalDue = d.TotalDue
-            }).ToList()
-        };
-
-        viewModel.GrandTotal = viewModel.DuePayments.Sum(x => x.TotalDue);
-        stopwatch.Stop();
-        var ts = stopwatch.Elapsed;
         ViewBag.isFromPost = true;
-        ViewBag.totalExecuteTime = $"Execute time :{ts.Minutes}m {ts.Seconds}s";
-        return View(viewModel);
+
+        if (filter.FromDate.HasValue && filter.ToDate.HasValue && filter.FromDate.Value.Date > filter.ToDate.Value.Date)
+        {
+            ModelState.AddModelError(nameof(DuePaymentVM.ToDate), "The 'To' date must be on or after the 'From' date.");
+        }
+        if (!ModelState.IsValid)
+        {
+            await FillDuePaymentListsAsync(filter);
+            ViewBag.isFromPost = false;
+            return View(filter);
+        }
+
+        var model = await BuildDuePaymentModelAsync(filter);
+        model.DuePayments = DueListExport.Sort(model.DuePayments, DueListExport.DefaultSortKey, DueListExport.DefaultSortDirection);
+        return View(model);
+    }
+
+    // GET: StudentPayments/DuePaymentExport?academicSessionId=..&fromDate=yyyy-MM-dd&format=xlsx|csv|pdf
+    // Re-runs the page's query and applies the grid's current quick-search and sort, so the file
+    // holds exactly the rows, in the order, that the user is looking at.
+    [HttpGet]
+    [Authorize(Policy = "DuePaymentStudentPaymentsPolicy")]
+    public async Task<IActionResult> DuePaymentExport(DuePaymentVM filter, string search = null, string sortBy = null,
+        string sortDir = null, string format = "xlsx")
+    {
+        if (filter.FromDate.HasValue && filter.ToDate.HasValue && filter.FromDate.Value.Date > filter.ToDate.Value.Date)
+        {
+            return BadRequest("The 'To' date must be on or after the 'From' date.");
+        }
+
+        var model = await BuildDuePaymentModelAsync(filter, includeSelectLists: false);
+        var rows = DueListExport.Sort(DueListExport.Search(model.DuePayments, search), sortBy, sortDir);
+        var subtitle = $"Due Payments - {string.Join(" - ", model.DescribeFilters())} - {rows.Count} student(s) - "
+            + $"Total due: {DueListExport.Amount(rows.Sum(r => r.TotalDue))} - {DateTime.Now:dd MMM yyyy}";
+        return DueListFile(rows, format, model.Institute, subtitle, "Due_Payments");
     }
 
     [HttpGet]
@@ -425,8 +417,8 @@ public class StudentPaymentsController : Controller
     {
         GlobalUI.PageTitle = "Previous Due Payment List";
         var previousDuePaymentVM = await BuildPreviousDueModelAsync(modelObject);
-        previousDuePaymentVM.DuePayments = PreviousDueExport.Sort(previousDuePaymentVM.DuePayments,
-            PreviousDueExport.DefaultSortKey, PreviousDueExport.DefaultSortDirection);
+        previousDuePaymentVM.DuePayments = DueListExport.Sort(previousDuePaymentVM.DuePayments,
+            DueListExport.DefaultSortKey, DueListExport.DefaultSortDirection);
         ViewBag.isFromPost = true;
         return View(previousDuePaymentVM);
     }
@@ -448,28 +440,11 @@ public class StudentPaymentsController : Controller
             DueOnly = dueOnly
         };
         var model = await BuildPreviousDueModelAsync(filter, includeSelectLists: false);
-        var rows = PreviousDueExport.Sort(PreviousDueExport.Search(model.DuePayments, search), sortBy, sortDir);
+        var rows = DueListExport.Sort(DueListExport.Search(model.DuePayments, search), sortBy, sortDir);
 
-        var headers = PreviousDueExport.Headers;
-        var data = PreviousDueExport.Rows(rows);
-        var stamp = DateTime.Now.ToString("yyyyMMdd_HHmm");
-        var scope = PreviousDueScopeLabel(model);
-
-        if (string.Equals(format, "pdf", StringComparison.OrdinalIgnoreCase))
-        {
-            var subtitle = $"Previous Due Payments (all sessions) - {scope} - {rows.Count} student(s) - "
-                + $"Total due: {PreviousDueExport.Amount(rows.Sum(r => r.TotalDue))} - {DateTime.Now:dd MMM yyyy}";
-            var pdf = new TabularPdfBuilder(model.Institute?.Name ?? "Previous Due Payments", subtitle, headers, data).GeneratePdf();
-            return File(pdf, "application/pdf", $"{stamp}_Previous_Due_Payments.pdf");
-        }
-
-        if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase))
-        {
-            return File(ExportWriter.ToCsv(headers, data), ExportWriter.CsvContentType, $"{stamp}_Previous_Due_Payments.csv");
-        }
-
-        var xlsx = ExportWriter.ToXlsx("Previous Dues", headers, data, PreviousDueExport.AmountColumnIndexes);
-        return File(xlsx, ExportWriter.XlsxContentType, $"{stamp}_Previous_Due_Payments.xlsx");
+        var subtitle = $"Previous Due Payments (all sessions) - {PreviousDueScopeLabel(model)} - {rows.Count} student(s) - "
+            + $"Total due: {DueListExport.Amount(rows.Sum(r => r.TotalDue))} - {DateTime.Now:dd MMM yyyy}";
+        return DueListFile(rows, format, model.Institute, subtitle, "Previous_Due_Payments");
     }
 
     public async Task<string> GetReceiptNo(int studentId, int feeHeadId)
@@ -554,27 +529,6 @@ public class StudentPaymentsController : Controller
             return true;
         }
         return false;
-    }
-
-    private List<IsActiveVM> GetActiveInActiveList()
-    {
-        List<IsActiveVM> isActiveVMs = new List<IsActiveVM>();
-
-        IsActiveVM status3 = new IsActiveVM();
-        status3.Id = 2;
-        status3.sName = "All";
-        isActiveVMs.Add(status3);
-
-        IsActiveVM status1 = new IsActiveVM();
-        status1.Id = 0;
-        status1.sName = "Inactive";
-        isActiveVMs.Add(status1);
-
-        IsActiveVM status2 = new IsActiveVM();
-        status2.Id = 1;
-        status2.sName = "Active";
-        isActiveVMs.Add(status2);
-        return isActiveVMs;
     }
 
     private void SetTempDataMessages()
@@ -813,6 +767,85 @@ public class StudentPaymentsController : Controller
         };
     }
 
+    /// <summary>Builds the Excel (default), CSV or PDF download shared by both due lists.</summary>
+    private FileContentResult DueListFile(List<DuePayment> rows, string format, Institute institute, string subtitle, string fileStem)
+    {
+        var headers = DueListExport.Headers;
+        var data = DueListExport.Rows(rows);
+        var stamp = DateTime.Now.ToString("yyyyMMdd_HHmm");
+
+        if (string.Equals(format, "pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            var pdf = new TabularPdfBuilder(institute?.Name ?? "Due Payments", subtitle, headers, data).GeneratePdf();
+            return File(pdf, "application/pdf", $"{stamp}_{fileStem}.pdf");
+        }
+        if (string.Equals(format, "csv", StringComparison.OrdinalIgnoreCase))
+        {
+            return File(ExportWriter.ToCsv(headers, data), ExportWriter.CsvContentType, $"{stamp}_{fileStem}.csv");
+        }
+        var xlsx = ExportWriter.ToXlsx("Dues", headers, data, DueListExport.AmountColumnIndexes);
+        return File(xlsx, ExportWriter.XlsxContentType, $"{stamp}_{fileStem}.xlsx");
+    }
+
+    /// <summary>
+    /// Shared by the Due Payment page and its export: loads the session's dues for the filters
+    /// (optionally limited to a fee period) plus what the view needs to redisplay them.
+    /// </summary>
+    private async Task<DuePaymentVM> BuildDuePaymentModelAsync(DuePaymentVM filter, bool includeSelectLists = true)
+    {
+        var model = new DuePaymentVM
+        {
+            AcademicSessionId = filter.AcademicSessionId,
+            AcademicClassId = filter.AcademicClassId,
+            AcademicSectionId = filter.AcademicSectionId,
+            Status = filter.Status,
+            Category = filter.Category,
+            FromDate = filter.FromDate?.Date,
+            ToDate = filter.ToDate?.Date,
+            DueOnly = filter.DueOnly,
+            Institute = await _instituteManager.GetFirstOrDefaultAsync()
+        };
+
+        if (model.AcademicSessionId <= 0)
+        {
+            var current = await _academicSessionManager.GetCurrentAcademicSessionAsync();
+            model.AcademicSessionId = current?.Id ?? 0;
+        }
+        model.AcademicSession = await _academicSessionManager.GetByIdAsync(model.AcademicSessionId);
+        model.SessionYear = DuePeriodRules.SessionYear(model.AcademicSession, DateTime.Today);
+        if (model.AcademicClassId > 0)
+            model.AcademicClass = await _academicClassManager.GetByIdAsync(model.AcademicClassId);
+        if (model.AcademicSectionId > 0)
+            model.AcademicSection = await _academicSectionManager.GetByIdAsync(model.AcademicSectionId);
+
+        var students = await _studentManager.GetStudentsByClassSessionSectionAsync(model.AcademicSessionId, model.AcademicClassId, model.AcademicSectionId);
+        students = FilterByResidentialStatus(students, model.Category);
+        students = FilterByStatus(students, model.Status);
+
+        var dues = await _studentPaymentManager.GetBulkDuePaymentsAsync(model.AcademicSessionId, students, model.FromDate, model.ToDate);
+        model.DuePayments = dues
+            .Where(d => !model.DueOnly || d.TotalDue > 0)
+            .Select(d => new DuePayment { Student = d.Student, PayableAmount = d.PayableAmount, PaidAmount = d.PaidAmount, TotalDue = d.TotalDue })
+            .ToList();
+
+        if (includeSelectLists)
+            await FillDuePaymentListsAsync(model);
+        return model;
+    }
+
+    private async Task FillDuePaymentListsAsync(DuePaymentVM model)
+    {
+        var sessions = await _academicSessionManager.GetAllAsync();
+        model.AcademicSessionList = sessions.OrderByDescending(s => s.Name)
+            .Select(s => new SelectListItem(s.Name, s.Id.ToString(), s.Id == model.AcademicSessionId))
+            .ToList();
+        model.SessionYear = DuePeriodRules.SessionYear(sessions.FirstOrDefault(s => s.Id == model.AcademicSessionId), DateTime.Today);
+        model.AcademicClassList = await GetAcademicClassListAsync(model.AcademicClassId);
+        model.AcademicSectionList = model.AcademicClassId > 0
+            ? await GetSectionListAsync(model.AcademicClassId, model.AcademicSessionId, model.AcademicSectionId)
+            : new List<SelectListItem>();
+    }
+
     /// <summary>
     /// Shared by the Previous Due page and its export: loads the filtered dues plus everything the
     /// view needs to redisplay the chosen filters (names for the report header, dropdown lists).
@@ -892,22 +925,6 @@ public class StudentPaymentsController : Controller
     {
         var sections = await _academicSectionManager.GetAllByClassWithSessionId(classId, sessionId);
         return new SelectList(sections, "Id", "Name", selectedId).ToList();
-    }
-
-    private List<SelectListItem> GetStudentStatusSelectList(string selectedValue)
-    {
-        return new SelectList(GetActiveInActiveList(), "Id", "sName", selectedValue).ToList();
-    }
-
-    private List<SelectListItem> GetStudentCategorySelectList(string selectedValue)
-    {
-        var list = new List<SelectListItem>
-        {
-            new() { Text = "All", Value = "all" },
-            new() { Text = "Residential", Value = "residential" },
-            new() { Text = "Non-Residential", Value = "nonResidential" }
-        };
-        return new SelectList(list, "Value", "Text", selectedValue).ToList();
     }
 
     #endregion Helper Methods

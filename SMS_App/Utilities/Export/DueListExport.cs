@@ -7,12 +7,12 @@ using SMS.Entities.AdditionalModels.Finance;
 namespace SMS_App.Utilities.Export
 {
     /// <summary>
-    /// Columns, sort keys and search for the "Due Payment (Previous)" list. The page's grid and the
-    /// CSV / Excel / PDF export both read this catalog, so a download always has the same columns,
-    /// order and rows the user is looking at. Sort keys match the <c>data-sort-key</c> attributes on
-    /// the table header cells in <c>Views/StudentPayments/DuePaymentPrevious.cshtml</c>.
+    /// Columns, sort keys and search for the due lists ("Due Payment" and "Due Payment (Previous)").
+    /// Each page's grid and its CSV / Excel / PDF export both read this catalog, so a download always
+    /// has the same columns, order and rows the user is looking at. Sort keys match the
+    /// <c>data-sort-key</c> attributes in <c>Views/StudentPayments/_DueListResults.cshtml</c>.
     /// </summary>
-    public static class PreviousDueExport
+    public static class DueListExport
     {
         public sealed class Column
         {

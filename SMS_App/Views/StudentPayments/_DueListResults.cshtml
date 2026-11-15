@@ -1,0 +1,174 @@
+@using SMS.Entities.AdditionalModels.Finance;
+@using SMS_App.Utilities.Export;
+@using System.Globalization;
+@model SMS_App.ViewModels.PaymentVM.DueListResultsVM
+@*
+    Shared results area for the due lists. Column order and data-sort-key values must match
+    DueListExport.All, and wwwroot/js/due-list.js reads the amount columns by their class.
+    Pair with wwwroot/css/due-list.css and DueList.init(...) on the page.
+*@
+@{
+    var dues = Model.Rows ?? new List<DuePayment>();
+    double totalPayable = dues.Sum(d => d.PayableAmount);
+    double totalPaid = dues.Sum(d => d.PaidAmount);
+    double totalDue = dues.Sum(d => d.TotalDue);
+    var phoneColumn = DueListExport.All.First(c => c.Key == "phone");
+    string Raw(double v) => v.ToString(CultureInfo.InvariantCulture);
+}
+
+@if (dues.Count > 0)
+{
+    <div class="row g-3 mb-3 due-summary no-print">
+        <div class="col-lg-3 col-sm-6">
+            <div class="card shadow-sm h-100"><div class="card-body py-2">
+                <div class="due-label">Students</div>
+                <div class="due-value" id="sumCount">@dues.Count</div>
+            </div></div>
+        </div>
+        <div class="col-lg-3 col-sm-6">
+            <div class="card shadow-sm h-100"><div class="card-body py-2">
+                <div class="due-label">Total payable</div>
+                <div class="due-value" id="sumPayable">@DueListExport.Amount(totalPayable)</div>
+            </div></div>
+        </div>
+        <div class="col-lg-3 col-sm-6">
+            <div class="card shadow-sm h-100 due-paid"><div class="card-body py-2">
+                <div class="due-label">Total paid</div>
+                <div class="due-value text-success" id="sumPaid">@DueListExport.Amount(totalPaid)</div>
+            </div></div>
+        </div>
+        <div class="col-lg-3 col-sm-6">
+            <div class="card shadow-sm h-100 due-total"><div class="card-body py-2">
+                <div class="due-label">Total due</div>
+                <div class="due-value text-danger" id="sumDue">@DueListExport.Amount(totalDue)</div>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="report-heading d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 pb-2 border-bottom">
+                <div class="d-flex align-items-center gap-3">
+                    <img src="~/Images/Institute/@Model.Institute?.Logo" alt="Institute logo"
+                         onerror="this.onerror=null;this.src='/images/institute/smslogo.png';" />
+                    <div>
+                        <h5 class="mb-0">@Model.Institute?.Name</h5>
+                        <div class="small text-muted">@Model.Institute?.Address</div>
+                        <div class="small fw-semibold mt-1">@Model.ReportTitle</div>
+                    </div>
+                </div>
+                <div class="text-md-end small">
+                    @foreach (var line in Model.ScopeLines)
+                    {
+                        <div>@line</div>
+                    }
+                    <div class="text-muted">Date: @DateTime.Now.ToString("dd MMM yyyy")</div>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-sm table-hover table-striped align-middle w-100" id="dueListTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="no-sort" scope="col">#</th>
+                            <th data-sort-key="roll" scope="col">Roll</th>
+                            <th data-sort-key="uniqueId" class="sort-text" scope="col">Unique ID</th>
+                            <th data-sort-key="name" scope="col">Student name</th>
+                            <th data-sort-key="class" scope="col">Class</th>
+                            <th data-sort-key="section" scope="col">Section</th>
+                            <th data-sort-key="phone" class="sort-text" scope="col">Contact no</th>
+                            <th data-sort-key="status" scope="col">Status</th>
+                            <th data-sort-key="payable" class="amount sum-payable" scope="col">Payable</th>
+                            <th data-sort-key="paid" class="amount sum-paid" scope="col">Paid</th>
+                            <th data-sort-key="due" class="amount sum-due default-sort" scope="col">Due</th>
+                            <th class="no-sort text-center" scope="col">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in dues)
+                        {
+                            var st = item.Student;
+                            var phone = phoneColumn.Text(item);
+                            <tr class="@(st.Status ? "" : "is-inactive")">
+                                <td></td>
+                                <td>@st.ClassRoll</td>
+                                <td>@st.UniqueId</td>
+                                <td>
+                                    @st.Name
+                                    @if (st.IsResidential)
+                                    {
+                                        <i class="fa fa-home text-info ms-1" title="Residential" aria-label="Residential"></i>
+                                    }
+                                </td>
+                                <td>@(st.AcademicClass?.Name ?? "N/A")</td>
+                                <td>@(st.AcademicSection?.Name ?? "N/A")</td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(phone))
+                                    {
+                                        <a href="tel:@phone">@phone</a>
+                                    }
+                                </td>
+                                <td data-order="@(st.Status ? 0 : 1)">
+                                    @if (st.Status)
+                                    {
+                                        <span class="badge bg-success-subtle text-success-emphasis">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary-subtle text-secondary-emphasis">Inactive</span>
+                                    }
+                                </td>
+                                <td class="amount" data-order="@Raw(item.PayableAmount)">@DueListExport.Amount(item.PayableAmount)</td>
+                                <td class="amount" data-order="@Raw(item.PaidAmount)">@DueListExport.Amount(item.PaidAmount)</td>
+                                <td class="amount fw-semibold @(item.TotalDue > 0 ? "text-danger" : "text-success")"
+                                    data-order="@Raw(item.TotalDue)">@DueListExport.Amount(item.TotalDue)</td>
+                                <td class="text-center row-actions">
+                                    <a class="btn btn-outline-info btn-sm py-0 px-1" target="_blank" title="Payment statement (PDF)" aria-label="Payment statement for @st.Name"
+                                       asp-action="StudentPaymentInfoExport" asp-controller="Reports" asp-route-reportType="pdf"
+                                       asp-route-fileName="payment_report_@st.ClassRoll" asp-route-classRoll="@st.ClassRoll"
+                                       asp-route-fromDate="@st.AdmissionDate.ToString("dd-MM-yyyy")" asp-route-toDate="@DateTime.Today.ToString("dd-MM-yyyy")">
+                                        <i class="fa fa-eye"></i>
+                                    </a>
+                                    <a class="btn btn-outline-primary btn-sm py-0 px-1" title="Student financial details" aria-label="Financial details for @st.Name"
+                                       asp-action="Details" asp-controller="Students" asp-fragment="financials" asp-route-tabName="financials" asp-route-id="@st.Id">
+                                        <i class="fa fa-info"></i>
+                                    </a>
+                                    <a class="btn btn-success btn-sm py-0 px-2" title="Take payment" aria-label="Take payment from @st.Name"
+                                       asp-action="Payment" asp-controller="StudentPayments" asp-route-stRoll="@st.ClassRoll">Pay</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th colspan="8" class="text-end">Total (<span id="footCount">@dues.Count</span> students)</th>
+                            <th class="amount" id="footPayable">@DueListExport.Amount(totalPayable)</th>
+                            <th class="amount" id="footPaid">@DueListExport.Amount(totalPaid)</th>
+                            <th class="amount text-danger" id="footDue">@DueListExport.Amount(totalDue)</th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5 text-muted">
+            @if (Model.IsFromPost)
+            {
+                <i class="fa fa-check-circle fa-2x text-success mb-2"></i>
+                <h6 class="mb-1">No dues found</h6>
+                <p class="mb-0 small">@(Model.DueOnly ? "No student matching these filters has an outstanding due." : "No student matches these filters.") Try other filters.</p>
+            }
+            else
+            {
+                <i class="fa fa-filter fa-2x mb-2"></i>
+                <h6 class="mb-1">Choose filters and select <strong>Get list</strong></h6>
+                <p class="mb-0 small">@Model.EmptyHint</p>
+            }
+        </div>
+    </div>
+}
