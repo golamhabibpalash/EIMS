@@ -30,6 +30,20 @@ namespace SMS.Entities
         [Display(Name = "Mother's Name")]
         public string MotherName { get; set; }
 
+        [Display(Name = "Father's Name (Bangla)"), StringLength(150)]
+        public string FatherNameBangla { get; set; }
+
+        [Display(Name = "Mother's Name (Bangla)"), StringLength(150)]
+        public string MotherNameBangla { get; set; }
+
+        // Stored file names of the parents' NID scans. The files are private (never under wwwroot)
+        // and are only streamed by StudentsController.ParentNid after a permission check.
+        [Display(Name = "Father's NID"), StringLength(100)]
+        public string FatherNidImage { get; set; }
+
+        [Display(Name = "Mother's NID"), StringLength(100)]
+        public string MotherNidImage { get; set; }
+
         [Display(Name = "Admission Date")]
         public DateTime AdmissionDate { get; set; }
 

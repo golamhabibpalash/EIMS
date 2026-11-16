@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using NodaTime;
 using SMS.BLL.Contracts;
 using SMS.Entities;
@@ -30,6 +31,7 @@ using SMS_App.Utilities.Reports;
 using SMS_App.Utilities.MACIPServices;
 using SMS_App.Utilities.Pagination;
 using SMS_App.Utilities.ShortMessageService;
+using SMS_App.Utilities.Students;
 using SMS_App.ViewModels;
 using SMS_App.ViewModels.Students;
 
@@ -71,7 +73,7 @@ public class StudentsController : Controller
     #region Constructor
     private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
 
-    public StudentsController(IStudentManager studentManager, IAcademicClassManager academicClassManager, IWebHostEnvironment host, IMapper mapper, IAcademicSessionManager academicSessionManager, IStudentPaymentManager studentPaymentManager, IDistrictManager districtManager, IUpazilaManager upazilaManager, IAcademicSectionManager academicSectionManager, IBloodGroupManager bloodGroupManager, IDivisionManager divisionManager, INationalityManager nationalityManager, IGenderManager genderManager, IReligionManager religionManager, IStudentFeeHeadManager studentFeeHeadManager, IClassFeeListManager classFeeListManager, UserManager<ApplicationUser> userManager, IPhoneSMSManager phoneSMSManager, IAttendanceMachineManager attendanceMachineManager, IInstituteManager instituteManager, IStudentActivateHistManager studentActivateHistManager, IOffDayManager offDayManager, IStudentFeeAllocationManager studentFeeAllocationManager, IAppLogger appLogger, IStudentBulkImportManager studentBulkImportManager, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles, IAcademicExamManager academicExamManager = null, IAttachDocManager attachDocManager = null)
+    public StudentsController(IStudentManager studentManager, IAcademicClassManager academicClassManager, IWebHostEnvironment host, IMapper mapper, IAcademicSessionManager academicSessionManager, IStudentPaymentManager studentPaymentManager, IDistrictManager districtManager, IUpazilaManager upazilaManager, IAcademicSectionManager academicSectionManager, IBloodGroupManager bloodGroupManager, IDivisionManager divisionManager, INationalityManager nationalityManager, IGenderManager genderManager, IReligionManager religionManager, IStudentFeeHeadManager studentFeeHeadManager, IClassFeeListManager classFeeListManager, UserManager<ApplicationUser> userManager, IPhoneSMSManager phoneSMSManager, IAttendanceMachineManager attendanceMachineManager, IInstituteManager instituteManager, IStudentActivateHistManager studentActivateHistManager, IOffDayManager offDayManager, IStudentFeeAllocationManager studentFeeAllocationManager, IAppLogger appLogger, IStudentBulkImportManager studentBulkImportManager, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles, IAcademicExamManager academicExamManager = null, IAttachDocManager attachDocManager = null, StudentNidFileStore nidFiles = null)
     {
         _tenantFiles = tenantFiles;
         _academicClassManager = academicClassManager;
@@ -101,7 +103,10 @@ public class StudentsController : Controller
         _academicExamManager = academicExamManager;
         _attachDocManager = attachDocManager;
         _studentBulkImportManager = studentBulkImportManager;
+        _nidFiles = nidFiles;
     }
+
+    private readonly StudentNidFileStore _nidFiles;
     #endregion Constructor
 
     #region Index
@@ -481,10 +486,11 @@ public class StudentsController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     [Authorize(Roles = "SuperAdmin, Admin")]
     [Authorize(Policy = "CreateStudentsPolicy")]
-    public async Task<IActionResult> Create([Bind("Id,Name,NameBangla,ClassRoll,FatherName,MotherName,AdmissionDate,Email,PhoneNo,Photo,DOB,BirthCertificateNo,BirthCertificateImage,ReligionId,GenderId,BloodGroupId,NationalityId,PresentAddressArea,PresentAddressPO,PresentUpazilaId,PresentDistrictId,PresentDivisionId,PermanentAddressArea,PermanentAddressPO,PermanentUpazilaId,PermanentDistrictId,PermanentDivisionId,AcademicSessionId,AcademicClassId,AcademicSectionId,AddressInfo,PreviousSchool,Status,CreatedBy,CreatedAt,EditedBy,EditedAt,GuardianPhone,MACAddress,IsResidential,SMSService, UniqueId")] StudentCreateVM newStudent, IFormFile sPhoto, IFormFile DOBFile, string returnUrl = null)
+    public async Task<IActionResult> Create([Bind("Id,Name,NameBangla,ClassRoll,FatherName,MotherName,FatherNameBangla,MotherNameBangla,AdmissionDate,Email,PhoneNo,Photo,DOB,BirthCertificateNo,BirthCertificateImage,ReligionId,GenderId,BloodGroupId,NationalityId,PresentAddressArea,PresentAddressPO,PresentUpazilaId,PresentDistrictId,PresentDivisionId,PermanentAddressArea,PermanentAddressPO,PermanentUpazilaId,PermanentDistrictId,PermanentDivisionId,AcademicSessionId,AcademicClassId,AcademicSectionId,AddressInfo,PreviousSchool,Status,CreatedBy,CreatedAt,EditedBy,EditedAt,GuardianPhone,MACAddress,IsResidential,SMSService, UniqueId")] StudentCreateVM newStudent, IFormFile sPhoto, IFormFile DOBFile, IFormFile FatherNidFile, IFormFile MotherNidFile, string returnUrl = null)
     {
         // Keep the originating list context available to the view if we have to re-render.
         ViewData["ReturnUrl"] = returnUrl;
+        await ValidateParentNidUploadsAsync(FatherNidFile, MotherNidFile);
         newStudent.ClassRoll = await CreateRoll(newStudent.AcademicSessionId, newStudent.AcademicClassId, newStudent.ClassRoll);
         var rollIsExist = await _studentManager.GetStudentByClassRollAsync(newStudent.ClassRoll);
         if (rollIsExist == null)
@@ -559,8 +565,9 @@ public class StudentsController : Controller
                             await sPhoto.CopyToAsync(stream);
                         }
 
-                        // Save file name in DB
+                        // Save file name in DB (on the entity being saved, not only the view model)
                         newStudent.Photo = fileName;
+                        student.Photo = fileName;
                     }
 
                     if (DOBFile != null && DOBFile.Length > 0)
@@ -602,7 +609,10 @@ public class StudentsController : Controller
                             await DOBFile.CopyToAsync(stream);
                         }
                         newStudent.BirthCertificateImage = fileName;
+                        student.BirthCertificateImage = fileName;
                     }
+                    student.FatherNidImage = await SaveParentNidAsync(FatherNidFile, "Father's NID");
+                    student.MotherNidImage = await SaveParentNidAsync(MotherNidFile, "Mother's NID");
                     student.MACAddress = MACService.GetMAC();
                     bool saveStudent = await _studentManager.AddAsync(student);
                     if (saveStudent == true)
@@ -1049,7 +1059,7 @@ public class StudentsController : Controller
     [HttpPost, ValidateAntiForgeryToken]
     [Authorize(Roles = "SuperAdmin, Admin")]
     [Authorize(Policy = "EditStudentsPolicy")]
-    public async Task<IActionResult> Edit(int id, [Bind("Id,Name,NameBangla,ClassRoll,FatherName,MotherName,AdmissionDate,Email,PhoneNo,Photo,DOB,BirthCertificateNo,BirthCertificateImage,ReligionId,GenderId,BloodGroupId,NationalityId,PresentAddressArea,PresentAddressPO,PresentUpazilaId,PresentDistrictId,PresentDivisionId,PermanentAddressArea,PermanentAddressPO,PermanentUpazilaId,PermanentDistrictId,PermanentDivisionId,AcademicSessionId,AcademicClassId,AcademicSectionId,AddressInfo,PreviousSchool,CreatedBy,CreatedAt,EditedBy,EditedAt,GuardianPhone,Status,MACAddress,IsResidential,SMSService,UniqueId")] Student student, IFormFile sPhoto, IFormFile DOBFile, string returnUrl = null)
+    public async Task<IActionResult> Edit(int id, [Bind("Id,Name,NameBangla,ClassRoll,FatherName,MotherName,FatherNameBangla,MotherNameBangla,AdmissionDate,Email,PhoneNo,Photo,DOB,BirthCertificateNo,BirthCertificateImage,ReligionId,GenderId,BloodGroupId,NationalityId,PresentAddressArea,PresentAddressPO,PresentUpazilaId,PresentDistrictId,PresentDivisionId,PermanentAddressArea,PermanentAddressPO,PermanentUpazilaId,PermanentDistrictId,PermanentDivisionId,AcademicSessionId,AcademicClassId,AcademicSectionId,AddressInfo,PreviousSchool,CreatedBy,CreatedAt,EditedBy,EditedAt,GuardianPhone,Status,MACAddress,IsResidential,SMSService,UniqueId")] Student student, IFormFile sPhoto, IFormFile DOBFile, IFormFile FatherNidFile, IFormFile MotherNidFile, bool removeFatherNid = false, bool removeMotherNid = false, string returnUrl = null)
     {
         // Keep the originating list context available to the view if we have to re-render.
         ViewData["ReturnUrl"] = returnUrl;
@@ -1057,6 +1067,17 @@ public class StudentsController : Controller
         {
             return NotFound();
         }
+        await ValidateParentNidUploadsAsync(FatherNidFile, MotherNidFile);
+        // Stored file names come from the database, never from the form.
+        var existing = await _studentManager.GetByIdAsync(id);
+        if (existing == null)
+        {
+            return NotFound();
+        }
+        student.FatherNidImage = existing.FatherNidImage;
+        student.MotherNidImage = existing.MotherNidImage;
+        // The form has no field for the birth certificate image, so keep the stored one unless replaced.
+        student.BirthCertificateImage = existing.BirthCertificateImage;
         var rollIsExist = await _studentManager.GetStudentByClassRollAsync(id, student.ClassRoll);
         if (rollIsExist == null)
         {
@@ -1130,6 +1151,20 @@ public class StudentsController : Controller
                         student.BirthCertificateImage = fileName;
                     }
 
+                    var replacedNids = new List<string>();
+                    var fatherNid = await SaveParentNidAsync(FatherNidFile, "Father's NID");
+                    if (fatherNid != null || removeFatherNid)
+                    {
+                        replacedNids.Add(student.FatherNidImage);
+                        student.FatherNidImage = fatherNid;
+                    }
+                    var motherNid = await SaveParentNidAsync(MotherNidFile, "Mother's NID");
+                    if (motherNid != null || removeMotherNid)
+                    {
+                        replacedNids.Add(student.MotherNidImage);
+                        student.MotherNidImage = motherNid;
+                    }
+
                     student.EditedBy = HttpContext.Session.GetString("UserId");
                     student.EditedAt = DateTime.Now;
                     student.MACAddress = MACService.GetMAC();
@@ -1137,6 +1172,7 @@ public class StudentsController : Controller
                     isUpdated = await _studentManager.UpdateAsync(student);
                     if (isUpdated == true)
                     {
+                        replacedNids.ForEach(name => _nidFiles?.TryDelete(name));
                         TempData["updated"] = "Updated Successfully";
                         return RedirectToList(returnUrl);
                     }
@@ -1197,6 +1233,8 @@ public class StudentsController : Controller
         bool isSaved = await _studentManager.RemoveAsync(student);
         if (isSaved == true)
         {
+            _nidFiles?.TryDelete(student.FatherNidImage);
+            _nidFiles?.TryDelete(student.MotherNidImage);
             TempData["delete"] = "Deleted Successfully.";
             return RedirectToList(returnUrl);
         }
@@ -1901,6 +1939,11 @@ public class StudentsController : Controller
             Email = student.Email,
             FatherName = student.FatherName,
             MotherName = student.MotherName,
+            FatherNameBangla = student.FatherNameBangla,
+            MotherNameBangla = student.MotherNameBangla,
+            StudentId = student.Id,
+            HasFatherNid = !string.IsNullOrEmpty(student.FatherNidImage),
+            HasMotherNid = !string.IsNullOrEmpty(student.MotherNidImage),
             GuardianPhone = student.GuardianPhone,
             PresentAddress = $"{student.PresentAddressArea}, {student.PresentUpazila.Name}, {student.PresentDistrict.Name}, {student.PresentDivision.Name}",
             PermanentAddress = $"{student.PermanentAddressArea}, {student.PermanentUpazila.Name}, {student.PermanentDistrict.Name}, {student.PermanentDivision.Name}"
@@ -1908,6 +1951,71 @@ public class StudentsController : Controller
         return personalDetails;
     }
     #endregion Other's
+
+    #region Parent NID
+    // Parents' NID scans are private files. Anyone who may open the student's Details or Profile
+    // can view them; a student account only for their own record.
+    [HttpGet]
+    public async Task<IActionResult> ParentNid(int id, string parent)
+    {
+        var auth = HttpContext.RequestServices.GetRequiredService<IAuthorizationService>();
+        if (!(await auth.AuthorizeAsync(User, "DetailsStudentsPolicy")).Succeeded &&
+            !(await auth.AuthorizeAsync(User, "ProfileStudentsPolicy")).Succeeded)
+        {
+            return Forbid();
+        }
+
+        var student = await _studentManager.GetByIdAsync(id);
+        if (student == null || _nidFiles == null)
+        {
+            return NotFound();
+        }
+        var user = await _userManager.GetUserAsync(User);
+        if (user?.UserType == 's' && !(int.TryParse(student.UniqueId, out var ownId) && ownId == user.ReferenceId))
+        {
+            return Forbid();
+        }
+
+        var storedName = string.Equals(parent, "mother", StringComparison.OrdinalIgnoreCase)
+            ? student.MotherNidImage
+            : student.FatherNidImage;
+        var stream = _nidFiles.OpenRead(storedName);
+        if (stream == null)
+        {
+            return NotFound();
+        }
+        Response.Headers["Cache-Control"] = "private, no-store";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        return File(stream, SMS_App.Utilities.OnlineAdmission.AdmissionFileStore.ContentTypeFor(storedName));
+    }
+
+    private async Task ValidateParentNidUploadsAsync(IFormFile fatherNid, IFormFile motherNid)
+    {
+        foreach (var (file, key, label) in new[] { (fatherNid, "FatherNidImage", "Father's NID"), (motherNid, "MotherNidImage", "Mother's NID") })
+        {
+            var error = await StudentNidFileStore.ValidateAsync(file, label);
+            if (error != null)
+            {
+                ModelState.AddModelError(key, error);
+            }
+        }
+    }
+
+    /// <summary>Stores an (already validated) NID upload; null when no file was chosen.</summary>
+    private async Task<string> SaveParentNidAsync(IFormFile file, string label)
+    {
+        if (file == null || file.Length == 0 || _nidFiles == null)
+        {
+            return null;
+        }
+        var (storedName, error) = await _nidFiles.SaveAsync(file, label);
+        if (error != null)
+        {
+            throw new InvalidOperationException(error);
+        }
+        return storedName;
+    }
+    #endregion Parent NID
 
     #region Application
     // The old online-application prototype (AppliedStudent) exposed applicants' details to anyone

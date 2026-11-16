@@ -120,7 +120,7 @@ namespace SMS_App.Utilities.OnlineAdmission
             return Path.Combine(_root, applicationId.ToString(), storedName);
         }
 
-        private static async Task<bool> HasExpectedSignatureAsync(IFormFile file, string extension)
+        internal static async Task<bool> HasExpectedSignatureAsync(IFormFile file, string extension)
         {
             byte[][] signatures = extension switch
             {

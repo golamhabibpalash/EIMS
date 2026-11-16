@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace SMS_App.Areas.API.Models;
@@ -18,6 +18,8 @@ public class StudentProfileDto
     public string SessionName { get; set; }
     public string FatherName { get; set; }
     public string MotherName { get; set; }
+    public string FatherNameBangla { get; set; }
+    public string MotherNameBangla { get; set; }
     public string GuardianPhone { get; set; }
     public string PhoneNo { get; set; }
     public string Email { get; set; }

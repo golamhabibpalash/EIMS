@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -81,6 +81,8 @@ public class StudentController : ControllerBase
             SessionName = sessionName,
             FatherName = s.FatherName,
             MotherName = s.MotherName,
+            FatherNameBangla = s.FatherNameBangla,
+            MotherNameBangla = s.MotherNameBangla,
             GuardianPhone = s.GuardianPhone,
             PhoneNo = s.PhoneNo,
             Email = s.Email,

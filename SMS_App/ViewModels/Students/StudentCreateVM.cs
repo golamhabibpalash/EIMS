@@ -30,6 +30,19 @@ public class StudentCreateVM
     [Display(Name = "Mother's Name"), StringLength(30)]
     public string MotherName { get; set; }
 
+    [Display(Name = "Father's Name (Bangla)"), StringLength(150)]
+    public string FatherNameBangla { get; set; }
+
+    [Display(Name = "Mother's Name (Bangla)"), StringLength(150)]
+    public string MotherNameBangla { get; set; }
+
+    // Set server-side from the uploaded files (never bound from the form).
+    [Display(Name = "Father's NID")]
+    public string FatherNidImage { get; set; }
+
+    [Display(Name = "Mother's NID")]
+    public string MotherNidImage { get; set; }
+
     [Display(Name = "Addmission Date*"), DataType(DataType.Date)]
     public DateTime AdmissionDate { get; set; }
 

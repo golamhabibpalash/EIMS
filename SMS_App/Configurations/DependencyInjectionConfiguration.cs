@@ -206,6 +206,7 @@ public static class DependencyInjectionConfiguration
         services.AddScoped<IAdmissionApplicationManager, AdmissionApplicationManager>();
         services.AddScoped<IAdmissionPaymentManager, AdmissionPaymentManager>();
         services.AddScoped<SMS_App.Utilities.OnlineAdmission.AdmissionFileStore>();
+        services.AddScoped<SMS_App.Utilities.Students.StudentNidFileStore>();
         services.AddScoped<SMS_App.Utilities.OnlineAdmission.AdmissionNotifier>();
 
         services.AddScoped<ILogManager, LogManager>();

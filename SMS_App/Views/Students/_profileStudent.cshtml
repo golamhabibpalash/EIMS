@@ -38,6 +38,38 @@
                     </tr>
                     <tr class="border-bottom">
                         <td class="fw-bold text-nowrap">
+                            <i class="bi bi-person me-2 text-primary"></i>Father
+                        </td>
+                        <td class="text-muted">
+                            @Model.FatherName
+                            @if (!string.IsNullOrWhiteSpace(Model.FatherNameBangla))
+                            {
+                                <div lang="bn">@Model.FatherNameBangla</div>
+                            }
+                            @if (!string.IsNullOrEmpty(Model.FatherNidImage))
+                            {
+                                <a class="small" asp-controller="Students" asp-action="ParentNid" asp-route-id="@Model.Id" asp-route-parent="father" target="_blank" rel="noopener">View NID</a>
+                            }
+                        </td>
+                    </tr>
+                    <tr class="border-bottom">
+                        <td class="fw-bold text-nowrap">
+                            <i class="bi bi-person me-2 text-primary"></i>Mother
+                        </td>
+                        <td class="text-muted">
+                            @Model.MotherName
+                            @if (!string.IsNullOrWhiteSpace(Model.MotherNameBangla))
+                            {
+                                <div lang="bn">@Model.MotherNameBangla</div>
+                            }
+                            @if (!string.IsNullOrEmpty(Model.MotherNidImage))
+                            {
+                                <a class="small" asp-controller="Students" asp-action="ParentNid" asp-route-id="@Model.Id" asp-route-parent="mother" target="_blank" rel="noopener">View NID</a>
+                            }
+                        </td>
+                    </tr>
+                    <tr class="border-bottom">
+                        <td class="fw-bold text-nowrap">
                             <i class="bi bi-telephone me-2 text-primary"></i>Guardian
                         </td>
                         <td class="text-muted">@Model.GuardianPhone.ToString().PadLeft(11, '0')</td>

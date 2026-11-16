@@ -1,4 +1,4 @@
-using BLL.Managers.Base;
+﻿using BLL.Managers.Base;
 using SMS.BLL.Contracts;
 using SMS.DAL.Contracts;
 using SMS.Entities;
@@ -1030,6 +1030,8 @@ namespace SMS.BLL.Managers
                     AcademicSessionId = academicSession.Id,
                     FatherName = application.FatherName,
                     MotherName = application.MotherName,
+                    FatherNameBangla = application.FatherNameBangla,
+                    MotherNameBangla = application.MotherNameBangla,
                     AdmissionDate = request.AdmissionDate.Date,
                     Email = application.Email,
                     PhoneNo = application.GuardianPhone,

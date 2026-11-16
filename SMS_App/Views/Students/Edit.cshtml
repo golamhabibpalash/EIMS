@@ -173,6 +173,54 @@
 
             </div>
             <div class="form-group row">
+                <label asp-for="FatherNameBangla" class="control-label col-form-label text-md-end col-md-2"></label>
+                <div class="col-md-4">
+                    <input asp-for="FatherNameBangla" class="form-control" lang="bn" />
+                    <span asp-validation-for="FatherNameBangla" class="text-danger"></span>
+                </div>
+
+                <label asp-for="MotherNameBangla" class="control-label col-form-label text-md-end col-md-2"></label>
+                <div class="col-md-4">
+                    <input asp-for="MotherNameBangla" class="form-control" lang="bn" />
+                    <span asp-validation-for="MotherNameBangla" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="FatherNidImage" class="control-label col-form-label text-md-end col-md-2"></label>
+                <div class="col-md-4">
+                    <input type="file" name="FatherNidFile" class="form-control-plaintext" accept=".jpg,.jpeg,.png,.pdf" />
+                    <small class="text-muted">JPG, PNG or PDF, up to 2 MB</small>
+                    @if (!string.IsNullOrEmpty(Model.FatherNidImage))
+                    {
+                        <div class="small mt-1">
+                            <a asp-action="ParentNid" asp-route-id="@Model.Id" asp-route-parent="father" target="_blank" rel="noopener">View current</a>
+                            <span class="form-check form-check-inline ms-2">
+                                <input class="form-check-input" type="checkbox" name="removeFatherNid" value="true" id="removeFatherNid" />
+                                <label class="form-check-label" for="removeFatherNid">Remove</label>
+                            </span>
+                        </div>
+                    }
+                    <span asp-validation-for="FatherNidImage" class="text-danger"></span>
+                </div>
+
+                <label asp-for="MotherNidImage" class="control-label col-form-label text-md-end col-md-2"></label>
+                <div class="col-md-4">
+                    <input type="file" name="MotherNidFile" class="form-control-plaintext" accept=".jpg,.jpeg,.png,.pdf" />
+                    <small class="text-muted">JPG, PNG or PDF, up to 2 MB</small>
+                    @if (!string.IsNullOrEmpty(Model.MotherNidImage))
+                    {
+                        <div class="small mt-1">
+                            <a asp-action="ParentNid" asp-route-id="@Model.Id" asp-route-parent="mother" target="_blank" rel="noopener">View current</a>
+                            <span class="form-check form-check-inline ms-2">
+                                <input class="form-check-input" type="checkbox" name="removeMotherNid" value="true" id="removeMotherNid" />
+                                <label class="form-check-label" for="removeMotherNid">Remove</label>
+                            </span>
+                        </div>
+                    }
+                    <span asp-validation-for="MotherNidImage" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
                 <label asp-for="PhoneNo" class="control-label col-form-label text-md-end col-md-2"></label>
                 <div class="col-md-4">
                     <input asp-for="PhoneNo" class="form-control" />

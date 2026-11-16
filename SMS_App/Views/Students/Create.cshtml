@@ -157,6 +157,34 @@
 
             </div>
             <div class="form-group row">
+                <label asp-for="FatherNameBangla" class="control-label col-form-label text-md-end col-md-2"></label>
+                <div class="col-md-4">
+                    <input asp-for="FatherNameBangla" class="form-control" lang="bn" />
+                    <span asp-validation-for="FatherNameBangla" class="text-danger"></span>
+                </div>
+
+                <label asp-for="MotherNameBangla" class="control-label col-form-label text-md-end col-md-2"></label>
+                <div class="col-md-4">
+                    <input asp-for="MotherNameBangla" class="form-control" lang="bn" />
+                    <span asp-validation-for="MotherNameBangla" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label asp-for="FatherNidImage" class="control-label col-form-label text-md-end col-md-2"></label>
+                <div class="col-md-4">
+                    <input type="file" name="FatherNidFile" class="form-control-plaintext" accept=".jpg,.jpeg,.png,.pdf" />
+                    <small class="text-muted">JPG, PNG or PDF, up to 2 MB</small>
+                    <span asp-validation-for="FatherNidImage" class="text-danger"></span>
+                </div>
+
+                <label asp-for="MotherNidImage" class="control-label col-form-label text-md-end col-md-2"></label>
+                <div class="col-md-4">
+                    <input type="file" name="MotherNidFile" class="form-control-plaintext" accept=".jpg,.jpeg,.png,.pdf" />
+                    <small class="text-muted">JPG, PNG or PDF, up to 2 MB</small>
+                    <span asp-validation-for="MotherNidImage" class="text-danger"></span>
+                </div>
+            </div>
+            <div class="form-group row">
                 <label asp-for="PhoneNo" class="control-label col-form-label text-md-end col-md-2"></label>
                 <div class="col-md-4">
                     <input asp-for="PhoneNo" class="form-control" maxlength="11" />

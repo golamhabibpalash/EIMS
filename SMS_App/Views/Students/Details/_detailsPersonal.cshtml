@@ -67,14 +67,52 @@
             <td class="text-start">@Model.FatherName</td>
         </tr>
         <tr>
+            <td class="text-end">Father's Name (Bangla)</td>
+            <td>:</td>
+            <td class="text-start" lang="bn">@Model.FatherNameBangla</td>
+        </tr>
+        <tr>
+            <td class="text-end">Father's NID</td>
+            <td>:</td>
+            <td class="text-start">
+                @if (Model.HasFatherNid)
+                {
+                    <a asp-controller="Students" asp-action="ParentNid" asp-route-id="@Model.StudentId" asp-route-parent="father" target="_blank" rel="noopener">View</a>
+                }
+                else
+                {
+                    <span class="text-muted">Not uploaded</span>
+                }
+            </td>
+        </tr>
+        <tr>
             <td class="text-end">Mother's Name</td>
             <td>:</td>
             <td class="text-start">@Model.MotherName</td>
         </tr>
         <tr>
+            <td class="text-end">Mother's Name (Bangla)</td>
+            <td>:</td>
+            <td class="text-start" lang="bn">@Model.MotherNameBangla</td>
+        </tr>
+        <tr>
+            <td class="text-end">Mother's NID</td>
+            <td>:</td>
+            <td class="text-start">
+                @if (Model.HasMotherNid)
+                {
+                    <a asp-controller="Students" asp-action="ParentNid" asp-route-id="@Model.StudentId" asp-route-parent="mother" target="_blank" rel="noopener">View</a>
+                }
+                else
+                {
+                    <span class="text-muted">Not uploaded</span>
+                }
+            </td>
+        </tr>
+        <tr>
             <td class="text-end">Guardian's Phone</td>
             <td>:</td>
-            <td class="text-start"@Model.GuardianPhone</td>
+            <td class="text-start">@Model.GuardianPhone</td>
         </tr>
         <tr class="bg-blue">
             <td colspan="3" class="p-1">

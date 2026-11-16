@@ -47,6 +47,11 @@ public class PersonalDetails
     // Guardians Information
     public string FatherName { get; set; }
     public string MotherName { get; set; }
+    public string FatherNameBangla { get; set; }
+    public string MotherNameBangla { get; set; }
+    public int StudentId { get; set; }
+    public bool HasFatherNid { get; set; }
+    public bool HasMotherNid { get; set; }
     public string GuardianPhone { get; set; }
 
     // Address Information
