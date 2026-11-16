@@ -25,9 +25,24 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
-## [1.6.2] - 2026-11-16
+## [2.0.0] - 2026-11-16
+
+### Added
+- Students: Create, Edit, Details and Profile now have Father's Name (Bangla), Mother's
+  Name (Bangla), and an upload for the father's and mother's NID (JPG, PNG or PDF, up to
+  2 MB). All are optional. NID copies are kept private and open only for staff who can view
+  the student, or for the student themselves. Students admitted through Online Admission
+  bring their parents' Bangla names with them.
+
+### Changed
+- CI Needs Resources/sql/Student_ParentInfo_SqlServer.sql (or _PostgreSQL.sql, on every
+  school database) run before this release is deployed.
 
 ### Fixed
+- Adding a student now keeps the uploaded photo and birth certificate image; before, the
+  files were uploaded but not linked to the student.
+- Editing a student no longer removes their birth certificate image.
+- The Guardian's Phone now shows on the student's Details page.
 - Testimonial and Transfer Certificate now print on a single page. The issue date and
   signature no longer move onto a second page, and a certificate with very long names or
   address is shrunk slightly to fit instead of being split.
