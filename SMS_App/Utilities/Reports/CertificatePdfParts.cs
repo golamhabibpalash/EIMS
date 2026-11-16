@@ -86,6 +86,22 @@ public static class CertificatePdfParts
         });
     }
 
+    /// <summary>
+    /// One-page certificate layout: <paramref name="content"/> (header, title, body) from the top and
+    /// <paramref name="footer"/> (issue date + signature) pinned to the bottom of the same page.
+    /// The footer is a decoration, so it always gets its space before the body is laid out (a spacer
+    /// <c>Extend()</c> in one column took the whole remainder and pushed the footer onto page 2), and
+    /// ScaleToFit shrinks an unusually long certificate instead of breaking it across pages.
+    /// </summary>
+    public static void OnePage(PageDescriptor page, Action<ColumnDescriptor> content, Action<ColumnDescriptor> footer)
+    {
+        Frame(page).ScaleToFit().Decoration(d =>
+        {
+            d.Content().Extend().Column(content);
+            d.After().PaddingTop(10).Column(footer);
+        });
+    }
+
     /// <summary>Applies the shared page setup (landscape A4) and double decorative border.</summary>
     public static IContainer Frame(PageDescriptor page)
     {

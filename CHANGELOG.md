@@ -25,6 +25,13 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-11-16
+
+### Fixed
+- Testimonial and Transfer Certificate now print on a single page. The issue date and
+  signature no longer move onto a second page, and a certificate with very long names or
+  address is shrunk slightly to fit instead of being split.
+
 ## [1.6.1] - 2026-11-15
 
 ### Fixed

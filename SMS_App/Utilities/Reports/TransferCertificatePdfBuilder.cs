@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using QuestPDF.Fluent;
 using QuestPDF.Infrastructure;
 using SMS.Entities;
@@ -34,14 +34,14 @@ public class TransferCertificatePdfBuilder : IDocument
     {
         container.Page(page =>
         {
-            CertificatePdfParts.Frame(page).Column(col =>
-            {
-                CertificatePdfParts.Header(col, _institute, _logo);
-                col.Item().PaddingTop(12).AlignCenter().Text("Transfer Certificate").Bold().FontSize(17);
-                col.Item().PaddingTop(14).Element(ComposeBody);
-                col.Item().Extend();
-                CertificatePdfParts.Footer(col, _institute, _signature, _c.IssueDate, _c.SignatoryName, _c.SignatoryDesignation);
-            });
+            CertificatePdfParts.OnePage(page,
+                col =>
+                {
+                    CertificatePdfParts.Header(col, _institute, _logo);
+                    col.Item().PaddingTop(12).AlignCenter().Text("Transfer Certificate").Bold().FontSize(17);
+                    col.Item().PaddingTop(14).Element(ComposeBody);
+                },
+                col => CertificatePdfParts.Footer(col, _institute, _signature, _c.IssueDate, _c.SignatoryName, _c.SignatoryDesignation));
         });
     }
 
