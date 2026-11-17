@@ -33,10 +33,17 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
   2 MB). All are optional. NID copies are kept private and open only for staff who can view
   the student, or for the student themselves. Students admitted through Online Admission
   bring their parents' Bangla names with them.
+- Admin > Security > Reset Password: users with the new "Reset User Password" permission
+  can search any user and set a new password for them, for people without email or who
+  cannot reset it themselves. It can generate an easy-to-read password. A SuperAdmin's
+  password can never be changed here; the screen says so. A locked account is unlocked
+  when its password is set. The key button on User List opens the same screen.
 
 ### Changed
 - CI Needs Resources/sql/Student_ParentInfo_SqlServer.sql (or _PostgreSQL.sql, on every
   school database) run before this release is deployed.
+- CI Optional data script Resources/sql/UserPasswordReset_Claims_{SqlServer,PostgreSQL}.sql adds
+  the Reset User Password permission and grants it to every SuperAdmin.
 
 ### Fixed
 - Adding a student now keeps the uploaded photo and birth certificate image; before, the

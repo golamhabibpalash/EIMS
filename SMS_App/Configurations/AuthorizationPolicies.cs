@@ -117,6 +117,9 @@ public class AuthorizationPolicies
         options.AddPolicy("CreateRoleAccountsPolicy", policy => policy.RequireClaim("Create User Role"));
         options.AddPolicy("EditRoleAccountsPolicy", policy => policy.RequireClaim("Edit User Role"));
         options.AddPolicy("AddOrRemoveUserAccountsPolicy", policy => policy.RequireClaim("Add or Remove User From Role"));
+        // Set a new password for another user (staff without email, students who forgot theirs).
+        // SuperAdmin accounts are always refused (UserPasswordsController).
+        options.AddPolicy("ResetUserPasswordPolicy", policy => policy.RequireClaim("Reset User Password"));
 
         //Administrations
         options.AddPolicy("ViewUserProfileAdministrationsPolicy", policy => policy.RequireClaim("View User Profile"));

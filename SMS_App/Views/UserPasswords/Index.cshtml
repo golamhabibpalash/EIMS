@@ -1,0 +1,96 @@
+@model SMS_App.ViewModels.AdministrationVM.UserPasswordIndexVM
+@{
+    ViewBag.Title = "Reset Password";
+    GlobalUI.PageTitle = "Reset User Password";
+}
+
+<div class="container-fluid py-2">
+    @if (TempData["success"] != null)
+    {
+        <div class="alert alert-success" role="status">@TempData["success"]</div>
+    }
+    @if (TempData["error"] != null)
+    {
+        <div class="alert alert-danger" role="alert">@TempData["error"]</div>
+    }
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <p class="text-muted mb-3">
+                Set a new password for a user who cannot reset it themselves (for example, no email address).
+                SuperAdmin accounts cannot be changed here.
+            </p>
+            <form method="get" asp-action="Index" class="mb-3" role="search">
+                <div class="input-group">
+                    <input type="search" name="search" value="@Model.Search" class="form-control"
+                           placeholder="Search by user name, email or phone" aria-label="Search users" autofocus />
+                    <button type="submit" class="btn btn-primary">Search</button>
+                    @if (!string.IsNullOrEmpty(Model.Search))
+                    {
+                        <a asp-action="Index" class="btn btn-outline-secondary">Clear</a>
+                    }
+                </div>
+            </form>
+
+            @if (!Model.Users.Any())
+            {
+                <p class="text-muted mb-0">No user matches "@Model.Search".</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>User Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Type</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var u in Model.Users)
+                            {
+                                <tr>
+                                    <td>
+                                        @u.UserName
+                                        @if (u.IsSuperAdmin)
+                                        {
+                                            <span class="badge bg-dark badge-dark ms-1 ml-1">SuperAdmin</span>
+                                        }
+                                        @if (u.IsLockedOut)
+                                        {
+                                            <span class="badge bg-warning badge-warning text-dark ms-1 ml-1">Locked</span>
+                                        }
+                                    </td>
+                                    <td>@u.Email</td>
+                                    <td>@u.PhoneNumber</td>
+                                    <td>@u.UserType</td>
+                                    <td class="text-end text-nowrap">
+                                        @if (u.IsSuperAdmin)
+                                        {
+                                            <span class="text-muted small" title="@SMS_App.Controllers.UserPasswordsController.SuperAdminRefusal">
+                                                <i class="fa fa-lock"></i> Not allowed
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <a class="btn btn-sm btn-warning" asp-action="Reset" asp-route-id="@u.Id" asp-route-search="@Model.Search">
+                                                <i class="fa fa-key"></i> Set Password
+                                            </a>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                @if (Model.HasMore)
+                {
+                    <p class="text-muted small mt-2 mb-0">Showing the first 50 users. Type more of the name, email or phone to narrow the list.</p>
+                }
+            }
+        </div>
+    </div>
+</div>

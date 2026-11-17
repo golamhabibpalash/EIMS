@@ -1,10 +1,13 @@
 ﻿@model IEnumerable<SMS.Entities.ApplicationUser>
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService AuthorizationService
 @{
     ViewBag.Title = "User List";
     GlobalUI.PageTitle = "All User List";
 
     int sl = 0;
     string userType = "";
+    bool canResetPassword = (await AuthorizationService.AuthorizeAsync(User, "ResetUserPasswordPolicy")).Succeeded;
 }
 @if (ViewBag.msg != null)
 {
@@ -47,6 +50,10 @@
                             @if (User.IsInRole("SuperAdmin"))
                             {
                                 <a class="btn btn-sm rounded btn-info mr-1" asp-action="Impersonate" asp-route-id="@item.Id" data-toggle="tooltip" data-placement="top" title="Login as this user for testing"><i class="fa fa-user-secret"></i> </a>
+                            }
+                            @if (canResetPassword)
+                            {
+                                <a class="btn btn-sm rounded btn-secondary mr-1" asp-controller="UserPasswords" asp-action="Reset" asp-route-id="@item.Id" data-toggle="tooltip" data-placement="top" title="Set a new password"><i class="fa fa-key"></i> </a>
                             }
                             <a class="btn btn-sm rounded btn-danger" asp-action="DeleteUser" asp-route-id="@item.Id" data-toggle="tooltip" data-placement="right" title="Delete"><i class="fa fa-trash"></i> </a>
                         </td>

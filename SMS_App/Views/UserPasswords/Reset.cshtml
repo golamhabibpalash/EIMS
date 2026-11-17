@@ -1,0 +1,104 @@
+@model SMS_App.ViewModels.AdministrationVM.UserPasswordResetVM
+@{
+    ViewBag.Title = "Set Password";
+    GlobalUI.PageTitle = "Set User Password";
+}
+
+<div class="container-fluid py-2">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <strong>Set a new password for @Model.UserName</strong>
+                </div>
+                <div class="card-body">
+                    <dl class="row small mb-3">
+                        <dt class="col-4">User Name</dt><dd class="col-8">@Model.UserName</dd>
+                        <dt class="col-4">Type</dt><dd class="col-8">@Model.UserType</dd>
+                        @if (!string.IsNullOrEmpty(Model.Email))
+                        {
+                            <dt class="col-4">Email</dt><dd class="col-8">@Model.Email</dd>
+                        }
+                        @if (!string.IsNullOrEmpty(Model.PhoneNumber))
+                        {
+                            <dt class="col-4">Phone</dt><dd class="col-8">@Model.PhoneNumber</dd>
+                        }
+                    </dl>
+
+                    <form asp-action="Reset" method="post" autocomplete="off">
+                        <input type="hidden" asp-for="UserId" />
+                        <input type="hidden" asp-for="Search" />
+                        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                        <div class="mb-3 form-group">
+                            <label asp-for="NewPassword" class="form-label"></label>
+                            <div class="input-group">
+                                <input asp-for="NewPassword" class="form-control" autocomplete="new-password" autofocus />
+                                <button type="button" class="btn btn-outline-secondary" id="togglePw" aria-label="Show password">Show</button>
+                                <button type="button" class="btn btn-outline-secondary" id="generatePw">Generate</button>
+                            </div>
+                            <small class="text-muted">At least 5 characters.</small>
+                            <span asp-validation-for="NewPassword" class="text-danger d-block"></span>
+                        </div>
+
+                        <div class="mb-3 form-group">
+                            <label asp-for="ConfirmPassword" class="form-label"></label>
+                            <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" />
+                            <span asp-validation-for="ConfirmPassword" class="text-danger d-block"></span>
+                        </div>
+
+                        <div class="alert alert-info small" id="generatedNote" style="display:none">
+                            Generated password: <strong id="generatedValue" class="font-monospace"></strong>
+                            <button type="button" class="btn btn-sm btn-link p-0 ms-2 ml-2" id="copyPw">Copy</button>
+                            <div>Note it down or copy it now; it is not shown again after saving.</div>
+                        </div>
+
+                        <p class="small text-muted">
+                            The user's old password stops working as soon as you save. Tell them the new password in person or by phone.
+                        </p>
+
+                        <div class="d-flex justify-content-between">
+                            <a asp-action="Index" asp-route-search="@Model.Search" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-warning">Save New Password</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            var pw = document.getElementById('NewPassword');
+            var confirm = document.getElementById('ConfirmPassword');
+            var toggle = document.getElementById('togglePw');
+
+            toggle.addEventListener('click', function () {
+                var show = pw.type === 'password';
+                pw.type = confirm.type = show ? 'text' : 'password';
+                toggle.textContent = show ? 'Hide' : 'Show';
+                toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+            });
+
+            document.getElementById('generatePw').addEventListener('click', function () {
+                // 8 characters without look-alikes (0/O, 1/l/I), easy to read out over the phone.
+                var chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+                var bytes = new Uint32Array(8);
+                window.crypto.getRandomValues(bytes);
+                var value = Array.from(bytes, function (b) { return chars[b % chars.length]; }).join('');
+                pw.value = confirm.value = value;
+                document.getElementById('generatedValue').textContent = value;
+                document.getElementById('generatedNote').style.display = '';
+            });
+
+            document.getElementById('copyPw').addEventListener('click', function () {
+                var btn = this;
+                navigator.clipboard.writeText(document.getElementById('generatedValue').textContent)
+                    .then(function () { btn.textContent = 'Copied'; });
+            });
+        })();
+    </script>
+}

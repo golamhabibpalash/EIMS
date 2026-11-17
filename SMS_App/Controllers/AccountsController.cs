@@ -664,7 +664,7 @@ public class AccountsController : Controller
                 var result = await _userManager.ResetPasswordAsync(user, model.Token, model.Password);
                 if (result.Succeeded)
                 {
-                    await _appLogger.InfoAsync($"Password reset to {model.Password} by {model.Email}", "Password Reset Success");
+                    await _appLogger.InfoAsync($"Password reset to {SMS_App.Utilities.LoggerService.SensitiveLogText.Secret(model.Password)} by {model.Email}", "Password Reset Success");
                     return View("ResetPasswordConfirmation");
                 }
                 ViewBag.msg = "Password not changed. Please input proper password";

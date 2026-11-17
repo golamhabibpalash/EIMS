@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
 using SMS.BLL.Contracts;
+using SMS_App.Utilities.LoggerService;
 using SMS_App.Utilities.Pagination;
 using SMS_App.ViewModels.LogVM;
 using System;
@@ -29,6 +30,15 @@ public class LogsController : Controller
         // Get all logs
         var logs = await _logManager.GetAllAsync();
         logs = logs.ToList().OrderByDescending(s => s.Timestamp).ToList();
+
+        // Passwords in log messages are visible to a SuperAdmin only. Mask before searching, so
+        // nobody else can find a password by guessing it in the search box.
+        var isSuperAdmin = User.IsInRole("SuperAdmin");
+        foreach (var log in logs)
+        {
+            log.Message = SensitiveLogText.ForViewer(log.Message, isSuperAdmin);
+            log.Exception = SensitiveLogText.ForViewer(log.Exception, isSuperAdmin);
+        }
         // Apply search filter
         if (!string.IsNullOrEmpty(searchText))
         {
