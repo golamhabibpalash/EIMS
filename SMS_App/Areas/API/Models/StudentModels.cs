@@ -24,6 +24,14 @@ public class StudentProfileDto
     public string PhoneNo { get; set; }
     public string Email { get; set; }
     public string Address { get; set; }
+    public string Gender { get; set; }
+    public string Nationality { get; set; }
+    public string Religion { get; set; }
+    public string BloodGroup { get; set; }
+    public string BirthCertificateNo { get; set; }
+    public string PresentAddress { get; set; }
+    public string PermanentAddress { get; set; }
+    public string PreviousSchool { get; set; }
     public DateTime DateOfBirth { get; set; }
     public DateTime AdmissionDate { get; set; }
     public bool IsResidential { get; set; }
@@ -139,6 +147,13 @@ public class SubjectDto
     public string Name { get; set; }
     public string Code { get; set; }
     public double TotalMarks { get; set; }
+}
+
+public class StudentDocumentDto
+{
+    public string Name { get; set; }
+    public string Url { get; set; }
+    public string Type { get; set; }
 }
 
 public class NoticeDto

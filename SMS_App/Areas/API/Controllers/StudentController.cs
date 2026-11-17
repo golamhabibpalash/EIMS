@@ -87,6 +87,24 @@ public class StudentController : ControllerBase
             PhoneNo = s.PhoneNo,
             Email = s.Email,
             Address = s.AddressInfo,
+            Gender = s.Gender?.Name,
+            Nationality = s.Nationality?.Name,
+            Religion = s.Religion?.Name,
+            BloodGroup = s.BloodGroup?.Name,
+            BirthCertificateNo = s.BirthCertificateNo,
+            PresentAddress = Address(
+                s.PresentAddressArea,
+                s.PresentAddressPO,
+                s.PresentUpazila?.Name,
+                s.PresentDistrict?.Name,
+                s.PresentDivision?.Name),
+            PermanentAddress = Address(
+                s.PermanentAddressArea,
+                s.PermanentAddressPO,
+                s.PermanentUpazila?.Name,
+                s.PermanentDistrict?.Name,
+                s.PermanentDivision?.Name),
+            PreviousSchool = s.PreviousSchool,
             DateOfBirth = s.DOB,
             AdmissionDate = s.AdmissionDate,
             IsResidential = s.IsResidential,
@@ -254,6 +272,22 @@ public class StudentController : ControllerBase
         });
     }
 
+    [HttpGet("documents")]
+    public async Task<IActionResult> Documents()
+    {
+        var ctx = await ResolveAsync();
+        if (ctx.Error != null) return ctx.Error;
+
+        var documents = await _studentManager.GetStudentProfileDocuments(ctx.Student.Id);
+        var items = documents?.Documents ?? new List<DocInfo>();
+        return Ok(items.Select(d => new StudentDocumentDto
+        {
+            Name = d.DocumentName,
+            Url = DocumentUrl(d.DocUrl),
+            Type = d.DocType,
+        }).ToList());
+    }
+
     [HttpGet("notices")]
     public async Task<IActionResult> Notices()
     {
@@ -317,4 +351,21 @@ public class StudentController : ControllerBase
 
     private static string PhotoUrl(string photo) =>
         string.IsNullOrWhiteSpace(photo) ? null : "/Images/Student/" + photo;
+
+    private static string DocumentUrl(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        var value = url.Trim();
+        if (value.StartsWith('/') ||
+            value.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return value;
+        }
+        return "/Images/Student/" + value;
+    }
+
+    private static string Address(params string[] parts) => string.Join(
+        ", ",
+        parts.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim()));
 }
