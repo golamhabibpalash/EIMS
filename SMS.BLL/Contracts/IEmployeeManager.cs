@@ -12,5 +12,7 @@ namespace SMS.BLL.Contracts
     {
         Task<Employee> GetByPhoneAttendance(string phoneLast9Digit);
         Task<Employee> GetByMachineUserIdAsync(string machineUserId);
+        Task<List<Employee>> GetAccountLookupAsync(ICollection<int> ids);
+        Task<List<Employee>> SearchForAccountsAsync(string term, int max);
     }
 }

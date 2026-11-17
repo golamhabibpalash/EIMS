@@ -30,5 +30,11 @@ namespace SMS.DAL.Contracts
         Task<List<StudentListVM>> GetCurrentStudentListAsync(int? AcademicClassId, int? AcademicSectionId);
         Task<List<Student>> GetStudentsWithSectionBySectionIdAsync(int academicSectionId, int? classId = null, int? sessionId = null, bool? isResidential = null);
         Task<List<Student>> GetStudentsWithSectionByClassSessionResidentialAsync(int classId, int sessionId, bool isResidential);
+
+        /// <summary>Students for a page of login accounts: by Id or by UniqueId (padding-tolerant). Light projection.</summary>
+        Task<List<Student>> GetAccountLookupAsync(ICollection<int> ids, ICollection<string> uniqueIds);
+
+        /// <summary>Students whose name, UniqueId or class roll matches <paramref name="term"/> (light projection, at most <paramref name="max"/>).</summary>
+        Task<List<Student>> SearchForAccountsAsync(string term, int max);
     }
 }

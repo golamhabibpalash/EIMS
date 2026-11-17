@@ -25,6 +25,19 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-18
+
+### Added
+- Reset Password now lists every user, page by page (25, 50 or 100 per page), instead of only
+  the first 50. It shows each user's name, plus the class roll for a student and the ID for an
+  employee. Users can be filtered by type (student, employee, other) and found by user name,
+  email, phone, student or employee name, class roll or employee ID. After setting a password
+  you return to the same page of the list.
+- Admins can now use Notice and Student Slider too: all their permissions are given to the
+  Admin and SuperAdmin roles, so every Admin has them without setting each one up.
+- CI Re-run Resources/sql/MobileContent_Claims_{SqlServer,PostgreSQL}.sql: it now grants the 8
+  permissions to the Admin and SuperAdmin roles (role claims) instead of SuperAdmin users.
+
 ## [2.1.0] - 2026-11-17
 
 ### Added

@@ -2,6 +2,16 @@
 @{
     ViewBag.Title = "Reset Password";
     GlobalUI.PageTitle = "Reset User Password";
+
+    // Keeps the current search/filter/page size on every link.
+    object Route(int page) => new { search = Model.Search, type = Model.Type, page, pageSize = Model.PageSize };
+
+    // Compact page window: 1 … 4 5 [6] 7 8 … 20
+    var pages = new List<int>();
+    for (var p = 1; p <= Model.TotalPages; p++)
+    {
+        if (p == 1 || p == Model.TotalPages || Math.Abs(p - Model.Page) <= 2) pages.Add(p);
+    }
 }
 
 <div class="container-fluid py-2">
@@ -20,12 +30,34 @@
                 Set a new password for a user who cannot reset it themselves (for example, no email address).
                 SuperAdmin accounts cannot be changed here.
             </p>
-            <form method="get" asp-action="Index" class="mb-3" role="search">
-                <div class="input-group">
-                    <input type="search" name="search" value="@Model.Search" class="form-control"
-                           placeholder="Search by user name, email or phone" aria-label="Search users" autofocus />
-                    <button type="submit" class="btn btn-primary">Search</button>
-                    @if (!string.IsNullOrEmpty(Model.Search))
+
+            <form method="get" asp-action="Index" class="row g-2 gx-2 mb-3 align-items-end" role="search">
+                <div class="col-md-6 col-12 mb-2">
+                    <label for="search" class="form-label small text-muted mb-1">Search</label>
+                    <input type="search" id="search" name="search" value="@Model.Search" class="form-control"
+                           placeholder="User name, email, phone, name, class roll or employee ID" />
+                </div>
+                <div class="col-md-2 col-6 mb-2">
+                    <label for="type" class="form-label small text-muted mb-1">Type</label>
+                    <select id="type" name="type" class="form-control form-select">
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.Type))">All</option>
+                        <option value="s" selected="@(Model.Type == "s")">Student</option>
+                        <option value="e" selected="@(Model.Type == "e")">Employee</option>
+                        <option value="o" selected="@(Model.Type == "o")">Other</option>
+                    </select>
+                </div>
+                <div class="col-md-2 col-6 mb-2">
+                    <label for="pageSize" class="form-label small text-muted mb-1">Per page</label>
+                    <select id="pageSize" name="pageSize" class="form-control form-select">
+                        @foreach (var size in SMS_App.ViewModels.AdministrationVM.UserPasswordIndexVM.PageSizes)
+                        {
+                            <option value="@size" selected="@(size == Model.PageSize)">@size</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2 col-12 mb-2 d-flex">
+                    <button type="submit" class="btn btn-primary flex-fill me-1 mr-1">Search</button>
+                    @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.Type))
                     {
                         <a asp-action="Index" class="btn btn-outline-secondary">Clear</a>
                     }
@@ -34,7 +66,9 @@
 
             @if (!Model.Users.Any())
             {
-                <p class="text-muted mb-0">No user matches "@Model.Search".</p>
+                <p class="text-muted mb-0">
+                    @(string.IsNullOrEmpty(Model.Search) ? "No users found." : $"No user matches \"{Model.Search}\".")
+                </p>
             }
             else
             {
@@ -42,17 +76,23 @@
                     <table class="table table-sm table-hover align-middle mb-0">
                         <thead>
                             <tr>
+                                <th>#</th>
                                 <th>User Name</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Class Roll</th>
+                                <th>Employee ID</th>
                                 <th>Email</th>
                                 <th>Phone</th>
-                                <th>Type</th>
                                 <th class="text-end">Action</th>
                             </tr>
                         </thead>
                         <tbody>
+                            @{ var sl = Model.FirstRow; }
                             @foreach (var u in Model.Users)
                             {
                                 <tr>
+                                    <td class="text-muted">@(sl++)</td>
                                     <td>
                                         @u.UserName
                                         @if (u.IsSuperAdmin)
@@ -64,9 +104,12 @@
                                             <span class="badge bg-warning badge-warning text-dark ms-1 ml-1">Locked</span>
                                         }
                                     </td>
+                                    <td>@u.Name</td>
+                                    <td>@u.UserType</td>
+                                    <td>@u.ClassRoll</td>
+                                    <td>@u.EmployeeId</td>
                                     <td>@u.Email</td>
                                     <td>@u.PhoneNumber</td>
-                                    <td>@u.UserType</td>
                                     <td class="text-end text-nowrap">
                                         @if (u.IsSuperAdmin)
                                         {
@@ -76,7 +119,9 @@
                                         }
                                         else
                                         {
-                                            <a class="btn btn-sm btn-warning" asp-action="Reset" asp-route-id="@u.Id" asp-route-search="@Model.Search">
+                                            <a class="btn btn-sm btn-warning" asp-action="Reset" asp-route-id="@u.Id"
+                                               asp-route-search="@Model.Search" asp-route-type="@Model.Type"
+                                               asp-route-page="@Model.Page" asp-route-pageSize="@Model.PageSize">
                                                 <i class="fa fa-key"></i> Set Password
                                             </a>
                                         }
@@ -86,11 +131,47 @@
                         </tbody>
                     </table>
                 </div>
-                @if (Model.HasMore)
-                {
-                    <p class="text-muted small mt-2 mb-0">Showing the first 50 users. Type more of the name, email or phone to narrow the list.</p>
-                }
+
+                <div class="d-flex flex-wrap justify-content-between align-items-center mt-3">
+                    <div class="small text-muted mb-2">
+                        Showing @Model.FirstRow–@Model.LastRow of @Model.TotalCount users
+                    </div>
+                    @if (Model.TotalPages > 1)
+                    {
+                        <nav aria-label="User pages">
+                            <ul class="pagination pagination-sm mb-2">
+                                <li class="page-item @(Model.Page == 1 ? "disabled" : "")">
+                                    <a class="page-link" href="@Url.Action("Index", Route(Model.Page - 1))" aria-label="Previous">&laquo;</a>
+                                </li>
+                                @{ var last = 0; }
+                                @foreach (var p in pages)
+                                {
+                                    if (p - last > 1)
+                                    {
+                                        <li class="page-item disabled"><span class="page-link">…</span></li>
+                                    }
+                                    <li class="page-item @(p == Model.Page ? "active" : "")" aria-current="@(p == Model.Page ? "page" : null)">
+                                        <a class="page-link" href="@Url.Action("Index", Route(p))">@p</a>
+                                    </li>
+                                    last = p;
+                                }
+                                <li class="page-item @(Model.Page == Model.TotalPages ? "disabled" : "")">
+                                    <a class="page-link" href="@Url.Action("Index", Route(Model.Page + 1))" aria-label="Next">&raquo;</a>
+                                </li>
+                            </ul>
+                        </nav>
+                    }
+                </div>
             }
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        // Changing the type or page size applies straight away (from page 1).
+        document.querySelectorAll('#type, #pageSize').forEach(function (el) {
+            el.addEventListener('change', function () { el.form.submit(); });
+        });
+    </script>
+}

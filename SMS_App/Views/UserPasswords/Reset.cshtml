@@ -28,6 +28,9 @@
                     <form asp-action="Reset" method="post" autocomplete="off">
                         <input type="hidden" asp-for="UserId" />
                         <input type="hidden" asp-for="Search" />
+                        <input type="hidden" asp-for="Type" />
+                        <input type="hidden" asp-for="Page" />
+                        <input type="hidden" asp-for="PageSize" />
                         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
                         <div class="mb-3 form-group">
@@ -58,7 +61,7 @@
                         </p>
 
                         <div class="d-flex justify-content-between">
-                            <a asp-action="Index" asp-route-search="@Model.Search" class="btn btn-outline-secondary">Cancel</a>
+                            <a asp-action="Index" asp-route-search="@Model.Search" asp-route-type="@Model.Type" asp-route-page="@Model.Page" asp-route-pageSize="@Model.PageSize" class="btn btn-outline-secondary">Cancel</a>
                             <button type="submit" class="btn btn-warning">Save New Password</button>
                         </div>
                     </form>

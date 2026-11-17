@@ -266,5 +266,37 @@ namespace SMS.DAL.Repositories
                 .OrderBy(s => s.ClassRoll)
                 .ToListAsync();
         }
+
+        public async Task<List<Student>> GetAccountLookupAsync(ICollection<int> ids, ICollection<string> uniqueIds)
+        {
+            // UniqueIds are zero-padded inconsistently across rows, so also try 1-2 leading zeros.
+            var keys = uniqueIds
+                .Where(u => !string.IsNullOrWhiteSpace(u))
+                .SelectMany(u => { var t = u.Trim().TrimStart('0'); return new[] { u.Trim(), t, "0" + t, "00" + t }; })
+                .Distinct()
+                .ToList();
+            return await _context.Student
+                .AsNoTracking()
+                .Where(s => ids.Contains(s.Id) || keys.Contains(s.UniqueId))
+                .Select(s => new Student { Id = s.Id, UniqueId = s.UniqueId, Name = s.Name, ClassRoll = s.ClassRoll })
+                .ToListAsync();
+        }
+
+        public async Task<List<Student>> SearchForAccountsAsync(string term, int max)
+        {
+            if (string.IsNullOrWhiteSpace(term))
+                return new List<Student>();
+            var lower = term.Trim().ToLower();
+            var isNumber = int.TryParse(term.Trim(), out var number);
+            return await _context.Student
+                .AsNoTracking()
+                .Where(s => s.Name.ToLower().Contains(lower)
+                         || s.UniqueId.Contains(lower)
+                         || (isNumber && s.ClassRoll == number))
+                .OrderBy(s => s.Name)
+                .Take(max)
+                .Select(s => new Student { Id = s.Id, UniqueId = s.UniqueId, Name = s.Name, ClassRoll = s.ClassRoll })
+                .ToListAsync();
+        }
     }
 }

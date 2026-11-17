@@ -18,5 +18,11 @@ namespace SMS.DAL.Contracts
         /// that mapping - the phone-number match above is the legacy scheme.
         /// </summary>
         Task<Employee> GetByMachineUserIdAsync(string machineUserId);
+
+        /// <summary>Employees for a page of login accounts (Id + name only).</summary>
+        Task<List<Employee>> GetAccountLookupAsync(ICollection<int> ids);
+
+        /// <summary>Employees whose name or Id matches <paramref name="term"/> (Id + name only, at most <paramref name="max"/>).</summary>
+        Task<List<Employee>> SearchForAccountsAsync(string term, int max);
     }
 }

@@ -24,4 +24,6 @@ public interface IStudentManager : IManager<Student>
     Task<ProfileDocument> GetStudentProfileDocuments(int id);
     Task<List<Student>> GetStudentsWithSectionBySectionIdAsync(int academicSectionId, int? classId = null, int? sessionId = null, bool? isResidential = null);
     Task<List<Student>> GetStudentsWithSectionByClassSessionResidentialAsync(int classId, int sessionId, bool isResidential);
+    Task<List<Student>> GetAccountLookupAsync(ICollection<int> ids, ICollection<string> uniqueIds);
+    Task<List<Student>> SearchForAccountsAsync(string term, int max);
 }

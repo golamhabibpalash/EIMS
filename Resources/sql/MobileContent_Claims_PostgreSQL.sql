@@ -2,8 +2,8 @@
 -- Mobile Notice + Mobile Slider permissions - POSTGRESQL
 -- Adds 8 permissions (view/create/edit/delete for notices and for the slider) used by
 -- Communications > SMS Panel > Notice / Student Slider (MobileContentController), so they
--- can be given to roles/users in Administrations > User Profile, and grants all of them to
--- every SuperAdmin. Run MobileContent_PostgreSQL.sql first (it creates the tables).
+-- can be given to users in Administrations > User Profile, and grants all of them to the
+-- SuperAdmin and Admin roles. Run MobileContent_PostgreSQL.sql first (it creates the tables).
 -- IDEMPOTENT: safe to re-run.
 -- Run per school database, e.g. psql -p 5433 -d sbd_<code> -f this.sql
 -- Users must LOG OUT and back in (or wait up to 15 minutes) for new permissions to apply.
@@ -42,12 +42,13 @@ BEGIN
     FROM perm p
     WHERE NOT EXISTS (SELECT 1 FROM "ClaimStores" c WHERE c."ClaimValue" = p.claim_value AND c."ClaimType" = p.claim_type);
 
-    -- Grant all of them to every SuperAdmin.
-    INSERT INTO "AspNetUserClaims" ("UserId", "ClaimType", "ClaimValue")
-    SELECT ur."UserId", p.claim_type, p.claim_value
-    FROM "AspNetUserRoles" ur
-    JOIN "AspNetRoles" r ON r."Id" = ur."RoleId" AND r."NormalizedName" = 'SUPERADMIN'
+    -- Grant all of them to the SuperAdmin and Admin ROLES (role claims), so every current and
+    -- future SuperAdmin/Admin has them. Other users get them one by one in User Profile.
+    INSERT INTO "AspNetRoleClaims" ("RoleId", "ClaimType", "ClaimValue")
+    SELECT r."Id", p.claim_type, p.claim_value
+    FROM "AspNetRoles" r
     CROSS JOIN perm p
-    WHERE NOT EXISTS (SELECT 1 FROM "AspNetUserClaims" c
-                      WHERE c."UserId" = ur."UserId" AND c."ClaimType" = p.claim_type AND c."ClaimValue" = p.claim_value);
+    WHERE r."NormalizedName" IN ('SUPERADMIN', 'ADMIN')
+      AND NOT EXISTS (SELECT 1 FROM "AspNetRoleClaims" c
+                      WHERE c."RoleId" = r."Id" AND c."ClaimType" = p.claim_type AND c."ClaimValue" = p.claim_value);
 END $$;

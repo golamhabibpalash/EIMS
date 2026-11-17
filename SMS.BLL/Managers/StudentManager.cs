@@ -258,5 +258,11 @@ namespace SMS.BLL.Managers
             if (percentage >= 1) return ("Poor", "Red");
             return ("No Data", "Gray");
         }
+
+        public Task<List<Student>> GetAccountLookupAsync(ICollection<int> ids, ICollection<string> uniqueIds) =>
+            _studentRepository.GetAccountLookupAsync(ids, uniqueIds);
+
+        public Task<List<Student>> SearchForAccountsAsync(string term, int max) =>
+            _studentRepository.SearchForAccountsAsync(term, max);
     }
 }

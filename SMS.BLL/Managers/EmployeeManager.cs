@@ -1,4 +1,5 @@
-﻿using BLL.Managers.Base;
+﻿using System.Collections.Generic;
+using BLL.Managers.Base;
 using Repositories;
 using SMS.BLL.Contracts;
 using SMS.DAL.Contracts;
@@ -24,5 +25,11 @@ namespace SMS.BLL.Managers
         {
             return await _employeeRepository.GetByPhoneAttendance(phoneLast9Digit);
         }
+
+        public Task<List<Employee>> GetAccountLookupAsync(ICollection<int> ids) =>
+            _employeeRepository.GetAccountLookupAsync(ids);
+
+        public Task<List<Employee>> SearchForAccountsAsync(string term, int max) =>
+            _employeeRepository.SearchForAccountsAsync(term, max);
     }
 }

@@ -73,5 +73,29 @@ namespace Repositories
             var employee = await _context.Employee.FirstOrDefaultAsync(e => e.Phone.Substring(2,e.Phone.Length) == phoneLast9Digit);
             return employee;
         }
+
+        public async Task<List<Employee>> GetAccountLookupAsync(ICollection<int> ids)
+        {
+            return await _context.Employee
+                .AsNoTracking()
+                .Where(e => ids.Contains(e.Id))
+                .Select(e => new Employee { Id = e.Id, EmployeeName = e.EmployeeName })
+                .ToListAsync();
+        }
+
+        public async Task<List<Employee>> SearchForAccountsAsync(string term, int max)
+        {
+            if (string.IsNullOrWhiteSpace(term))
+                return new List<Employee>();
+            var lower = term.Trim().ToLower();
+            var isNumber = int.TryParse(term.Trim(), out var number);
+            return await _context.Employee
+                .AsNoTracking()
+                .Where(e => e.EmployeeName.ToLower().Contains(lower) || (isNumber && e.Id == number))
+                .OrderBy(e => e.EmployeeName)
+                .Take(max)
+                .Select(e => new Employee { Id = e.Id, EmployeeName = e.EmployeeName })
+                .ToListAsync();
+        }
     }
 }
