@@ -43,6 +43,9 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
   files were uploaded but not linked to the student.
 - Editing a student no longer removes their birth certificate image.
 - The Guardian's Phone now shows on the student's Details page.
+- The verification code screen (Forgot Password) is easier to use: a large full-width code
+  box that opens the number keypad on phones and can fill the code from the SMS, a clear
+  Verify button, a note saying where the code was sent, and a link to send a new code.
 - Testimonial and Transfer Certificate now print on a single page. The issue date and
   signature no longer move onto a second page, and a certificate with very long names or
   address is shrunk slightly to fit instead of being split.

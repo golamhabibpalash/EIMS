@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -577,6 +577,7 @@ public class AccountsController : Controller
                         }
                     }
 
+                    TempData["OtpChannel"] = "SMS";
                     return RedirectToAction("OTPGenerate");
                 }
                 else if (model.VerificationBy == "Email")
@@ -585,6 +586,7 @@ public class AccountsController : Controller
                     bool isSend = EmailService.SendOTP(model.Email,"One time password",DateTime.Now,randomNumber.ToString());
                     if (isSend)
                     {
+                        TempData["OtpChannel"] = "Email";
                         return RedirectToAction("OTPGenerate");
                     }
                 }
