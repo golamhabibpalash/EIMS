@@ -113,6 +113,10 @@ Multiple pre-configured connection string profiles (all SQL Server, encrypted):
 - `Momitun_DefaultConnection` - Momitun server
 - `MCPS_DefaultConnection` - MCPS server
 
+### Student dashboard content
+
+Student home sliders and notices are managed under **Communications** and read by the mobile app via `GET /API/Student/dashboard-content`. Existing databases need `Resources/sql/MobileContent_PostgreSQL.sql` or `Resources/sql/MobileContent_SqlServer.sql` applied before deployment; `EnsureCreatedAsync()` does not add tables to an existing database.
+
 ## NuGet Packages
 
 - AutoMapper - Object mapping

@@ -1,0 +1,73 @@
+@model IEnumerable<MobileSlider>
+
+@{
+    ViewData["Title"] = "Student Sliders";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+    var items = Model.OrderBy(s => s.DisplayOrder).ThenByDescending(s => s.CreatedAt).ToList();
+}
+
+@if (TempData["created"] != null)
+{
+    <div class="alert alert-success">@TempData["created"]</div>
+}
+@if (TempData["deleted"] != null)
+{
+    <div class="alert alert-info">@TempData["deleted"]</div>
+}
+@if (TempData["failed"] != null)
+{
+    <div class="alert alert-danger">@TempData["failed"]</div>
+}
+
+<div class="row">
+    <div class="col-12 mb-2">
+        <a asp-action="CreateSlider" class="btn btn-info btn-sm">Add Slider</a>
+    </div>
+    <table class="table table-bordered table-striped table-responsive-sm" id="myTable">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Image</th>
+                <th>Title</th>
+                <th>Order</th>
+                <th>Published</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (var i = 0; i < items.Count; i++)
+            {
+                var item = items[i];
+                <tr>
+                    <td>@(i + 1)</td>
+                    <td>
+                        @if (!string.IsNullOrWhiteSpace(item.ImagePath))
+                        {
+                            <img src="@item.ImagePath" alt="@item.Title" style="max-width: 120px; max-height: 60px;" />
+                        }
+                    </td>
+                    <td>@item.Title</td>
+                    <td>@item.DisplayOrder</td>
+                    <td>@(item.IsPublished ? "Yes" : "No")</td>
+                    <td>@item.PublishedFrom?.ToString("dd MMM yyyy")</td>
+                    <td>@item.PublishedTo?.ToString("dd MMM yyyy")</td>
+                    <td>
+                        <a asp-action="EditSlider" asp-route-id="@item.Id" class="btn btn-primary btn-sm">Edit</a>
+                        <form asp-action="DeleteSlider" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this slider?');">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            @if (items.Count == 0)
+            {
+                <tr>
+                    <td colspan="8" class="text-center text-muted">No sliders have been added.</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

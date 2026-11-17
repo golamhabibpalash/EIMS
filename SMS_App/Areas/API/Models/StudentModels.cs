@@ -166,3 +166,27 @@ public class NoticeDto
     public bool IsRead { get; set; }
     public DateTime CreatedAt { get; set; }
 }
+
+public class StudentDashboardContentDto
+{
+    public List<MobileSliderDto> Sliders { get; set; } = new();
+    public List<MobileNoticeDto> Notices { get; set; } = new();
+}
+
+public class MobileSliderDto
+{
+    public int Id { get; set; }
+    public string Title { get; set; }
+    public string Subtitle { get; set; }
+    public string ImageUrl { get; set; }
+    public string TargetUrl { get; set; }
+}
+
+public class MobileNoticeDto
+{
+    public int Id { get; set; }
+    public string Title { get; set; }
+    public string Message { get; set; }
+    public string Url { get; set; }
+    public DateTime CreatedAt { get; set; }
+}

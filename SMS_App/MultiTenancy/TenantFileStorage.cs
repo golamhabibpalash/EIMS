@@ -32,6 +32,7 @@ namespace SMS_App.MultiTenancy
         private static readonly string[] StandardFolders =
         {
             Path.Combine("Images", "Institute"),
+            Path.Combine("Images", "MobileSlider"),
             Path.Combine("Images", "Student"),
             Path.Combine("Images", "Student", "Photo"),
             Path.Combine("Images", "Employee", "photo"),

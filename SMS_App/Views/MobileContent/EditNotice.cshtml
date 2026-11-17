@@ -1,0 +1,71 @@
+@model MobileNotice
+
+@{
+    ViewData["Title"] = "Edit Student Notice";
+    GlobalUI.PageTitle = ViewData["Title"].ToString();
+}
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <form asp-action="EditNotice" asp-route-id="@Model.Id" method="post">
+            <fieldset class="border border-info p-3">
+                <legend class="float-none w-auto text-primary px-2" style="font-size: 1.1rem;">Notice</legend>
+                <div class="form-group row">
+                    <label asp-for="Title" class="col-sm-3 col-form-label"></label>
+                    <div class="col-sm-9">
+                        <input asp-for="Title" class="form-control" maxlength="200" />
+                        <span class="text-danger" asp-validation-for="Title"></span>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label asp-for="Message" class="col-sm-3 col-form-label"></label>
+                    <div class="col-sm-9">
+                        <textarea asp-for="Message" class="form-control" rows="4" maxlength="2000"></textarea>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label asp-for="Url" class="col-sm-3 col-form-label"></label>
+                    <div class="col-sm-9">
+                        <input asp-for="Url" class="form-control" maxlength="500" placeholder="Optional link or route" />
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label asp-for="DisplayOrder" class="col-sm-3 col-form-label"></label>
+                    <div class="col-sm-9">
+                        <input asp-for="DisplayOrder" class="form-control" type="number" />
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label asp-for="PublishedFrom" class="col-sm-3 col-form-label"></label>
+                    <div class="col-sm-9">
+                        <input asp-for="PublishedFrom" class="form-control" type="datetime-local" />
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label asp-for="PublishedTo" class="col-sm-3 col-form-label"></label>
+                    <div class="col-sm-9">
+                        <input asp-for="PublishedTo" class="form-control" type="datetime-local" />
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <div class="col-sm-3"></div>
+                    <div class="col-sm-9">
+                        <div class="form-check">
+                            <input asp-for="IsPublished" class="form-check-input" />
+                            <label asp-for="IsPublished" class="form-check-label"></label>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <div class="col-sm-12 text-end">
+                        <partial name="_Create_Back" />
+                    </div>
+                </div>
+            </fieldset>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}

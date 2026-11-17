@@ -84,6 +84,11 @@ namespace SMS.DB
         public DbSet<Log> Logs { get; set; }
         #endregion
 
+        #region M
+        public DbSet<MobileNotice> MobileNotices { get; set; }
+        public DbSet<MobileSlider> MobileSliders { get; set; }
+        #endregion
+
         #region N
         public DbSet<Nationality> Nationality { get; set; }
         public DbSet<NotificationEvent> NotificationEvents { get; set; }

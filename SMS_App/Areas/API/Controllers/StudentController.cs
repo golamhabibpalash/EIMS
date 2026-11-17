@@ -38,6 +38,8 @@ public class StudentController : ControllerBase
     private readonly IAcademicSessionManager _academicSessionManager;
     private readonly IAcademicClassSubjectManager _classSubjectManager;
     private readonly IUserNotificationManager _notificationManager;
+    private readonly IMobileNoticeManager _mobileNoticeManager;
+    private readonly IMobileSliderManager _mobileSliderManager;
     private readonly ILogger<StudentController> _logger;
 
     public StudentController(
@@ -49,6 +51,8 @@ public class StudentController : ControllerBase
         IAcademicSessionManager academicSessionManager,
         IAcademicClassSubjectManager classSubjectManager,
         IUserNotificationManager notificationManager,
+        IMobileNoticeManager mobileNoticeManager,
+        IMobileSliderManager mobileSliderManager,
         ILogger<StudentController> logger)
     {
         _userManager = userManager;
@@ -59,6 +63,8 @@ public class StudentController : ControllerBase
         _academicSessionManager = academicSessionManager;
         _classSubjectManager = classSubjectManager;
         _notificationManager = notificationManager;
+        _mobileNoticeManager = mobileNoticeManager;
+        _mobileSliderManager = mobileSliderManager;
         _logger = logger;
     }
 
@@ -164,6 +170,33 @@ public class StudentController : ControllerBase
         try { dto.UnreadNotifications = await _notificationManager.GetUnreadCountAsync(ctx.User.Id); } catch { }
 
         return Ok(dto);
+    }
+
+    [HttpGet("dashboard-content")]
+    public async Task<IActionResult> DashboardContent()
+    {
+        var sliders = await _mobileSliderManager.GetPublishedAsync(10);
+        var notices = await _mobileNoticeManager.GetPublishedAsync(10);
+
+        return Ok(new StudentDashboardContentDto
+        {
+            Sliders = sliders.Select(s => new MobileSliderDto
+            {
+                Id = s.Id,
+                Title = s.Title,
+                Subtitle = s.Subtitle,
+                ImageUrl = CleanUrl(s.ImagePath),
+                TargetUrl = CleanUrl(s.TargetUrl),
+            }).ToList(),
+            Notices = notices.Select(n => new MobileNoticeDto
+            {
+                Id = n.Id,
+                Title = n.Title,
+                Message = n.Message,
+                Url = CleanUrl(n.Url),
+                CreatedAt = n.CreatedAt,
+            }).ToList(),
+        });
     }
 
     [HttpGet("attendance")]
@@ -366,6 +399,9 @@ public class StudentController : ControllerBase
         }
         return "/Images/Student/" + value;
     }
+
+    private static string CleanUrl(string value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static string Address(params string[] parts) => string.Join(
         ", ",

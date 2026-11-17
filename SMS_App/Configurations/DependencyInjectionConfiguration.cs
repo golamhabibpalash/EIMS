@@ -119,6 +119,11 @@ public static class DependencyInjectionConfiguration
         services.AddScoped<IUserNotificationManager, UserNotificationManager>();
         services.AddScoped<SMS_App.Utilities.Notifications.INotificationService, SMS_App.Utilities.Notifications.NotificationService>();
 
+        services.AddScoped<IMobileNoticeRepository, MobileNoticeRepository>();
+        services.AddScoped<IMobileNoticeManager, MobileNoticeManager>();
+        services.AddScoped<IMobileSliderRepository, MobileSliderRepository>();
+        services.AddScoped<IMobileSliderManager, MobileSliderManager>();
+
         services.AddScoped<IZKTecoService, ZKTecoService>();
         services.AddScoped<IAttendanceMachineService, AttendanceMachineService>();
 
