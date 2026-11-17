@@ -50,6 +50,11 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
   files were uploaded but not linked to the student.
 - Editing a student no longer removes their birth certificate image.
 - The Guardian's Phone now shows on the student's Details page.
+- Passwords recorded in the activity log (password resets and new employee logins) are now
+  shown only to a SuperAdmin on the Logs page; everyone else sees them hidden, including
+  in older entries, and cannot find them with the search box.
+- The Logs page can now be opened only by a SuperAdmin; before, any signed-in user could
+  open it by its address.
 - The verification code screen (Forgot Password) is easier to use: a large full-width code
   box that opens the number keypad on phones and can fill the code from the SMS, a clear
   Verify button, a note saying where the code was sent, and a link to send a new code.

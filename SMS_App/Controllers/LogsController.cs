@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SMS.BLL.Contracts;
 using SMS_App.Utilities.LoggerService;
@@ -11,6 +12,8 @@ using System.Threading.Tasks;
 
 namespace SMS_App.Controllers;
 
+// Activity logs hold user names, emails and (for a SuperAdmin) passwords: SuperAdmin only.
+[Authorize(Roles = "SuperAdmin")]
 public class LogsController : Controller
 {
     private readonly ILogManager _logManager;
