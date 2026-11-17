@@ -11,6 +11,7 @@ namespace SMS.BLL.Contracts
     public interface IExamResultManager:IManager<ExamResult>
     {
         Task<List<ExamResult>> GetExamResultsByExamGroupNClassId(int examGroupId, int classId);
+        Task<List<ExamResult>> GetByStudentIdAsync(int studentId);
         bool IsResultProcessedAsync(int examGroupId, int classId);
         Task<Dictionary<(int ExamGroupId, int ClassId), bool>> GetResultProcessedStatusBulkAsync(IEnumerable<(int ExamGroupId, int ClassId)> examGroupAndClassPairs);
         Task<string> GetHighestMarksOfTheClassAsync(int examGroupId, int classId);

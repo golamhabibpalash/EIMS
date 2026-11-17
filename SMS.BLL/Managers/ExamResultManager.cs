@@ -25,6 +25,18 @@ public class ExamResultManager : Manager<ExamResult>, IExamResultManager
         return await _examResultRepository.GetExamResultsByExamGroupNClassId(examGroupId, classId);
     }
 
+    public async Task<List<ExamResult>> GetByStudentIdAsync(int studentId)
+    {
+        return await _examResultRepository.Table
+            .AsNoTracking()
+            .Include(e => e.AcademicExamGroup)
+            .Include(e => e.ExamResultDetails)
+                .ThenInclude(d => d.AcademicSubject)
+            .Where(e => e.StudentId == studentId)
+            .OrderByDescending(e => e.Id)
+            .ToListAsync();
+    }
+
     public async Task<string> GetHighestMarksOfTheClassAsync(int examGroupId, int classId)
     {
         var maxMarks = await _examResultRepository.Table

@@ -34,6 +34,7 @@ public class StudentController : ControllerBase
     private readonly IStudentManager _studentManager;
     private readonly IStudentPaymentManager _studentPaymentManager;
     private readonly IAcademicExamManager _academicExamManager;
+    private readonly IExamResultManager _examResultManager;
     private readonly IAcademicSessionManager _academicSessionManager;
     private readonly IAcademicClassSubjectManager _classSubjectManager;
     private readonly IUserNotificationManager _notificationManager;
@@ -44,6 +45,7 @@ public class StudentController : ControllerBase
         IStudentManager studentManager,
         IStudentPaymentManager studentPaymentManager,
         IAcademicExamManager academicExamManager,
+        IExamResultManager examResultManager,
         IAcademicSessionManager academicSessionManager,
         IAcademicClassSubjectManager classSubjectManager,
         IUserNotificationManager notificationManager,
@@ -53,6 +55,7 @@ public class StudentController : ControllerBase
         _studentManager = studentManager;
         _studentPaymentManager = studentPaymentManager;
         _academicExamManager = academicExamManager;
+        _examResultManager = examResultManager;
         _academicSessionManager = academicSessionManager;
         _classSubjectManager = classSubjectManager;
         _notificationManager = notificationManager;
@@ -227,26 +230,25 @@ public class StudentController : ControllerBase
         var ctx = await ResolveAsync();
         if (ctx.Error != null) return ctx.Error;
 
-        var r = await _academicExamManager.GetSingleStudentResultDetailForProfile(ctx.Student.Id) ?? new ProfileResult();
-        return Ok(new ResultSummaryDto
+        var results = await _examResultManager.GetByStudentIdAsync(ctx.Student.Id);
+        return Ok(results.Select(r => new ResultSummaryDto
         {
-            CurrentCgpa = r.CurrentCGPA,
-            LastSemesterCgpa = r.LastSemesterCGPA,
-            CurrentClassRank = r.CurrentClassRank,
-            CurrentExamName = r.CurrentExamName,
-            CurrentGrade = r.CurrentGrade,
-            CurrentObtainMarks = r.CurrentObtainMarks,
-            CurrentTotalFail = r.CurrentTotalFail,
-            Subjects = r.CurrentExamDetails.Select(d => new ResultSubjectDto
+            CurrentCgpa = r.CGPA,
+            CurrentClassRank = r.Rank,
+            CurrentExamName = r.AcademicExamGroup?.ExamGroupName,
+            CurrentGrade = r.FinalGrade,
+            CurrentObtainMarks = r.TotalObtainMarks,
+            CurrentTotalFail = r.TotalFails,
+            Subjects = (r.ExamResultDetails ?? new List<ExamResultDetail>()).Select(d => new ResultSubjectDto
             {
-                SubjectCode = d.SubjectCode,
-                SubjectName = d.SubjectName,
+                SubjectCode = d.AcademicSubject?.SubjectCode?.ToString(),
+                SubjectName = d.AcademicSubject?.SubjectName,
                 TotalMark = d.TotalMark,
                 Grade = d.Grade,
                 Gpa = d.GPA,
-                TotalObtainMark = d.TotalObtainMark,
+                TotalObtainMark = d.ObtainMark,
             }).ToList(),
-        });
+        }).ToList());
     }
 
     [HttpGet("academics")]
