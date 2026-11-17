@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SMS_App.MultiTenancy;
@@ -12,7 +12,8 @@ using System.Threading.Tasks;
 
 namespace SMS_App.Controllers
 {
-    [Authorize(Roles = "SuperAdmin, Admin")]
+    // Permission-based (Admin > User Profile), not role-based: anyone granted the claim can manage
+    // the mobile app's notices / slider. Each action carries its own policy below.
     public class MobileContentController : Controller
     {
         private readonly IMobileNoticeManager _noticeManager;
@@ -33,12 +34,14 @@ namespace SMS_App.Controllers
             _tenantFiles = tenantFiles;
         }
 
+        [Authorize(Policy = "IndexMobileNoticesPolicy")]
         public async Task<IActionResult> Notices()
         {
             var items = await _noticeManager.GetAllAsync();
             return View(items.OrderBy(n => n.DisplayOrder).ThenByDescending(n => n.CreatedAt));
         }
 
+        [Authorize(Policy = "CreateMobileNoticesPolicy")]
         public IActionResult CreateNotice()
         {
             return View(new MobileNotice { IsPublished = true, DisplayOrder = 0 });
@@ -46,6 +49,7 @@ namespace SMS_App.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Policy = "CreateMobileNoticesPolicy")]
         public async Task<IActionResult> CreateNotice(MobileNotice model)
         {
             if (!ModelState.IsValid)
@@ -80,6 +84,7 @@ namespace SMS_App.Controllers
             return RedirectToAction(nameof(Notices));
         }
 
+        [Authorize(Policy = "EditMobileNoticesPolicy")]
         public async Task<IActionResult> EditNotice(int id)
         {
             var notice = await _noticeManager.GetByIdAsync(id);
@@ -93,6 +98,7 @@ namespace SMS_App.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Policy = "EditMobileNoticesPolicy")]
         public async Task<IActionResult> EditNotice(int id, MobileNotice model)
         {
             var notice = await _noticeManager.GetByIdAsync(id);
@@ -129,6 +135,7 @@ namespace SMS_App.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Policy = "DeleteMobileNoticesPolicy")]
         public async Task<IActionResult> DeleteNotice(int id)
         {
             var notice = await _noticeManager.GetByIdAsync(id);
@@ -149,12 +156,14 @@ namespace SMS_App.Controllers
             return RedirectToAction(nameof(Notices));
         }
 
+        [Authorize(Policy = "IndexMobileSlidersPolicy")]
         public async Task<IActionResult> Sliders()
         {
             var items = await _sliderManager.GetAllAsync();
             return View(items.OrderBy(s => s.DisplayOrder).ThenByDescending(s => s.CreatedAt));
         }
 
+        [Authorize(Policy = "CreateMobileSlidersPolicy")]
         public IActionResult CreateSlider()
         {
             return View(new MobileSlider { IsPublished = true, DisplayOrder = 0 });
@@ -162,6 +171,7 @@ namespace SMS_App.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Policy = "CreateMobileSlidersPolicy")]
         public async Task<IActionResult> CreateSlider(MobileSlider model, IFormFile image)
         {
             if (!ModelState.IsValid)
@@ -204,6 +214,7 @@ namespace SMS_App.Controllers
             return RedirectToAction(nameof(Sliders));
         }
 
+        [Authorize(Policy = "EditMobileSlidersPolicy")]
         public async Task<IActionResult> EditSlider(int id)
         {
             var slider = await _sliderManager.GetByIdAsync(id);
@@ -217,6 +228,7 @@ namespace SMS_App.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Policy = "EditMobileSlidersPolicy")]
         public async Task<IActionResult> EditSlider(int id, MobileSlider model, IFormFile image)
         {
             var slider = await _sliderManager.GetByIdAsync(id);
@@ -265,6 +277,7 @@ namespace SMS_App.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [Authorize(Policy = "DeleteMobileSlidersPolicy")]
         public async Task<IActionResult> DeleteSlider(int id)
         {
             var slider = await _sliderManager.GetByIdAsync(id);

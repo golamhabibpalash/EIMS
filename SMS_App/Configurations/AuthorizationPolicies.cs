@@ -405,6 +405,16 @@ public class AuthorizationPolicies
         options.AddPolicy("IndexAdmissionPaymentsPolicy", policy => policy.RequireClaim("View Admission Payments"));
         options.AddPolicy("VerifyAdmissionPaymentsPolicy", policy => policy.RequireClaim("Verify Admission Payments"));
 
+        //Mobile app content (MobileContentController): notices and home-screen slider
+        options.AddPolicy("IndexMobileNoticesPolicy", policy => policy.RequireClaim("View Mobile Notices"));
+        options.AddPolicy("CreateMobileNoticesPolicy", policy => policy.RequireClaim("Create Mobile Notice"));
+        options.AddPolicy("EditMobileNoticesPolicy", policy => policy.RequireClaim("Edit Mobile Notice"));
+        options.AddPolicy("DeleteMobileNoticesPolicy", policy => policy.RequireClaim("Delete Mobile Notice"));
+        options.AddPolicy("IndexMobileSlidersPolicy", policy => policy.RequireClaim("View Mobile Slider"));
+        options.AddPolicy("CreateMobileSlidersPolicy", policy => policy.RequireClaim("Create Mobile Slider"));
+        options.AddPolicy("EditMobileSlidersPolicy", policy => policy.RequireClaim("Edit Mobile Slider"));
+        options.AddPolicy("DeleteMobileSlidersPolicy", policy => policy.RequireClaim("Delete Mobile Slider"));
+
         //Upazila
         options.AddPolicy("IndexUpazilasPolicy", policy => policy.RequireClaim("View Upazilas"));
         options.AddPolicy("DetailsUpazilasPolicy", policy => policy.RequireClaim("View Details Upazila"));

@@ -1,4 +1,11 @@
-@model IEnumerable<MobileSlider>
+﻿@model IEnumerable<MobileSlider>
+@using Microsoft.AspNetCore.Authorization
+@inject IAuthorizationService AuthorizationService
+@{
+    var canCreate = (await AuthorizationService.AuthorizeAsync(User, "CreateMobileSlidersPolicy")).Succeeded;
+    var canEdit = (await AuthorizationService.AuthorizeAsync(User, "EditMobileSlidersPolicy")).Succeeded;
+    var canDelete = (await AuthorizationService.AuthorizeAsync(User, "DeleteMobileSlidersPolicy")).Succeeded;
+}
 
 @{
     ViewData["Title"] = "Student Sliders";
@@ -21,7 +28,10 @@
 
 <div class="row">
     <div class="col-12 mb-2">
-        <a asp-action="CreateSlider" class="btn btn-info btn-sm">Add Slider</a>
+        @if (canCreate)
+        {
+            <a asp-action="CreateSlider" class="btn btn-info btn-sm">Add Slider</a>
+        }
     </div>
     <table class="table table-bordered table-striped table-responsive-sm" id="myTable">
         <thead>
@@ -54,11 +64,17 @@
                     <td>@item.PublishedFrom?.ToString("dd MMM yyyy")</td>
                     <td>@item.PublishedTo?.ToString("dd MMM yyyy")</td>
                     <td>
-                        <a asp-action="EditSlider" asp-route-id="@item.Id" class="btn btn-primary btn-sm">Edit</a>
-                        <form asp-action="DeleteSlider" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this slider?');">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-                        </form>
+                        @if (canEdit)
+                        {
+                            <a asp-action="EditSlider" asp-route-id="@item.Id" class="btn btn-primary btn-sm">Edit</a>
+                        }
+                        @if (canDelete)
+                        {
+                            <form asp-action="DeleteSlider" asp-route-id="@item.Id" method="post" class="d-inline" onsubmit="return confirm('Delete this slider?');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                            </form>
+                        }
                     </td>
                 </tr>
             }
