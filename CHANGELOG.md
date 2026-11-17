@@ -25,6 +25,16 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-17
+
+### Added
+- Mobile app Notice and Student Slider (Communications > SMS Panel) now use permissions like
+  other screens: View, Create, Edit and Delete for each, given to any user in Administrations >
+  User Profile. Both now appear in the menu for users who have View, and the Add, Edit and
+  Delete buttons show only for users allowed to use them.
+- CI Data script Resources/sql/MobileContent_Claims_{SqlServer,PostgreSQL}.sql adds the 8
+  permissions and grants them to every SuperAdmin; run it after MobileContent_*.sql.
+
 ## [2.0.0] - 2026-11-16
 
 ### Added
