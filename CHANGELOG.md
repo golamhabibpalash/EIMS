@@ -25,6 +25,18 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-19
+
+### Changed
+
+- **Institute Profile setup** (the first-time page for a new school) is redesigned: details
+  are grouped into Basic Information, Contact, School Hours and Branding. You can now enter
+  the phone numbers, email, short name and title icon there too, with a preview of each image
+  before saving. Mistakes are shown next to the field: a missing name, an EIIN that isn't
+  digits, a closing time before the opening time, or an image that is too large or not an
+  image. The page can only be used once; after that the profile is edited from Institute
+  Profile.
+
 ## [2.2.1] - 2026-11-19
 
 ### Fixed
