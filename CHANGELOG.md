@@ -25,6 +25,12 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-19
+
+### Added
+
+- **Mobile staff dashboard** now receives the signed-in employee's real name and photo from EIMS, so the greeting shows the person instead of only the account username.
+
 ## [2.3.0] - 2026-11-19
 
 ### Changed
