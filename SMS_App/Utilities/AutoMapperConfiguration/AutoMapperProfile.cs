@@ -7,6 +7,7 @@ using SMS_App.ViewModels.SetupVM;
 using SMS_App.ViewModels.Students;
 using SMS.Entities;
 using SMS_App.ViewModels.LogVM;
+using SMS_App.ViewModels.InstituteVM;
 
 namespace SMS_App.Utilities.AutoMapperConfiguration
 {
@@ -14,6 +15,12 @@ namespace SMS_App.Utilities.AutoMapperConfiguration
     {
         public AutoMapperProfile()
         {
+            // Image files are saved by InstitutesController; only their stored names reach the entity.
+            CreateMap<InstituteCreateVM, Institute>()
+                .ForMember(d => d.Logo, o => o.Ignore())
+                .ForMember(d => d.Banner, o => o.Ignore())
+                .ForMember(d => d.FavIcon, o => o.Ignore());
+
             CreateMap<StudentCreateVM, Student>();
             CreateMap<Student, StudentCreateVM>();
 

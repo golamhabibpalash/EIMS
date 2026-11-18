@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +10,7 @@ using SMS_App.ViewModels.InstituteVM;
 using SMS.BLL.Contracts;
 using SMS.Entities;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -27,10 +29,13 @@ public class InstitutesController : Controller
     private static readonly string[] AllowedImageExtensions = { ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico", ".bmp" };
 
     private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
+    private readonly IMapper _mapper;
 
-    public InstitutesController(IInstituteManager instituteManager, IWebHostEnvironment host, ILogger<InstitutesController> logger, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles)
+    public InstitutesController(IInstituteManager instituteManager, IWebHostEnvironment host, ILogger<InstitutesController> logger,
+        SMS_App.MultiTenancy.ITenantFileStorage tenantFiles, IMapper mapper)
     {
         _tenantFiles = tenantFiles;
+        _mapper = mapper;
         _logger = logger;
         _instituteManager = instituteManager;
         _host = host;
@@ -58,64 +63,101 @@ public class InstitutesController : Controller
     }
 
 
-    public ActionResult Create()
+    [HttpGet]
+    [Authorize(Policy = "CreateInstitutesPolicy")]
+    public async Task<IActionResult> Create()
     {
-        return View();
+        // The system holds one institute; once it exists, it is edited from the profile page.
+        if (await _instituteManager.GetFirstOrDefaultAsync() != null)
+        {
+            return RedirectToAction(nameof(Index));
+        }
+        GlobalUI.PageTitle = "Set Up Institute Profile";
+        return View(new InstituteCreateVM());
     }
-
 
     [HttpPost, ValidateAntiForgeryToken]
     [Authorize(Policy = "CreateInstitutesPolicy")]
-    public async Task<ActionResult> Create(Institute institute, IFormFile logo, IFormFile banner)
+    public async Task<IActionResult> Create(InstituteCreateVM model)
     {
-        if (ModelState.IsValid)
+        GlobalUI.PageTitle = "Set Up Institute Profile";
+        if (await _instituteManager.GetFirstOrDefaultAsync() != null)
+        {
+            TempData["error"] = "The institute profile already exists. Edit it from this page.";
+            return RedirectToAction(nameof(Index));
+        }
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var institute = _mapper.Map<Institute>(model);
+        // Opening/closing/late are times of day; keep them on one fixed date.
+        institute.StartingTime = DateTime.Today.Add(model.StartingTime.TimeOfDay);
+        institute.LateTime = DateTime.Today.Add(model.LateTime.TimeOfDay);
+        institute.ClosingTime = DateTime.Today.Add(model.ClosingTime.TimeOfDay);
+
+        var savedFiles = new List<string>();
+        var uploads = new (IFormFile file, string prefix, string label, string field, Action<string> apply)[]
+        {
+            (model.LogoFile, "instituteLogo_", "Logo", nameof(model.LogoFile), f => institute.Logo = f),
+            (model.BannerFile, "instituteBanner_", "Banner", nameof(model.BannerFile), f => institute.Banner = f),
+            (model.FavIconFile, "instituteFavIcon_", "Title icon", nameof(model.FavIconFile), f => institute.FavIcon = f),
+        };
+        foreach (var upload in uploads)
+        {
+            if (upload.file == null) continue;
+            var (fileName, error) = await SaveInstituteImageAsync(upload.file, upload.prefix, upload.label);
+            if (error != null)
+            {
+                DeleteInstituteImages(savedFiles);
+                ModelState.AddModelError(upload.field, error);
+                return View(model);
+            }
+            savedFiles.Add(fileName);
+            upload.apply(fileName);
+        }
+
+        institute.CreatedAt = institute.EditedAt = DateTime.Now;
+        institute.CreatedBy = institute.EditedBy = HttpContext.Session.GetString("UserId") ?? User.Identity?.Name;
+        institute.MACAddress = MACService.GetMAC();
+
+        bool added;
+        try
+        {
+            added = await _instituteManager.AddAsync(institute);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Creating the institute profile failed");
+            added = false;
+        }
+        if (!added)
+        {
+            DeleteInstituteImages(savedFiles);
+            ModelState.AddModelError(string.Empty, "The institute profile could not be saved. Please try again.");
+            return View(model);
+        }
+
+        TempData["created"] = "Institute profile created successfully";
+        return RedirectToAction(nameof(Index));
+    }
+
+    /// <summary>Removes images saved during a create that did not complete.</summary>
+    private void DeleteInstituteImages(IEnumerable<string> fileNames)
+    {
+        foreach (var name in fileNames)
         {
             try
             {
-                if (banner != null)
-                {
-                    string banarName = "";
-                    string root = _tenantFiles.WebRootPath;
-                    string folder = "Images/Institute";
-                    banarName = "instituteBanner_" + Guid.NewGuid() + Path.GetExtension(banner.FileName);
-                    var pathCombine = Path.Combine(root, folder, banarName);
-                    using (var stream = new FileStream(pathCombine, FileMode.Create))
-                    {
-                        await banner.CopyToAsync(stream);
-                    }
-                        institute.Banner = banarName;
-                }
-                if (logo != null)
-                {
-                    string logoName = "";
-                    string root = _tenantFiles.WebRootPath;
-                    string folder = "Images/Institute";
-                    logoName = "instituteLogo_" + Guid.NewGuid() + Path.GetExtension(logo.FileName);
-                    var pathCombine = Path.Combine(root, folder, logoName);
-                    
-                    using (var stream = new FileStream(pathCombine, FileMode.Create))
-                    {
-                        await logo.CopyToAsync(stream);
-                    }
-                    institute.Logo = logoName;
-                }
-
-                institute.CreatedAt = DateTime.Now;
-                institute.CreatedBy = HttpContext.Session.GetString("UserId");
-
-                await _instituteManager.AddAsync(institute);
-                return RedirectToAction(nameof(Index));
+                var path = Path.Combine(_tenantFiles.WebRootPath, ImageFolder, Path.GetFileName(name));
+                if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
             }
-            catch
+            catch (IOException ex)
             {
-                return View();
+                _logger.LogWarning(ex, "Could not remove unused institute image {File}", name);
             }
         }
-        else
-        {
-            return View(institute);
-        }
-        
     }
 
 

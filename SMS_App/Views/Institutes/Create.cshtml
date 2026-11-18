@@ -1,124 +1,285 @@
-﻿@model SMS.Entities.Institute
-
+﻿@model SMS_App.ViewModels.InstituteVM.InstituteCreateVM
 @{
-    GlobalUI.PageTitle = "Add Institution information";
-    ViewData["Title"] = "Institution information";
+    ViewData["Title"] = "Set Up Institute Profile";
+    const string imageAccept = ".png,.jpg,.jpeg,.gif,.webp,.svg,.ico,.bmp";
+
+    // The three image slots, rendered by one loop so they look and behave the same.
+    var images = new[]
+    {
+        (Field: nameof(Model.LogoFile), Label: "Logo", Hint: "Square image, at least 200 × 200 px. Shown on reports, ID cards and certificates.", Shape: "square"),
+        (Field: nameof(Model.BannerFile), Label: "Banner", Hint: "Wide image, about 1200 × 200 px. Shown at the top of printed documents.", Shape: "wide"),
+        (Field: nameof(Model.FavIconFile), Label: "Title Icon", Hint: "Small square image (32 × 32 or 64 × 64 px). Shown in the browser tab.", Shape: "icon"),
+    };
 }
 
-<div class="row">
-    <div class="col-md-6">
-        <form asp-action="Create" enctype="multipart/form-data" method="post">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <div class="form-group row">
-                <label asp-for="Name" class="control-label col-md-2 text-md-end col-form-label"></label>
-                <div class="col-md-8">
-                    <input asp-for="Name" class="form-control" />
-                    <span asp-validation-for="Name" class="text-danger"></span>
-                </div>
-            </div>
+@section Styles {
+    <style>
+        .inst-create .card { border-radius: 10px; }
+        .inst-create .card-header { background: #fff; border-bottom: 1px solid #eef0f3; }
+        .inst-create .card-header .section-title { font-size: 1.05rem !important; line-height: 1.4; font-weight: 600; margin: 0;
+                                                   display: flex; align-items: center; gap: .5rem; }
+        .inst-create .card-header .section-title i { color: #2A3F54; font-size: 1rem; width: 1.1rem; text-align: center; }
+        .inst-create .section-help { font-size: .825rem; color: #6c757d; margin: 2px 0 0; }
+        .inst-create .is-required::after { content: " *"; color: #dc3545; }
+        .inst-create .form-text { font-size: .8rem; }
 
-@*            <div class="form-group row">
-                <label asp-for="ISO" class="control-label col-md-2 text-md-end col-form-label"></label>
-                <div class="col-md-8">
-                    <input asp-for="ISO" class="form-control" />
-                    <span asp-validation-for="ISO" class="text-danger"></span>
-                </div>
-            </div>*@
+        .inst-create .image-slot { border: 2px dashed #ced4da; border-radius: 8px; padding: 12px; text-align: center;
+                                   cursor: pointer; transition: border-color .15s, background .15s; position: relative; }
+        .inst-create .image-slot:hover, .inst-create .image-slot:focus-within { border-color: #5bc0de; background: #f5fbfd; }
+        .inst-create .image-slot.is-invalid { border-color: #dc3545; }
+        .inst-create .image-slot input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+        .inst-create .image-preview { display: flex; align-items: center; justify-content: center; margin: 0 auto 8px;
+                                      background: #f8f9fa; border-radius: 6px; overflow: hidden; color: #adb5bd; }
+        .inst-create .image-preview.square { width: 110px; height: 110px; }
+        .inst-create .image-preview.wide { width: 100%; height: 70px; }
+        .inst-create .image-preview.icon { width: 48px; height: 48px; }
+        .inst-create .image-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .inst-create .image-name { font-size: .8rem; color: #495057; word-break: break-all; }
+        .inst-create .image-remove { position: relative; z-index: 2; }
 
-            <div class="form-group row">
-                <label asp-for="EIIN" class="control-label col-md-2 text-md-end col-form-label"></label>
-                <div class="col-md-8">
-                    <input asp-for="EIIN" class="form-control" />
-                    <span asp-validation-for="EIIN" class="text-danger"></span>
-                </div>
-            </div>
+        .inst-create .form-actions { padding: 4px 0 12px; }
+    </style>
+}
 
-            <div class="form-group row">
-                <label asp-for="Slogan" class="control-label col-md-2 text-md-end col-form-label"></label>
-                <div class="col-md-8">
-                    <input asp-for="Slogan" class="form-control" />
-                    <span asp-validation-for="Slogan" class="text-danger"></span>
-                </div>
-            </div>
-            <div class="form-group row">
-                <label asp-for="Banner" class="control-label col-md-2 text-md-end col-form-label"></label>
-                <div class="col-md-8 input-group">
-                    <div class="custom-file">
-                        <input name="banner" type="file" class="custom-file-input" id="inputGroupFile01">
-                        <label class="custom-file-label" for="inputGroupFile01">Choose file</label>
+<div class="inst-create container-fluid py-2">
+    <p class="text-muted mb-3">
+        Enter your institute's details once. They appear on reports, ID cards, certificates and the login page,
+        and can be changed later from <strong>Institute Profile</strong>. Fields marked
+        <span class="text-danger">*</span> are required.
+    </p>
+
+    <form asp-action="Create" method="post" enctype="multipart/form-data" id="instituteForm" novalidate>
+        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+
+        <div class="row">
+            <div class="col-lg-8">
+                @* ---------- Basic information ---------- *@
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header">
+                        <h2 class="section-title"><i class="fas fa-school"></i> Basic Information</h2>
+                        <p class="section-help">How the institute is named on every page and document.</p>
                     </div>
-                    <span asp-validation-for="Banner" class="text-danger"></span>
-                </div>
-            </div>
-            <div class="form-group row">
-                <label asp-for="Logo" class="control-label col-md-2 text-md-end col-form-label"></label>
-                <div class="input-group col-md-8">
-                    <div class="custom-file">
-                        <input name="logo" type="file" class="custom-file-input" id="inputGroupFile02">
-                        <label class="custom-file-label" for="inputGroupFile02">Choose file</label>
+                    <div class="card-body">
+                        <div class="form-group mb-3">
+                            <label asp-for="Name" class="form-label is-required"></label>
+                            <input asp-for="Name" class="form-control" placeholder="e.g. Dhaka Model College & Public School" autofocus autocomplete="organization" />
+                            <span asp-validation-for="Name" class="text-danger small"></span>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 form-group mb-3">
+                                <label asp-for="ShortName" class="form-label"></label>
+                                <input asp-for="ShortName" class="form-control" placeholder="e.g. DMCPS" />
+                                <small class="form-text text-muted">Used where space is short, such as ID cards.</small>
+                                <span asp-validation-for="ShortName" class="text-danger small d-block"></span>
+                            </div>
+                            <div class="col-md-6 form-group mb-3">
+                                <label asp-for="EIIN" class="form-label"></label>
+                                <input asp-for="EIIN" class="form-control" inputmode="numeric" placeholder="e.g. 108265" />
+                                <small class="form-text text-muted">Educational Institute Identification Number.</small>
+                                <span asp-validation-for="EIIN" class="text-danger small d-block"></span>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 form-group mb-3">
+                                <label asp-for="BranchName" class="form-label"></label>
+                                <input asp-for="BranchName" class="form-control" placeholder="e.g. Main Campus" />
+                                <span asp-validation-for="BranchName" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6 form-group mb-3">
+                                <label asp-for="Slogan" class="form-label"></label>
+                                <input asp-for="Slogan" class="form-control" placeholder="e.g. Knowledge is power" />
+                                <span asp-validation-for="Slogan" class="text-danger small"></span>
+                            </div>
+                        </div>
                     </div>
-                    <span asp-validation-for="Logo" class="text-danger"></span>
+                </div>
+
+                @* ---------- Contact ---------- *@
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header">
+                        <h2 class="section-title"><i class="fas fa-address-book"></i> Contact</h2>
+                        <p class="section-help">Printed on documents so parents can reach the institute.</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 form-group mb-3">
+                                <label asp-for="Phone1" class="form-label"></label>
+                                <input asp-for="Phone1" type="tel" class="form-control" inputmode="tel" autocomplete="tel" placeholder="01712345678" />
+                                <span asp-validation-for="Phone1" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6 form-group mb-3">
+                                <label asp-for="Phone2" class="form-label"></label>
+                                <input asp-for="Phone2" type="tel" class="form-control" inputmode="tel" placeholder="Optional second number" />
+                                <span asp-validation-for="Phone2" class="text-danger small"></span>
+                            </div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label asp-for="Email" class="form-label"></label>
+                            <input asp-for="Email" type="email" class="form-control" autocomplete="email" placeholder="info@yourschool.edu.bd" />
+                            <span asp-validation-for="Email" class="text-danger small"></span>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label asp-for="Address" class="form-label"></label>
+                            <textarea asp-for="Address" class="form-control" rows="2" autocomplete="street-address"
+                                      placeholder="House, road, area, district"></textarea>
+                            <span asp-validation-for="Address" class="text-danger small"></span>
+                        </div>
+                    </div>
+                </div>
+
+                @* ---------- School hours ---------- *@
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header">
+                        <h2 class="section-title"><i class="fas fa-clock"></i> School Hours</h2>
+                        <p class="section-help">Used by attendance: arriving after the late time counts as late.</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 form-group mb-3">
+                                <label asp-for="StartingTime" class="form-label"></label>
+                                <input asp-for="StartingTime" type="time" class="form-control" value="@Model.StartingTime.ToString("HH:mm")" />
+                                <span asp-validation-for="StartingTime" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-4 form-group mb-3">
+                                <label asp-for="LateTime" class="form-label"></label>
+                                <input asp-for="LateTime" type="time" class="form-control" value="@Model.LateTime.ToString("HH:mm")" />
+                                <span asp-validation-for="LateTime" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-4 form-group mb-3">
+                                <label asp-for="ClosingTime" class="form-label"></label>
+                                <input asp-for="ClosingTime" type="time" class="form-control" value="@Model.ClosingTime.ToString("HH:mm")" />
+                                <span asp-validation-for="ClosingTime" class="text-danger small"></span>
+                            </div>
+                        </div>
+                        <small id="hoursProblem" class="text-danger d-none" role="alert"></small>
+                    </div>
                 </div>
             </div>
-            <div class="form-group row">
-                <label asp-for="Address" class="control-label col-md-2 text-md-end col-form-label"></label>
-                <div class="col-md-8">
-                    <input asp-for="Address" class="form-control" />
-                    <span asp-validation-for="Address" class="text-danger"></span>
+
+            @* ---------- Branding ---------- *@
+            <div class="col-lg-4">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header">
+                        <h2 class="section-title"><i class="fas fa-image"></i> Branding</h2>
+                        <p class="section-help">Optional. PNG, JPG, GIF, WEBP, SVG, ICO or BMP, up to 5 MB each.</p>
+                    </div>
+                    <div class="card-body">
+                        @foreach (var image in images)
+                        {
+                            var serverError = ViewData.ModelState.TryGetValue(image.Field, out var entry)
+                                ? entry.Errors.Select(e => e.ErrorMessage).FirstOrDefault() : null;
+                            var hasError = !string.IsNullOrEmpty(serverError);
+                            <div class="form-group mb-3">
+                                <label class="form-label d-block" for="@image.Field">@image.Label</label>
+                                <div class="image-slot @(hasError ? "is-invalid" : "")" data-slot="@image.Field">
+                                    <input type="file" id="@image.Field" name="@image.Field" accept="@imageAccept"
+                                           aria-describedby="@(image.Field)Hint" />
+                                    <div class="image-preview @image.Shape" aria-hidden="true">
+                                        <i class="fas fa-cloud-upload-alt fa-lg"></i>
+                                    </div>
+                                    <div class="image-name">Click or drop an image here</div>
+                                    <button type="button" class="btn btn-link btn-sm text-danger image-remove d-none p-0 mt-1">Remove</button>
+                                </div>
+                                <small id="@(image.Field)Hint" class="form-text text-muted">@image.Hint</small>
+                                <span class="text-danger small d-block" role="alert" data-slot-error="@image.Field">@serverError</span>
+                            </div>
+                        }
+                    </div>
                 </div>
             </div>
-            <div class="form-group row">
-                <label asp-for="BranchName" class="control-label col-md-2 text-md-end col-form-label">Branch Name</label>
-                <div class="col-md-8">
-                    <input asp-for="BranchName" class="form-control" />
-                    <span asp-validation-for="BranchName" class="text-danger"></span>
-                </div>
-            </div>
-            <div class="form-group row">
-                <div class="col-md-2 offset-md-2">
-                    <input type="submit" value="Create" class="btn btn-primary btn-sm" />
-                </div>
-            </div>
-        </form>
-    </div>
-    <div class="col-md-6">
-        <div id="photoDiv" style="display:none">
-            <label>Banner :<img class="img-fluid" id="sPhotoId" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Banner" style="height:130px;" /></label>
-            
         </div>
-        <div id="logoDiv" style="display:none">
-            <label>Logo: <img class="img-fluid" id="sLogoId" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Logo" style="height:130px;" /></label>
-            
+
+        <div class="form-actions d-flex justify-content-end">
+            <button type="submit" id="saveButton" class="btn btn-primary px-4">
+                <i class="fas fa-save me-1 mr-1"></i> Save Institute Profile
+            </button>
         </div>
-    </div>
+    </form>
 </div>
 
-
 @section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
-<script>
-    $(document).ready(function () {
-        function readURL(input, idName) {
-            if (input.files && input.files[0]) {
-                var reader = new FileReader();
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+    <script>
+        (function () {
+            var maxBytes = 5 * 1024 * 1024;
+            var allowed = '@imageAccept'.split(',');
+            var form = document.getElementById('instituteForm');
 
-                reader.onload = function (e) {
-                    $(idName).attr('src', e.target.result);
+            // ----- Image slots: preview, type/size check, remove -----
+            document.querySelectorAll('.image-slot').forEach(function (slot) {
+                var input = slot.querySelector('input[type=file]');
+                var preview = slot.querySelector('.image-preview');
+                var name = slot.querySelector('.image-name');
+                var remove = slot.querySelector('.image-remove');
+                var error = document.querySelector('[data-slot-error="' + slot.dataset.slot + '"]');
+                var emptyPreview = preview.innerHTML;
+
+                function reset(message) {
+                    input.value = '';
+                    preview.innerHTML = emptyPreview;
+                    name.textContent = 'Click or drop an image here';
+                    remove.classList.add('d-none');
+                    slot.classList.toggle('is-invalid', !!message);
+                    error.textContent = message || '';
                 }
 
-                reader.readAsDataURL(input.files[0]); // convert to base64 string
+                input.addEventListener('change', function () {
+                    var file = input.files && input.files[0];
+                    if (!file) { reset(); return; }
+                    var ext = '.' + file.name.split('.').pop().toLowerCase();
+                    if (allowed.indexOf(ext) < 0) { reset('Please choose an image file (' + allowed.join(', ') + ').'); return; }
+                    if (file.size > maxBytes) {
+                        reset('This image is ' + (file.size / 1048576).toFixed(1) + ' MB. Please use one under 5 MB.');
+                        return;
+                    }
+                    var img = document.createElement('img');
+                    img.alt = '';
+                    img.src = URL.createObjectURL(file);
+                    preview.innerHTML = '';
+                    preview.appendChild(img);
+                    name.textContent = file.name;
+                    remove.classList.remove('d-none');
+                    slot.classList.remove('is-invalid');
+                    error.textContent = '';
+                });
+
+                remove.addEventListener('click', function (e) { e.preventDefault(); reset(); });
+            });
+
+            // ----- School hours: opening < late <= closing -----
+            var opening = document.getElementById('StartingTime');
+            var late = document.getElementById('LateTime');
+            var closing = document.getElementById('ClosingTime');
+            var hoursProblem = document.getElementById('hoursProblem');
+
+            function hoursMessage() {
+                if (!opening.value || !closing.value || !late.value) return '';
+                if (closing.value <= opening.value) return 'Closing time must be after the opening time.';
+                if (late.value < opening.value || late.value > closing.value) return 'Late time must be between the opening and closing time.';
+                return '';
             }
-        }
-        $("#inputGroupFile01").change(function () {
-            $("#photoDiv").show();
-            let imgId = "#sPhotoId";
-            readURL(this, imgId);
-        });
-        $("#inputGroupFile02").change(function () {
-            $("#logoDiv").show();
-            let imgId = "#sLogoId";
-            readURL(this, imgId);
-        });
-    });
-</script>
+            function checkHours() {
+                var message = hoursMessage();
+                hoursProblem.textContent = message;
+                hoursProblem.classList.toggle('d-none', !message);
+                return !message;
+            }
+            [opening, late, closing].forEach(function (el) { el.addEventListener('change', checkHours); });
+
+            // ----- Submit: block on problems, prevent double submit -----
+            form.addEventListener('submit', function (e) {
+                var valid = checkHours();
+                if (window.jQuery && $(form).valid && !$(form).valid()) valid = false;
+                if (!valid) {
+                    e.preventDefault();
+                    var first = form.querySelector('.input-validation-error, #hoursProblem:not(.d-none)');
+                    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
+                }
+                var button = document.getElementById('saveButton');
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm me-1 mr-1" role="status" aria-hidden="true"></span> Saving…';
+            });
+        })();
+    </script>
 }
