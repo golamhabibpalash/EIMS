@@ -58,8 +58,9 @@
         </div>
     </div>
 </div>
-@if (Model.Employee != null)
+@if (Model.UserRoleClaimsVM?.ApplicationUser != null)
 {
+    var account = Model.UserRoleClaimsVM.ApplicationUser;
     <div class="row">
         <div class="col-md-3">
             <div class="card">
@@ -69,6 +70,21 @@
                     </div>
                 </div>
                 <div class="card-body">
+                    @if (Model.Employee == null)
+                    {
+                        @* Accounts with no employee record (e.g. a new school's admin) still get their permissions here. *@
+                        <dl class="row p-2">
+                            <dt class="col-sm-4 col-4 text-md-end text-sm-right text-right">User :</dt>
+                            <dd class="col-sm-8 col-8 border-bottom">@account.UserName</dd>
+                            <dt class="col-sm-4 col-4 text-md-end text-sm-right text-right">Email :</dt>
+                            <dd class="col-sm-8 col-8 border-bottom">@account.Email</dd>
+                            <dt class="col-sm-4 col-4 text-md-end text-sm-right text-right">Phone :</dt>
+                            <dd class="col-sm-8 col-8 border-bottom">@account.PhoneNumber</dd>
+                        </dl>
+                        <p class="text-muted small mb-0">This account is not linked to an employee record.</p>
+                    }
+                    else
+                    {
                     <div class="text-center">
                         <img src="~/Images/Employee/photo/@Model.Employee.Image" alt="Alternate Text" onerror="this.src='@Url.Content("~/Images/Student/noimage.jpg")'" style="width:40%;" />
                     </div>
@@ -136,6 +152,7 @@
                             </dl>
                         </div>
                     </div>
+                    }
                 </div>
                 <div class="card-footer">
                     <div class="card-title text-center">Roles</div>

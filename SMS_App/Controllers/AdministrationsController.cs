@@ -62,8 +62,10 @@ namespace SMS_App.Controllers
                     var userIsInRole = await _userManager.GetRolesAsync(aUser);
                     var userInClaims = await _userManager.GetClaimsAsync(aUser);
 
-                    Employee employee = await _employeeManager.GetByIdAsync(aUser.ReferenceId);
-                    userProfileVM.Employee = employee;
+                    // Only employee accounts point ReferenceId at an Employee; others show account details only.
+                    userProfileVM.Employee = aUser.UserType == 'e' && aUser.ReferenceId > 0
+                        ? await _employeeManager.GetByIdAsync(aUser.ReferenceId)
+                        : null;
                     //userRoleClaimsVM.ApplicationRoles = new List<SelectListItem>();
                     var allRoles = await _roleManager.Roles.ToListAsync();
                     userRoleClaimsVM.ApplicationRoles = allRoles.Select(x => new SelectListItem()
@@ -174,7 +176,9 @@ namespace SMS_App.Controllers
                     }).ToList();
 
                 // Employee info
-                model.Employee = await _employeeManager.GetByIdAsync(aUser.ReferenceId);
+                model.Employee = aUser.UserType == 'e' && aUser.ReferenceId > 0
+                    ? await _employeeManager.GetByIdAsync(aUser.ReferenceId)
+                    : null;
 
                 // Modules
                 model.Modules = (List<ProjectModule>)await _projectModuleManager.GetAllAsync();
