@@ -25,6 +25,20 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-11-19
+
+### Fixed
+
+- **Administrations > User Profile** now shows the roles and page permissions of every
+  account. Before, an account with no employee record (such as a new school's admin)
+  showed an empty page.
+
+### Changed
+
+- CI Added `Resources/sql/Seed_AllMenus_SuperAdmin_PostgreSQL.sql`: gives a new PostgreSQL
+  school database its full menu (modules, sub-modules, permissions) and grants every
+  permission to a SuperAdmin by email. Generated from SiteMap.Config and kept in sync by a test.
+
 ## [2.2.0] - 2026-11-18
 
 ### Added
