@@ -7,6 +7,7 @@ using SMS.BLL.Contracts;
 using SMS.Entities;
 using SMS.Entities.Utilities;
 using SMS_App.Areas.API.Models;
+using SMS_App.Utilities.Employees;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -85,19 +86,23 @@ public class EmployeeController : ControllerBase
         var dashboard = new EmployeeDashboardDto
         {
             Name = employee.EmployeeName,
+            Email = string.IsNullOrWhiteSpace(employee.Email) ? user.Email : employee.Email,
             Designation = employee.Designation?.DesignationName,
             PhoneNumber = employee.Phone,
             PhotoUrl = PhotoUrl(employee.Image),
             CanSeeCollection = User.Claims.Any(c => FinanceClaimValues.Contains(c.Value)),
         };
 
-        dashboard.TodaysPresence = await BuildPresenceAsync(employee);
+        var presence = await BuildPresenceAsync(employee);
+        dashboard.TodaysPresence = presence.Message;
+        dashboard.PresenceStatus = presence.Status;
+        dashboard.PresenceTime = presence.Time;
         await ApplyStatsAsync(dashboard);
 
         return Ok(dashboard);
     }
 
-    private async Task<string> BuildPresenceAsync(Employee employee)
+    private async Task<EmployeePresence> BuildPresenceAsync(Employee employee)
     {
         try
         {
@@ -107,20 +112,14 @@ public class EmployeeController : ControllerBase
                             AttendancePinMatcher.Matches(p.CardNo, employee.Id.ToString()))
                 .OrderBy(p => p.PunchDatetime)
                 .FirstOrDefault();
-
-            if (firstPunch == null) return "You are absent today";
+            if (firstPunch == null) return EmployeePresence.Classify(null, null);
 
             var institute = await _instituteManager.GetFirstOrDefaultAsync();
-            var isLate = institute != null &&
-                         firstPunch.PunchDatetime.TimeOfDay > institute.LateTime.TimeOfDay;
-            var time = firstPunch.PunchDatetime.ToString("hh:mm tt");
-            return isLate
-                ? $"You are late today ({time})"
-                : $"You are attended ({time}) today";
+            return EmployeePresence.Classify(firstPunch.PunchDatetime, institute?.LateTime.TimeOfDay);
         }
         catch
         {
-            return "Presence unavailable";
+            return EmployeePresence.NotAvailable;
         }
     }
 
