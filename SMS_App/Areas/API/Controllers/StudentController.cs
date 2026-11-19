@@ -75,51 +75,11 @@ public class StudentController : ControllerBase
         if (ctx.Error != null) return ctx.Error;
         var s = ctx.Student;
 
-        var sessionName = s.AcademicSession?.Name
-            ?? (await _academicSessionManager.GetCurrentAcademicSessionAsync())?.Name;
+        var sessionName = s.AcademicSession == null
+            ? (await _academicSessionManager.GetCurrentAcademicSessionAsync())?.Name
+            : null;
 
-        return Ok(new StudentProfileDto
-        {
-            Id = s.Id,
-            UniqueId = s.UniqueId,
-            Name = s.Name,
-            NameBangla = s.NameBangla,
-            ClassRoll = s.ClassRoll,
-            ClassName = s.AcademicClass?.Name,
-            SectionName = s.AcademicSection?.Name,
-            SessionName = sessionName,
-            FatherName = s.FatherName,
-            MotherName = s.MotherName,
-            FatherNameBangla = s.FatherNameBangla,
-            MotherNameBangla = s.MotherNameBangla,
-            GuardianPhone = s.GuardianPhone,
-            PhoneNo = s.PhoneNo,
-            Email = s.Email,
-            Address = s.AddressInfo,
-            Gender = s.Gender?.Name,
-            Nationality = s.Nationality?.Name,
-            Religion = s.Religion?.Name,
-            BloodGroup = s.BloodGroup?.Name,
-            BirthCertificateNo = s.BirthCertificateNo,
-            PresentAddress = Address(
-                s.PresentAddressArea,
-                s.PresentAddressPO,
-                s.PresentUpazila?.Name,
-                s.PresentDistrict?.Name,
-                s.PresentDivision?.Name),
-            PermanentAddress = Address(
-                s.PermanentAddressArea,
-                s.PermanentAddressPO,
-                s.PermanentUpazila?.Name,
-                s.PermanentDistrict?.Name,
-                s.PermanentDivision?.Name),
-            PreviousSchool = s.PreviousSchool,
-            DateOfBirth = s.DOB,
-            AdmissionDate = s.AdmissionDate,
-            IsResidential = s.IsResidential,
-            Status = s.Status,
-            PhotoUrl = PhotoUrl(s.Photo),
-        });
+        return Ok(StudentProfileMapper.ToProfileDto(s, sessionName));
     }
 
     [HttpGet("dashboard")]
@@ -402,8 +362,4 @@ public class StudentController : ControllerBase
 
     private static string CleanUrl(string value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
-    private static string Address(params string[] parts) => string.Join(
-        ", ",
-        parts.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p.Trim()));
 }
