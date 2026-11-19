@@ -33,6 +33,7 @@ public class AuthController : ControllerBase
     private readonly IJwtTokenService _jwt;
     private readonly IClaimsTransformation _claimsTransformation;
     private readonly IStudentManager _studentManager;
+    private readonly IEmployeeManager _employeeManager;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -41,6 +42,7 @@ public class AuthController : ControllerBase
         IJwtTokenService jwt,
         IClaimsTransformation claimsTransformation,
         IStudentManager studentManager,
+        IEmployeeManager employeeManager,
         ILogger<AuthController> logger)
     {
         _userManager = userManager;
@@ -48,6 +50,7 @@ public class AuthController : ControllerBase
         _jwt = jwt;
         _claimsTransformation = claimsTransformation;
         _studentManager = studentManager;
+        _employeeManager = employeeManager;
         _logger = logger;
     }
 
@@ -115,17 +118,7 @@ public class AuthController : ControllerBase
         if (roles.Count == 0)
             roles = (await _userManager.GetRolesAsync(user)).ToList();
 
-        return Ok(new UserProfileDto
-        {
-            Id = user.Id,
-            UserName = user.UserName,
-            DisplayName = user.UserName,
-            Email = user.Email,
-            Roles = roles,
-            // Permissions were rehydrated onto User by PermissionClaimsTransformation
-            // (invoked from the bearer OnTokenValidated event).
-            Permissions = ExtractPermissions(User.Claims),
-        });
+        return Ok(await BuildProfileAsync(user, roles, ExtractPermissions(User.Claims)));
     }
 
     [HttpPost("logout")]
@@ -198,17 +191,52 @@ public class AuthController : ControllerBase
                 RefreshToken = refresh.Token,
                 ExpiresAtUtc = access.ExpiresUtc,
             },
-            User = new UserProfileDto
-            {
-                Id = user.Id,
-                UserName = user.UserName,
-                DisplayName = user.UserName,
-                Email = user.Email,
-                Roles = roles.ToList(),
-                Permissions = await ResolvePermissionsAsync(baseClaims),
-            },
+            User = await BuildProfileAsync(
+                user,
+                roles.ToList(),
+                await ResolvePermissionsAsync(baseClaims)),
         };
     }
+
+    private async Task<UserProfileDto> BuildProfileAsync(
+        ApplicationUser user,
+        IReadOnlyCollection<string> roles,
+        IReadOnlyCollection<string> permissions)
+    {
+        var displayName = user.UserName;
+        string phoneNumber = null;
+        string designation = null;
+        string photoUrl = null;
+
+        if (user.UserType == 'e')
+        {
+            var employee = await _employeeManager.GetByIdAsync(user.ReferenceId);
+            if (employee != null)
+            {
+                if (!string.IsNullOrWhiteSpace(employee.EmployeeName))
+                    displayName = employee.EmployeeName;
+                phoneNumber = employee.Phone;
+                designation = employee.Designation?.DesignationName;
+                photoUrl = EmployeePhotoUrl(employee.Image);
+            }
+        }
+
+        return new UserProfileDto
+        {
+            Id = user.Id,
+            UserName = user.UserName,
+            DisplayName = displayName,
+            Email = user.Email,
+            PhoneNumber = phoneNumber,
+            Designation = designation,
+            PhotoUrl = photoUrl,
+            Roles = roles.ToList(),
+            Permissions = permissions.ToList(),
+        };
+    }
+
+    private static string EmployeePhotoUrl(string photo) =>
+        string.IsNullOrWhiteSpace(photo) ? null : "/Images/Employee/photo/" + photo;
 
     /// <summary>
     /// Runs the shared <see cref="IClaimsTransformation"/> over a principal built

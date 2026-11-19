@@ -6,6 +6,8 @@ namespace SMS_App.Areas.API.Models;
 public class EmployeeDashboardDto
 {
     public string Name { get; set; }
+    public string Designation { get; set; }
+    public string PhoneNumber { get; set; }
 
     /// <summary>Relative path; the client prefixes the instance base URL.</summary>
     public string PhotoUrl { get; set; }

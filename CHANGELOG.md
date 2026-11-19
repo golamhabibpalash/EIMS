@@ -25,6 +25,12 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-19
+
+### Added
+
+- **Mobile staff dashboard** now receives the signed-in employee's designation and phone number alongside their name and photo, so the greeting shows complete contact details instead of only the account email.
+
 ## [2.4.0] - 2026-11-19
 
 ### Added

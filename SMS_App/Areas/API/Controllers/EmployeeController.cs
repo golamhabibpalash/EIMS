@@ -57,6 +57,8 @@ public class EmployeeController : ControllerBase
         return Ok(new EmployeeDashboardDto
         {
             Name = employee.EmployeeName,
+            Designation = employee.Designation?.DesignationName,
+            PhoneNumber = employee.Phone,
             PhotoUrl = PhotoUrl(employee.Image),
         });
     }
