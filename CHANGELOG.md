@@ -25,6 +25,12 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-11-19
+
+### Added
+
+- **Mobile staff dashboard** now returns the employee's own attendance for today, live student/employee totals and today's student attendance; the collection card is only returned to accounts with finance permissions.
+
 ## [2.5.0] - 2026-11-19
 
 ### Added
