@@ -492,110 +492,132 @@ public class AccountsController : Controller
     [HttpPost]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordVM model)
     {
-        if (ModelState.IsValid)
+        if (!ModelState.IsValid)
         {
-            var username = string.Empty;
-            Student student = null;
-            await _appLogger.WarningAsync($"{model.Email} user trying to reset password.");
-            bool isEmail = IsValidEmail(model.Email);
-            if (isEmail)
-            {
-                username = model.Email;
-            }
-            else
-            {
-                student = await _studentManager.GetStudentByClassRollAsync(Convert.ToInt32(model.Email));
-                if (student!=null)
-                {
-                    username = student.UniqueId;
-                }
-            }
+            return View(model);
+        }
 
-            var user = await _userManager.FindByNameAsync(username);
+        var username = string.Empty;
+        Student student = null;
+        await _appLogger.WarningAsync($"{model.Email} user trying to reset password.");
 
-            if (user == null)
+        // The identifier may be an email/username or a numeric class roll. Parse
+        // defensively: a plain (non-email, non-numeric) value is treated as a
+        // username so this never throws on unexpected input.
+        bool isEmail = IsValidEmail(model.Email);
+        if (isEmail)
+        {
+            username = model.Email;
+        }
+        else if (int.TryParse(model.Email?.Trim(), out var classRoll))
+        {
+            student = await _studentManager.GetStudentByClassRollAsync(classRoll);
+            if (student != null)
             {
-                ViewBag.msg = "please insert a varified user name";
+                username = student.UniqueId;
+            }
+        }
+        else
+        {
+            username = model.Email?.Trim();
+        }
+
+        var user = string.IsNullOrEmpty(username) ? null : await _userManager.FindByNameAsync(username);
+
+        if (user == null)
+        {
+            ViewBag.msg = "Please enter a valid username, email or class roll.";
+            return View(model);
+        }
+
+        // Best-effort display name; a missing employee/student record must not
+        // break the reset.
+        if (user.UserType == 'e')
+        {
+            var emp = await _employeeManager.GetByIdAsync(user.ReferenceId);
+            model.Name = emp?.EmployeeName;
+        }
+        else if (user.UserType == 's')
+        {
+            student ??= await _studentManager.GetStudentByUniqueIdAsync(user.ReferenceId.ToString());
+            model.Name = student?.Name;
+        }
+
+        // The one-time code is delivered to the phone/email already on file, so
+        // email confirmation is NOT required. Validate the chosen channel has a
+        // destination and give the user a clear message either way.
+        bool wantsSms = string.Equals(model.VerificationBy, "SMS", StringComparison.OrdinalIgnoreCase);
+        if (wantsSms && string.IsNullOrWhiteSpace(user.PhoneNumber))
+        {
+            ViewBag.msg = "No phone number is on file for this account. Try Email instead.";
+            return View(model);
+        }
+        if (!wantsSms && string.IsNullOrWhiteSpace(user.Email))
+        {
+            ViewBag.msg = "No email address is on file for this account. Try SMS instead.";
+            return View(model);
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var passwordResetLink = Url.Action("ResetPassword", "Accounts", new { email = model.Email, token = token }, Request.Scheme);
+
+        HttpContext.Session.SetString("token", token);
+        HttpContext.Session.SetString("passwordResetLink", passwordResetLink);
+        HttpContext.Session.SetString("useremail", model.Email);
+
+        Random rnd = new Random();
+        int randomNumber = rnd.Next(100000, 999999);
+        HttpContext.Session.SetString("randomNumber", randomNumber.ToString());
+        var instituteInfo = await _instituteManager.GetAllAsync();
+        string instituteName = instituteInfo.FirstOrDefault()?.Name;
+        string text = "You are trying to reset your password. Your OTP is:" + randomNumber + " -" + instituteName;
+
+        await _appLogger.WarningAsync($"{model.Email} user OTP is {randomNumber}");
+        if (wantsSms)
+        {
+            await _appLogger.InfoAsync($"Before SMS Send; user = {model.Email}; phone number = {user.PhoneNumber}");
+            bool smsSend = await MobileSMS.SendSMS(user.PhoneNumber, text);
+            if (!smsSend)
+            {
+                ViewBag.msg = "SMS not sent due to technical problem, Try again.";
                 return View(model);
             }
-            string name = "";
-            if (user.UserType == 'e')
-            {
-                var emp = await _employeeManager.GetByIdAsync(user.ReferenceId);
-                name = emp.EmployeeName;
-                model.Name = name;
-            }
-            else if (user.UserType == 's')
-            {
-                name = student.Name;
-                model.Name = name;
-            }
-            if (user != null && await _userManager.IsEmailConfirmedAsync(user))
-            {
-                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-                var passwordResetLink = Url.Action("ResetPassword", "Accounts", new { email = model.Email, token = token }, Request.Scheme);
 
-                HttpContext.Session.SetString("token", token);
-                HttpContext.Session.SetString("passwordResetLink", passwordResetLink);
-                HttpContext.Session.SetString("useremail", model.Email);
-
-                Random rnd = new Random();
-                int randomNumber = rnd.Next(100000, 999999);
-                HttpContext.Session.SetString("randomNumber", randomNumber.ToString());
-                var instituteInfo = await _instituteManager.GetAllAsync();
-                string text = "You are trying to reset your password. Your OTP is:" + randomNumber + " -" + instituteInfo.FirstOrDefault().Name;
-
-                await _appLogger.WarningAsync($"{model.Email} user OTP is {randomNumber}");
-                if (model.VerificationBy == "SMS")
+            // Logging the OTP SMS must never break the reset flow.
+            try
+            {
+                await _phoneSMSManager.AddAsync(new PhoneSMS
                 {
-                    await _appLogger.InfoAsync($"Before SMS Send; user = {model.Email}; phone number = {user.PhoneNumber}");
-                    bool smsSend = await MobileSMS.SendSMS(user.PhoneNumber, text);
-                    if (smsSend == false)
-                    {
-                        ViewBag.msg = "SMS not sent due to technical problem, Try again.";
-                        return View(model);
-                    }
-                    else if (smsSend == true)
-                    {
-                        PhoneSMS phoneSMS = new()
-                        {
-                            Text = text,
-                            CreatedAt = DateTime.Now,
-                            CreatedBy = model.Email,
-                            MobileNumber = user.PhoneNumber,
-                            MACAddress = MACService.GetMAC(),
-                            SMSType = "OTP"
-                        };
-                        try
-                        {
-                            await _phoneSMSManager.AddAsync(phoneSMS);
-                        }
-                        catch (Exception)
-                        {
-
-                            throw;
-                        }
-                    }
-
-                    TempData["OtpChannel"] = "SMS";
-                    return RedirectToAction("OTPGenerate");
-                }
-                else if (model.VerificationBy == "Email")
-                {
-                    HttpContext.Session.SetString("randomNumber", randomNumber.ToString());
-                    bool isSend = EmailService.SendOTP(model.Email,"One time password",DateTime.Now,randomNumber.ToString());
-                    if (isSend)
-                    {
-                        TempData["OtpChannel"] = "Email";
-                        return RedirectToAction("OTPGenerate");
-                    }
-                }
-
-                ViewBag.link = passwordResetLink;
+                    Text = text,
+                    CreatedAt = DateTime.Now,
+                    CreatedBy = model.Email,
+                    MobileNumber = user.PhoneNumber,
+                    MACAddress = MACService.GetMAC(),
+                    SMSType = "OTP"
+                });
             }
-            return View();
+            catch (Exception ex)
+            {
+                await _appLogger.WarningAsync($"Could not record OTP SMS for {model.Email}: {ex.Message}");
+            }
+
+            TempData["OtpChannel"] = "SMS";
+            return RedirectToAction("OTPGenerate");
         }
-        return View(model);
+        else
+        {
+            // Send to the address on file, not model.Email — the user may have
+            // entered a class roll rather than an email.
+            bool isSend = EmailService.SendOTP(user.Email, "One time password", DateTime.Now, randomNumber.ToString());
+            if (!isSend)
+            {
+                ViewBag.msg = "Email not sent due to technical problem, Try again.";
+                return View(model);
+            }
+
+            TempData["OtpChannel"] = "Email";
+            return RedirectToAction("OTPGenerate");
+        }
     }
 
     [HttpGet, AllowAnonymous]
@@ -646,17 +668,21 @@ public class AccountsController : Controller
         {
             bool isValieUser = IsValidEmail(model.Email);
             ApplicationUser user = null;
-            if (!isValieUser)
+            if (isValieUser)
             {
-                var student = await _studentManager.GetStudentByClassRollAsync(Convert.ToInt32(model.Email));
-                if (student!=null)
+                user = await _userManager.FindByEmailAsync(model.Email);
+            }
+            else if (int.TryParse(model.Email?.Trim(), out var classRoll))
+            {
+                var student = await _studentManager.GetStudentByClassRollAsync(classRoll);
+                if (student != null)
                 {
                     user = await _userManager.FindByNameAsync(student.UniqueId);
                 }
             }
             else
             {
-                user = await _userManager.FindByEmailAsync(model.Email);
+                user = await _userManager.FindByNameAsync(model.Email?.Trim());
             }
             
             if (user != null)
