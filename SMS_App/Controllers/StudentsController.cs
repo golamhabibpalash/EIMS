@@ -1174,6 +1174,8 @@ public class StudentsController : Controller
                     {
                         replacedNids.ForEach(name => _nidFiles?.TryDelete(name));
                         TempData["updated"] = "Updated Successfully";
+                        // Keep the Identity login in step with the new email/phone.
+                        await SyncIdentityContactAsync(student.UniqueId, student.Email, student.PhoneNo);
                         return RedirectToList(returnUrl);
                     }
                 }
@@ -1200,6 +1202,45 @@ public class StudentsController : Controller
         ViewData["UpazilaList"] = new SelectList(await _upazilaManager.GetAllAsync(), "Id", "Name", exitStudent.PresentDistrictId);
 
         return View(exitStudent);
+    }
+
+    /// <summary>
+    /// Mirrors a student's current email/phone onto their Identity login
+    /// (AspNetUsers), matched by the student account's <c>ReferenceId</c> (the
+    /// numeric UniqueId) and <c>UserType 's'</c>. Without this a changed phone
+    /// would leave AspNetUsers stale, so a password-reset SMS would go to the
+    /// old number. Best-effort: never blocks the profile save.
+    /// </summary>
+    private async Task SyncIdentityContactAsync(string uniqueId, string email, string phone)
+    {
+        try
+        {
+            if (!int.TryParse(uniqueId, out var referenceId)) return;
+
+            var user = _userManager.Users
+                .FirstOrDefault(u => u.UserType == 's' && u.ReferenceId == referenceId);
+            if (user == null) return;
+
+            bool changed = false;
+            if (!string.IsNullOrWhiteSpace(email)
+                && !string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+            {
+                user.Email = email;
+                user.NormalizedEmail = _userManager.NormalizeEmail(email);
+                changed = true;
+            }
+            if (!string.Equals(user.PhoneNumber ?? string.Empty, phone ?? string.Empty, StringComparison.Ordinal))
+            {
+                user.PhoneNumber = phone;
+                changed = true;
+            }
+            if (changed)
+                await _userManager.UpdateAsync(user);
+        }
+        catch (Exception ex)
+        {
+            await _appLogger.WarningAsync($"Could not sync Identity contact for student {uniqueId}: {ex.Message}");
+        }
     }
     #endregion Edit
 

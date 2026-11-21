@@ -528,7 +528,11 @@ public class EmployeesController : Controller
             await _appLogger.InfoAsync($"after update employee");
 
             if (isUpdated)
+            {
                 TempData["edited"] = "Update Successfully";
+                // Keep the Identity login in step with the new email/phone.
+                await SyncIdentityContactAsync('e', existingEmployee.Id, existingEmployee.Email, existingEmployee.Phone);
+            }
 
             return RedirectToAction(nameof(Index));
         }
@@ -538,6 +542,43 @@ public class EmployeesController : Controller
                 return NotFound();
 
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Mirrors a person's current email/phone onto their Identity login
+    /// (AspNetUsers), matched by <c>UserType</c> + <c>ReferenceId</c>. Without
+    /// this, a changed phone/email would leave AspNetUsers stale, so password
+    /// reset codes and email lookups would use the old contact details.
+    /// Best-effort: a failure here must never block the profile save.
+    /// </summary>
+    private async Task SyncIdentityContactAsync(char userType, int referenceId, string email, string phone)
+    {
+        try
+        {
+            var user = _userManager.Users
+                .FirstOrDefault(u => u.UserType == userType && u.ReferenceId == referenceId);
+            if (user == null) return;
+
+            bool changed = false;
+            if (!string.IsNullOrWhiteSpace(email)
+                && !string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+            {
+                user.Email = email;
+                user.NormalizedEmail = _userManager.NormalizeEmail(email);
+                changed = true;
+            }
+            if (!string.Equals(user.PhoneNumber ?? string.Empty, phone ?? string.Empty, StringComparison.Ordinal))
+            {
+                user.PhoneNumber = phone;
+                changed = true;
+            }
+            if (changed)
+                await _userManager.UpdateAsync(user);
+        }
+        catch (Exception ex)
+        {
+            await _appLogger.WarningAsync($"Could not sync Identity contact for {userType}:{referenceId}: {ex.Message}");
         }
     }
 
