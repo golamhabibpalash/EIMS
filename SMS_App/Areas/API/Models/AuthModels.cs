@@ -16,6 +16,24 @@ public class RefreshRequestDto
     public string RefreshToken { get; set; }
 }
 
+/// <summary>
+/// Body of <c>POST /API/Auth/forgot-password</c>: who to reset and how to
+/// deliver the one-time code (<c>Channel</c> is "sms" or "email").
+/// </summary>
+public class ForgotPasswordRequestDto
+{
+    public string UserName { get; set; }
+    public string Channel { get; set; }
+}
+
+/// <summary>Body of <c>POST /API/Auth/reset-password</c>.</summary>
+public class ResetPasswordRequestDto
+{
+    public string UserName { get; set; }
+    public string Otp { get; set; }
+    public string NewPassword { get; set; }
+}
+
 public class TokensDto
 {
     public string AccessToken { get; set; }
