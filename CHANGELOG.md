@@ -25,6 +25,12 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-11-23
+
+### Changed
+
+- CI deploy now updates the multi-tenant platform (*.schoolbd.net, e.g. brs.schoolbd.net) as part of the SchoolBD VPS release, instead of leaving it to a manual `install-platform.sh` run.
+
 ## [2.7.0] - 2026-11-23
 
 ### Changed
