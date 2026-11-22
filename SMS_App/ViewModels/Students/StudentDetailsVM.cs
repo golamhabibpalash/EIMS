@@ -19,6 +19,7 @@ public class StudentDetailsVM
     public List<StudentPaymentSchedulePaidVM> StudentPaymentSchedulePaidVMs { get; set; } = new List<StudentPaymentSchedulePaidVM>();
     public List<AttendanceIndivisualVM> AttendanceDetails { get; set; }
     public List<StudentActivateHistModel> StatusActivity { get; set; }
+    public ProfileResult Results { get; set; } = new ProfileResult();
 }
 
 public class AttendanceIndivisualVM

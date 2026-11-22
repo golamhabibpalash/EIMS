@@ -503,10 +503,78 @@
                     </div>
                    
                     <div id="results" class="tab-pane">
-                        <div class="text-center">
-                            <h4 class="text-danger">This page is under construction</h4>
-                        </div>
-                        
+                        @{
+                            var r = Model.Results ?? new SMS.Entities.AdditionalModels.StudentVM.ProfileResult();
+                            var hasResult = r.CurrentExamDetails != null && r.CurrentExamDetails.Count > 0;
+                            var cgpaDelta = r.CurrentCGPA - r.LastSemesterCGPA;
+                        }
+                        @if (!hasResult)
+                        {
+                            <div class="text-center text-muted py-4">
+                                <i class="fa fa-graduation-cap fa-2x mb-2"></i>
+                                <h5 class="mb-0">No published result yet</h5>
+                                <p class="mb-0">This student's result appears here once an exam is processed and published.</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="p-2">
+                                <h5 class="text-primary mb-3">@r.CurrentExamName</h5>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-6 col-md-3"><div class="border rounded p-2 text-center"><div class="text-muted small">CGPA</div><div class="h5 mb-0">@r.CurrentCGPA.ToString("0.00")</div></div></div>
+                                    <div class="col-6 col-md-3"><div class="border rounded p-2 text-center"><div class="text-muted small">Grade</div><div class="h5 mb-0">@r.CurrentGrade</div></div></div>
+                                    <div class="col-6 col-md-3"><div class="border rounded p-2 text-center"><div class="text-muted small">Class Rank</div><div class="h5 mb-0">@(r.CurrentClassRank > 0 ? r.CurrentClassRank.ToString() : "N/A")</div></div></div>
+                                    <div class="col-6 col-md-3"><div class="border rounded p-2 text-center"><div class="text-muted small">Obtained</div><div class="h5 mb-0">@r.CurrentObtainMarks.ToString("0.##")</div></div></div>
+                                </div>
+                                @if (r.LastSemesterCGPA > 0)
+                                {
+                                    <p class="mb-2">Compared to the previous exam (CGPA @r.LastSemesterCGPA.ToString("0.00")):
+                                        @if (cgpaDelta > 0)
+                                        {
+                                            <span class="text-success fw-bold">&#9650; improved by @cgpaDelta.ToString("0.00")</span>
+                                        }
+                                        else if (cgpaDelta < 0)
+                                        {
+                                            <span class="text-danger fw-bold">&#9660; down by @Math.Abs(cgpaDelta).ToString("0.00")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">no change</span>
+                                        }
+                                    </p>
+                                }
+                                @if (r.CurrentTotalFail > 0)
+                                {
+                                    <p class="text-danger mb-2">Failed in @r.CurrentTotalFail subject(s).</p>
+                                }
+                                <div class="card mb-3">
+                                    <div class="card-body">
+                                        <h6 class="card-title mb-2">Performance curve — subject-wise obtained marks</h6>
+                                        <canvas id="resultChart" height="110"></canvas>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered align-middle">
+                                        <thead class="table-light">
+                                            <tr><th>Subject</th><th>Code</th><th class="text-end">Total</th><th class="text-end">Obtained</th><th class="text-center">Grade</th><th class="text-end">GPA</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var s in r.CurrentExamDetails)
+                                            {
+                                                <tr>
+                                                    <td>@s.SubjectName</td>
+                                                    <td>@s.SubjectCode</td>
+                                                    <td class="text-end">@s.TotalMark.ToString("0.##")</td>
+                                                    <td class="text-end">@s.TotalObtainMark.ToString("0.##")</td>
+                                                    <td class="text-center">@s.Grade</td>
+                                                    <td class="text-end">@s.GPA.ToString("0.00")</td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        }
                     </div>
                    
                     <div id="documents" class="tab-pane">
@@ -631,5 +699,20 @@
                 financialsTab.classList.add('active');
             }
         }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Result performance curve: subject-wise obtained marks for the current exam.
+        (function () {
+            var el = document.getElementById('resultChart');
+            if (!el || typeof Chart === 'undefined') return;
+            var labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize((Model.Results?.CurrentExamDetails ?? new System.Collections.Generic.List<SMS.Entities.AdditionalModels.StudentVM.CurrentExamDetail>()).Select(x => x.SubjectName)));
+            var marks = @Html.Raw(System.Text.Json.JsonSerializer.Serialize((Model.Results?.CurrentExamDetails ?? new System.Collections.Generic.List<SMS.Entities.AdditionalModels.StudentVM.CurrentExamDetail>()).Select(x => x.TotalObtainMark)));
+            new Chart(el, {
+                type: 'line',
+                data: { labels: labels, datasets: [{ label: 'Obtained marks', data: marks, borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.15)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#0d6efd' }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: true } } }
+            });
+        })();
     </script>
 }
