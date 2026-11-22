@@ -25,6 +25,16 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-11-23
+
+### Added
+
+- **Student Details → Results** tab now shows the latest exam result — CGPA (with improvement vs the previous exam), grade, class rank and obtained marks, a subject-wise marks table, and a performance curve — replacing the "under construction" placeholder.
+
+### Fixed
+
+- **Student Details → Attendance** tab showed 0% for every month. It now matches the student's real attendance punches (by enrolled PIN / unique id / roll, like the other attendance screens) and counts distinct days present, so monthly percentages are correct.
+
 ## [2.7.1] - 2026-11-23
 
 ### Changed
