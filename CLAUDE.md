@@ -134,8 +134,14 @@ Four areas: `API`, `Identity`, `SMSAPP`, `Student` — routed as `{area:exists}/
 ### Mobile API (JWT bearer)
 The `API` area serves the SchoolBD Flutter app over JWT bearer auth, **alongside** the cookie-based
 web app (default scheme stays the cookie). Key pieces:
-- `Areas/API/Controllers/AuthController.cs` — `/API/Auth/login|refresh|me|logout`. Validates via
-  `SignInManager.CheckPasswordSignInAsync`; issues tokens from `Utilities/Jwt/JwtTokenService.cs`.
+- Request/response DTOs live in `Areas/API/Models/` (`AuthModels`, `StudentModels`, `EmployeeModels`,
+  `AcademicsModels`, `StudentDirectoryModels`, `InstituteModels`), not in `SMS.Entities`. The API
+  shapes its own JSON so entity changes don't silently reshape the mobile contract.
+- `Areas/API/Controllers/AuthController.cs` — `/API/Auth/login|refresh|me|logout` plus
+  `forgot-password|reset-password`. Validates via `SignInManager.CheckPasswordSignInAsync`; issues
+  tokens from `Utilities/Jwt/JwtTokenService.cs`. `login`, `forgot-password` and `reset-password`
+  carry `[EnableRateLimiting(MobileApiRateLimits.Login)]` (20/min/IP, defined in
+  `Utilities/Jwt/MobileApiRateLimits.cs`, configured in Program.cs) to cap password/roll guessing.
 - **Access tokens stay slim** (id, name, roles, security stamp). Permission claims are NOT baked in —
   the JWT `OnTokenValidated` event (Program.cs) re-runs `PermissionClaimsTransformation`, so bearer
   requests get the same ~250-claim set per request without overflowing proxy header limits (same
@@ -145,11 +151,26 @@ web app (default scheme stays the cookie). Key pieces:
 - The global auth filter (Program.cs `AddMvc`) accepts BOTH `IdentityConstants.ApplicationScheme`
   and `JwtBearerDefaults.AuthenticationScheme`, so bearer calls aren't blocked by the site-wide
   "must be authenticated" policy. API controllers add `[Authorize(AuthenticationSchemes = "Bearer")]`.
-- `Areas/API/Controllers/StudentController.cs` — student self-service (`/API/Student/profile`,
-  `dashboard`, `attendance`, `payments`, `results`, `academics`, `notices`), each scoped to the
-  signed-in student and reusing the same managers as the web student dashboard. Note the
-  `using StudentEntity = SMS.Entities.Student;` alias — bare `Student` binds to the sibling
-  `Areas.Student` namespace.
+- `Areas/API/Controllers/StudentController.cs` — **student** self-service (`/API/Student/profile`,
+  `dashboard`, `dashboard-content`, `attendance`, `payments`, `results`, `academics`, `documents`,
+  `notices`, `notices/{id}/read`), each scoped to the signed-in student and reusing the same managers
+  as the web student dashboard. Note the `using StudentEntity = SMS.Entities.Student;` alias — bare
+  `Student` binds to the sibling `Areas.Student` namespace.
+- **Naming trap**: `StudentController` (singular, above) is student self-service; the sibling
+  `StudentsController` (plural, `/API/Students`) is the **staff** student directory (list/filters/
+  detail), gated by both `[Authorize(Roles = "SuperAdmin,Admin,Teacher")]` and the same
+  `IndexStudentsPolicy`/`DetailsStudentsPolicy` claims the web screens use. Staff endpoints stack
+  the claim policy on top of bearer auth; student/employee self-service endpoints rely on the
+  signed-in identity alone.
+- `Areas/API/Controllers/EmployeeController.cs` (`/API/Employee/dashboard`) — staff self-service
+  identity, counts and structured employee presence.
+- `Areas/API/Controllers/AcademicsController.cs` (`/API/Academics/classes`, `classes/{id}`,
+  `grading`) — staff academics reference data.
+- `Areas/API/Controllers/InstituteController.cs` (`/API/Institute/profile`) — `[AllowAnonymous]`
+  deployment branding (name, logo, open-now) the app reads before login; `logo` is a path relative
+  to the instance root, null when none is uploaded.
+- `Areas/API/Controllers/AccountsController.cs` is still the empty scaffold (returns placeholder
+  strings); it is not wired to anything. Ignore it — real auth is `AuthController`.
 - `Jwt` config lives in `appsettings.json` (`Key` ≥ 32 chars, set per instance like the connection
   string); Program.cs throws at startup if it's missing/short. CORS policy `MobileApi` is for the
   Flutter *web* build; native apps ignore CORS.
