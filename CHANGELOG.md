@@ -25,6 +25,18 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-11-23
+
+### Changed
+
+- **Add/Edit Employee** now accepts a photo only as a PNG or JPG image of 1 MB or less, and rejects anything larger or in another format with a clear message.
+- **Employee Details** page now organises the record into working Personal / Official / Address / Other tabs (with the photo, designation and active status beside them), replacing the placeholder menu that did nothing.
+
+### Fixed
+
+- **Activity Logs** screen showed each entry's time in a broken format that mixed 24-hour time with "AM/PM" (for example "19:07:41 PM"); timestamps now display correctly.
+- **Employees** page now shows each employee's uploaded photo instead of always falling back to the default avatar.
+
 ## [2.6.0] - 2026-11-19
 
 ### Added
