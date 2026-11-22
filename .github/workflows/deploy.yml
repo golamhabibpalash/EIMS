@@ -22,6 +22,12 @@ name: Deploy EIMS
 #   secrets: SSH_HOST  SSH_USER  SSH_KEY   (SSH_USER needs passwordless sudo)
 #   vars:    SITE_URL
 #
+# Deploying SchoolBD also updates the multi-tenant platform on that same VPS (the
+# schoolbd-platform service serving *.schoolbd.net, e.g. brs.schoolbd.net): CI reuses the
+# publish eims-deploy.sh leaves at /var/www/eims-deploy/publish and runs
+# Resources/deployment/multitenant/install-platform.sh (additive/idempotent; keeps its
+# own env/appsettings/data), then checks the platform's /build-info.
+#
 # Never touched on any server: appsettings*.json, Keys/, logs/, App_Data/ (admission
 # uploads), wwwroot/Uploads/, and uploaded images. A server's own web.config is kept;
 # only its processPath is pointed at the self-contained SMS_App.exe when needed.
@@ -462,6 +468,47 @@ jobs:
         env:
           SITE_URL: ${{ vars.SITE_URL }}
         run: bash Resources/deployment/verify-build.sh "$SITE_URL" "${{ github.sha }}"
+
+      # Same VPS, same build: the multi-tenant platform (schoolbd-platform, *.schoolbd.net,
+      # e.g. brs.schoolbd.net) is updated from the publish eims-deploy.sh just left behind.
+      # install-platform.sh is additive/idempotent - it keeps the platform's env, appsettings
+      # and tenant data, re-runs `platform init`, restarts and health-checks the service.
+      - name: Update the multi-tenant platform (*.schoolbd.net)
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          key="$(mktemp)"; trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$SSH_KEY" > "$key"; chmod 600 "$key"
+          ssh -i "$key" -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 \
+            "$SSH_USER@$SSH_HOST" \
+            'f=$(mktemp /tmp/install-platform.XXXXXX) && cat > "$f" && sudo -n bash "$f" </dev/null; rc=$?; rm -f "$f"; exit $rc' \
+            < Resources/deployment/multitenant/install-platform.sh
+
+      - name: Verify the platform build is live
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          EXPECTED: ${{ github.sha }}
+        run: |
+          key="$(mktemp)"; trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$SSH_KEY" > "$key"; chmod 600 "$key"
+          # The platform answers /build-info on 127.0.0.1:5100 (not publicly on that port);
+          # read it over SSH and match the released commit the same prefix way verify-build.sh does.
+          live="$(ssh -i "$key" -o StrictHostKeyChecking=accept-new "$SSH_USER@$SSH_HOST" \
+            'curl -s --max-time 20 http://127.0.0.1:5100/build-info' </dev/null)"
+          commit="$(echo "$live" | awk '{print $2}')"
+          echo "Platform build-info: ${live:-<none>}"
+          if [ -n "$commit" ] && { [[ "$EXPECTED" == "$commit"* ]] || [[ "$commit" == "$EXPECTED"* ]]; }; then
+            echo "OK - platform (*.schoolbd.net) is running $live"
+          else
+            echo "::error::Platform is not running $EXPECTED (build-info: '${live:-<none>}')"
+            exit 1
+          fi
 
   # 4. One summary table for the whole release ------------------------------
   summary:
