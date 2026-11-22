@@ -141,16 +141,43 @@ namespace SMS.DAL.Repositories
 
         public async Task<List<Tran_MachineRawPunch>> GetAttendanceByMonthSingleStudent(int studentId, string monthYear)
         {
-            if (monthYear.Length >= 6 && int.TryParse(monthYear[..4], out int year) && int.TryParse(monthYear[^2..], out int month))
+            // Callers pass month-then-4-digit-year ("012026", or the unpadded "12026"): the last four
+            // characters are the year, whatever precedes them is the month. (The old code read it as
+            // YYYYMM, which matched no caller and always returned nothing - every percentage was 0.)
+            if (string.IsNullOrWhiteSpace(monthYear))
             {
-                List<Tran_MachineRawPunch> allAttendance = await _context.Tran_MachineRawPunch
-                    .Where(t => t.PunchDatetime.Year == year && t.PunchDatetime.Month == month
-                        && t.CardNo == studentId.ToString())
-                    .ToListAsync();
-                return allAttendance;
+                return new List<Tran_MachineRawPunch>();
+            }
+            monthYear = monthYear.Trim();
+            if (monthYear.Length < 5
+                || !int.TryParse(monthYear[^4..], out int year)
+                || !int.TryParse(monthYear[..^4], out int month)
+                || month < 1 || month > 12)
+            {
+                return new List<Tran_MachineRawPunch>();
             }
 
-            return new List<Tran_MachineRawPunch>();
+            // Punches store the machine PIN in CardNo, not the student's database id. Match the same
+            // way every other attendance screen does: against the student's enrolled PIN / UniqueId /
+            // class roll (with leading-zero variants), via AttendancePinMatcher.
+            var student = await _context.Student.AsNoTracking().FirstOrDefaultAsync(s => s.Id == studentId);
+            if (student == null)
+            {
+                return new List<Tran_MachineRawPunch>();
+            }
+            var pins = AttendancePinMatcher.StudentPins(student.MachineUserId, student.UniqueId, student.ClassRoll)
+                .SelectMany(AttendancePinMatcher.KeyVariants)
+                .Where(p => !string.IsNullOrEmpty(p))
+                .Distinct()
+                .ToList();
+            if (pins.Count == 0)
+            {
+                return new List<Tran_MachineRawPunch>();
+            }
+
+            return await _context.Tran_MachineRawPunch
+                .Where(t => t.PunchDatetime.Year == year && t.PunchDatetime.Month == month && pins.Contains(t.CardNo))
+                .ToListAsync();
         }
 
         public async Task<List<Tran_MachineRawPunch>> GetCheckinDataByDateAsync(string date)

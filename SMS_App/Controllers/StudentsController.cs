@@ -414,15 +414,17 @@ public class StudentsController : Controller
             List<AttendanceIndivisualVM> attendanceIndivisualVMs = new List<AttendanceIndivisualVM>();
             for (int i = startingMonth; i <= presentMonth; i++)
             {
-                var monthYear = i.ToString() + DateTime.Now.Year;
+                var monthYear = i.ToString().PadLeft(2, '0') + DateTime.Now.Year;
                 AttendanceIndivisualVM attendanceIndivisualVM = new AttendanceIndivisualVM();
                 var monthlyAttendance = await _attendanceMachineManager.GetAttendanceByMonthSingleStudent(student.Id, monthYear);
-                attendanceIndivisualVM.AttendanceCount = monthlyAttendance.Count;
+                // Count distinct days present: a day can have several punches (in/out, re-scans).
+                int presentDays = monthlyAttendance.Select(a => a.PunchDatetime.Date).Distinct().Count();
+                attendanceIndivisualVM.AttendanceCount = presentDays;
                 var holidays = await _offDayManager.GetMonthlyHolidaysAsync(i.ToString().PadLeft(2, '0') + DateTime.Now.Year.ToString());
                 attendanceIndivisualVM.TotalDays = DateTime.DaysInMonth(DateTime.Now.Year, i) - holidays.Count;
-                if (monthlyAttendance.Count > 0)
+                if (presentDays > 0 && attendanceIndivisualVM.TotalDays > 0)
                 {
-                    attendanceIndivisualVM.PresentPercentage = (monthlyAttendance.Count * 100) / (attendanceIndivisualVM.TotalDays);
+                    attendanceIndivisualVM.PresentPercentage = (presentDays * 100) / (attendanceIndivisualVM.TotalDays);
                 }
                 else
                 {
@@ -439,6 +441,19 @@ public class StudentsController : Controller
             throw;
         }
         #endregion Attendance =====================================================================================================================
+
+        #region Results ============================================================================
+        // Current-exam result for the Results tab. Best-effort: a student with no published exam
+        // yet just shows the empty-state, never an error.
+        try
+        {
+            sd.Results = await _academicExamManager.GetSingleStudentResultDetailForProfile(student.Id) ?? new ProfileResult();
+        }
+        catch (Exception)
+        {
+            sd.Results = new ProfileResult();
+        }
+        #endregion Results =========================================================================
 
         ViewBag.districts = await _districtManager.GetAllAsync();
         ViewBag.Upazila = await _upazilaManager.GetAllAsync();
