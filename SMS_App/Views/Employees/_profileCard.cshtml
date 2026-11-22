@@ -1,10 +1,7 @@
 ﻿@model SMS.Entities.Employee
 
 @using Microsoft.AspNetCore.Identity;
-@using System.IO;
-@using Microsoft.AspNetCore.Hosting;
 
-@inject IWebHostEnvironment env;
 @{
     var blurSize = Model.Status == true ? "" : "2px";
 }
@@ -17,17 +14,13 @@
                     <div class="" style="filter:blur(@blurSize)">
                         <a href="#">
                             @{
-                                var avatarImg = $"/Images/Employee/photo/maleEmployee.png";
-                                if (!string.IsNullOrEmpty(Model.Image))
-                                {
-                                    string root = env.WebRootPath;
-                                    string folder = "Images/Employee/photo/";
-                                    var path = System.IO.Path.Combine(root, folder, Model.Image);
-                                    if (System.IO.File.Exists(path))
-                                    {
-                                        avatarImg = $"/Images/Employee/photo/" + Model.Image;
-                                    }
-                                }
+                                // Emit the photo URL directly and let onerror fall back to the
+                                // default avatar. Don't probe the disk with IWebHostEnvironment.WebRootPath:
+                                // tenant uploads live under ITenantFileStorage, not the shared wwwroot,
+                                // so a File.Exists check there wrongly hides every photo in multi-tenant mode.
+                                var avatarImg = string.IsNullOrEmpty(Model.Image)
+                                    ? "/Images/Employee/photo/maleEmployee.png"
+                                    : "/Images/Employee/photo/" + Model.Image;
                             }
                             <img src="@avatarImg"
                                 class="employee-avatar"
