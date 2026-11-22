@@ -72,7 +72,8 @@
                         <div class="form-group row">
                             <label asp-for="Image" class="control-label col-md-6 text-md-end"></label>
                             <div class="col-md-6">
-                                <input type="file" name="empImage" class="rounded-pill" id="empImage" />
+                                <input type="file" name="empImage" class="rounded-pill" id="empImage" accept=".png,.jpg,.jpeg" />
+                                <small class="form-text text-muted d-block">PNG or JPG only, max 1 MB.</small>
                                 <span asp-validation-for="Image" class="text-danger"></span>
                             </div>
                         </div>
@@ -293,10 +294,34 @@
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
 <script>
+    // Mirror of the server rule: PNG/JPG only, 1 MB max. Clears the chosen file on failure.
+    function validateEmployeePhoto(input) {
+        var file = input.files && input.files[0];
+        if (!file) { return true; }
+        var okTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+        var okExt = /\.(png|jpe?g)$/i.test(file.name);
+        if (okTypes.indexOf(file.type) === -1 || !okExt) {
+            alertify.error('Photo must be a PNG or JPG image.');
+            input.value = '';
+            $('#blah').hide();
+            return false;
+        }
+        if (file.size > 1024 * 1024) {
+            alertify.error('Photo must be 1 MB or smaller.');
+            input.value = '';
+            $('#blah').hide();
+            return false;
+        }
+        return true;
+    }
+
     $(document).ready(function () {
         //Code for Image instant View
         $('#blah').hide();
         $("#empImage").change(function () {
+            if (!validateEmployeePhoto(this)) {
+                return;
+            }
             $('#blah').show();
             readURL(this);
         });

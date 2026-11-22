@@ -229,6 +229,8 @@ public class EmployeesController : Controller
         var employeeDetailsVM = _mapper.Map<EmployeeDetailsVM>(employee);
 
         employeeDetailsVM.Designation = await _designationManager.GetByIdAsync((int)employee.DesignationId);
+        var empType = await _empTypeManager.GetByIdAsync(employee.EmpTypeId);
+        ViewBag.EmpTypeName = empType?.Name ?? "N/A";
         return View(employeeDetailsVM);
     }
 
@@ -300,6 +302,9 @@ public class EmployeesController : Controller
 
 
         var employee = _mapper.Map<Employee>(employeeVM);
+
+        // Reject non-image or oversized photos before writing anything to disk.
+        ValidateImageUpload(empImage, nameof(empImage), "Employee photo");
 
         if (ModelState.IsValid)
         {
@@ -488,9 +493,23 @@ public class EmployeesController : Controller
             return NotFound();
 
         await _appLogger.InfoAsync($"Before Upload Files.");
-        // FILE UPLOAD HANDLING
-        employeeVM.Image = await SaveFileIfProvided(Image, $"{id.ToString()}_image_", "Images/Employee/photo", existingEmployee.Image);
-        employeeVM.NIDCard = await SaveFileIfProvided(NIDCard, $"{id.ToString()}_NID_", "Images/Employee/NID", existingEmployee.NIDCard);
+
+        // Reject non-image or oversized photos before writing anything to disk.
+        ValidateImageUpload(Image, nameof(Image), "Employee photo");
+
+        // FILE UPLOAD HANDLING — only persist files when the whole form is valid, so a rejected
+        // submit never leaves an orphan upload on disk.
+        if (ModelState.IsValid)
+        {
+            employeeVM.Image = await SaveFileIfProvided(Image, $"{id.ToString()}_image_", "Images/Employee/photo", existingEmployee.Image);
+            employeeVM.NIDCard = await SaveFileIfProvided(NIDCard, $"{id.ToString()}_NID_", "Images/Employee/NID", existingEmployee.NIDCard);
+        }
+        else
+        {
+            // Keep the existing files referenced on the redisplayed form.
+            employeeVM.Image = existingEmployee.Image;
+            employeeVM.NIDCard = existingEmployee.NIDCard;
+        }
 
         await _appLogger.InfoAsync($"Employee image {employeeVM.Image} uploaded.");
 
@@ -635,6 +654,34 @@ public class EmployeesController : Controller
     public IActionResult EmployeeEvaluation()
     {
         return View();
+    }
+
+    // Uploaded photos: PNG or JPG only, 1 MB max. Adds a ModelState error and returns false when a
+    // file is present but invalid; an absent upload is allowed (the field is optional). Keep this as
+    // the authoritative check — the client-side guard in the view is only for a faster error message.
+    private const long MaxImageUploadBytes = 1 * 1024 * 1024;
+    private static readonly string[] AllowedImageExtensions = { ".png", ".jpg", ".jpeg" };
+
+    private bool ValidateImageUpload(IFormFile file, string fieldName, string label)
+    {
+        if (file == null || file.Length == 0)
+            return true;
+
+        var extension = (Path.GetExtension(file.FileName) ?? string.Empty).ToLowerInvariant();
+        var contentType = (file.ContentType ?? string.Empty).ToLowerInvariant();
+        bool isImage = AllowedImageExtensions.Contains(extension)
+                       && (contentType == "image/png" || contentType == "image/jpeg" || contentType == "image/jpg");
+        if (!isImage)
+        {
+            ModelState.AddModelError(fieldName, $"{label} must be a PNG or JPG image.");
+            return false;
+        }
+        if (file.Length > MaxImageUploadBytes)
+        {
+            ModelState.AddModelError(fieldName, $"{label} must be 1 MB or smaller.");
+            return false;
+        }
+        return true;
     }
 
     private async Task<string> SaveFileIfProvided(
