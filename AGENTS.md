@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for OpenCode working in **EIMS** (Education Institute Management System) — ASP.NET Core 8.0 MVC, EF Core 7.0.11 on .NET 8 (don't "fix" the version skew by upgrading EF independently). See `CLAUDE.md` for the full write-up; this is the compact operating guide.
+Guidance for OpenCode working in **EIMS** (Education Institute Management System) — ASP.NET Core 8.0 MVC, EF Core 7.0.11 on .NET 8 (don't "fix" the version skew by upgrading EF independently). See `CLAUDE.md` for the full write-up; this is the compact operating guide. `SMS.Tests` is the only test project.
 
 ## Architecture (strict)
 
@@ -9,6 +9,7 @@ Guidance for OpenCode working in **EIMS** (Education Institute Management System
 ```
 SMS_App → SMS.BLL (Managers) → SMS.DAL (Repositories) → SMS.DB (DbContext) → SMS.Entities
 SMS.Frameworks = shared utilities (no upward deps)
+SMS.Tests → references SMS_App (xUnit; not part of the downward chain)
 ```
 
 - Interfaces in `SMS.*/Contracts/`, implementations in `SMS.*/Managers|Repositories/`.
@@ -17,12 +18,14 @@ SMS.Frameworks = shared utilities (no upward deps)
 ## Build, run, verify
 
 ```bash
-dotnet build                                     # root: builds the whole solution (6 projects)
+dotnet build                                     # root: builds the whole solution (7 projects)
 dotnet run --project SMS_App/SMS_App.csproj      # https://localhost:5001
+dotnet test SMS.Tests/SMS.Tests.csproj           # xUnit; no database needed
+dotnet test SMS.Tests/SMS.Tests.csproj --filter "FullyQualifiedName~TenantIsolationTests"
 dotnet run --project Resources/deployment/EncryptConnString -- enc|dec|test "<value>"
 ```
 
-- **There is NO test project** and no lint/format script. Verify changes with `dotnet build` and by running the app.
+- Only `SMS.Tests` is automated (multi-tenancy/tenant isolation, auth, students, reports). It uses EF InMemory and `SMS.Tests/MultiTenancy/TestPlatform.cs` (fake platform registry), so it needs no DB. Most features still have no tests — verify those with `dotnet build` and by running the app. There is no lint/format script.
 - Startup writes to the configured database: `CanConnectAsync()` → `EnsureCreatedAsync()` → `DbSeeder.SeedAsync()`. It fails fast if the DB is unreachable (not a code bug), and on first run seeds `admin@eims.com` / `Admin@123` as `SuperAdmin`+`Admin`. Check which DB `DefaultConnection` targets before running.
 - AutoMapper profile: `SMS_App/Utilities/AutoMapperConfiguration/AutoMapperProfile.cs` (injected as `IMapper`).
 - Hangfire is **disabled by default** (`Hangfire.IsEnabled=false`); dashboard exists only when enabled.
@@ -32,7 +35,7 @@ dotnet run --project Resources/deployment/EncryptConnString -- enc|dec|test "<va
 - `SMS_App/appsettings.json` is **gitignored/local**, so every machine has its own; read `DatabaseProvider` before running. The local copy here is `"PostgreSQL"`; the tracked `appsettings.Production.json` says `"SqlServer"`. Deployed instances keep their own file (CI strips `appsettings*.json`), so edits never reach production.
   - **SqlServer**: `DefaultConnection` is AES-encrypted (AES-128-CBC/PKCS7, base64), decrypted with env vars `AES_KEY`/`AES_IV` (defaults `"1234567890123456"`).
   - **PostgreSQL**: `DefaultConnection` is used as **plain text**.
-- Startup only runs `EnsureCreatedAsync()`, which **never adds tables to an existing DB**. The migration history was squashed (`Migrations_SqlServer/…InitialCreate.cs` is empty and the model differ is out of step), so `dotnet ef migrations add` cannot scaffold and `dotnet ef database update` is not a deploy path. Don't "repair" migrations as part of an unrelated task.
+- Startup only runs `EnsureCreatedAsync()`, which **never adds tables to an existing DB**. The migration history was squashed (`Migrations_SqlServer/…InitialCreate.cs` is empty and the model differ is out of step), so `dotnet ef migrations add` cannot scaffold; `dotnet ef database update` can apply the existing history to a local SqlServer DB but is not a deploy path. Don't "repair" migrations as part of an unrelated task.
 - New tables ship as **idempotent per-provider scripts** in `Resources/sql/` (see `UserNotifications_{SqlServer,PostgreSQL}.sql`, `OnlineAdmission_*`), run by hand on each instance **before** deploying. Keep them in sync with `SMS.DB/ApplicationDbContext.cs`; add `ProjectModules`/`ProjectSubModules`/`ClaimStores` rows for new screens (`Seed_Modules_SubModules_ClaimStores_FromSiteMap.sql`, `*_Claims_*.sql`). Code touching a new table should degrade gracefully when the table is absent — CI/deploy never creates schema.
   - Get exact DDL from `Database.GenerateCreateScript()` (per `CLAUDE.md`), not from EF migration SQL. SQL Server scripts must be a single batch with **no `GO`** (DBeaver/shared-hosting consoles reject it).
 - PostgreSQL is provisioned from a dump, not migrations (`Resources/docker/setup-eims-postgres.ps1`; hard-coded dump path `C:\Users\golam\Downloads\eimsdb_noble.dump`, container port **5433** — but the local `appsettings.json` points at **5434**, so align both before running).
@@ -47,25 +50,41 @@ dotnet run --project Resources/deployment/EncryptConnString -- enc|dec|test "<va
 - A screen is invisible until it has a `<item Controller Action Claim>` in `SMS_App/SiteMap.Config`. The `Claim=` attribute holds a **policy name** (e.g. `IndexInstitutesPolicy`), not a claim string.
 - Areas: `API`, `Identity`, `SMSAPP`, `Student` — routed `{area:exists}/{controller=Home}/{action=Index}/{id?}`. Online Admission lives in root controllers, not an area.
 
+## Multi-tenancy (database per school, opt-in)
+
+- Off by default (no `MultiTenancy` section in local `appsettings.json`) = old one-school behaviour on `DefaultConnection`; `MultiTenancy:Enabled=true` turns one deployment into the SchoolBD platform. Design: `docs/MULTI_TENANT_ARCHITECTURE.md`.
+- The school comes **only** from the Host header matched against `SchoolBD_PlatformDB` (`TenantResolutionMiddleware` → `ITenantCatalog`). Never read a tenant from query/headers/cookies, and never enable `ForwardedHeaders.XForwardedHost`. `/health` and `/build-info` are answered before tenancy/auth in `Program.cs`.
+- `ApplicationDbContext` is scoped and built from `ITenantContext.Current` per scope (`SMS_App/MultiTenancy/TenancyServiceCollectionExtensions.cs`); no pooling. Code outside a request (jobs, CLI) must call `ITenantContext.Set(tenant)` in its own scope first.
+- Anything cached, grouped or stored per school must include the tenant: use `tenant.Scoped(key)` / `TenantInfo.Key`. School-owned files go through `ITenantFileStorage` (`Images/`, `Uploads/`, admission uploads), **not** `IWebHostEnvironment.WebRootPath` (that is only for shipped assets such as `Reports/*.rdlc`).
+- Logins carry the `schoolbd_tenant` claim (`TenantClaims`); any new auth scheme must add and validate it, or a cookie/token from one school would work on another.
+- `GlobalUI` is per-request now (backed by `HttpContext.Items`); keep using it as before.
+- Platform needs `MultiTenancy__Platform__ConnectionString` and `SCHOOLBD_SECRETS_KEY` (base64 of 32 bytes). Onboarding is the `platform` CLI (`dotnet SMS_App.dll platform help`); registry schema is `Resources/sql/Platform_{SqlServer,PostgreSQL}.sql`. Hangfire is forced off in multi-tenant mode; `deploy.yml` does not update the VPS `schoolbd-platform` service — re-run `Resources/deployment/multitenant/install-platform.sh` after a release.
+
+## Mobile API (JWT bearer)
+
+- The `API` area serves the Flutter app over JWT bearer alongside cookie auth: `/API/Auth/login|refresh|me|logout`, plus `/API/Student/*` self-service. Tokens stay slim (id/name/roles/stamp); `OnTokenValidated` re-runs `PermissionClaimsTransformation` per request — don't put permission claims in the token.
+- Refresh is stateless + security-stamp-checked (no token table). `Jwt:Key` must be ≥32 chars or startup throws; set it per instance like the connection string.
+- The global auth filter accepts both `IdentityConstants.ApplicationScheme` and `JwtBearerDefaults.AuthenticationScheme`; API controllers add `[Authorize(AuthenticationSchemes = "Bearer")]`. Note the `using StudentEntity = SMS.Entities.Student;` alias in `Areas/API/Controllers/StudentController.cs` — bare `Student` binds to the sibling `Areas.Student` namespace.
+
 ## Online Admission (guardian portal)
 
 - Public pages: `AdmissionController` (`/Admission`), guardian portal `AdmissionPortalController`, staff `AdmissionSetup` / `AdmissionApplications` / `AdmissionPayments`. Business rules live in `SMS.BLL/Managers/OnlineAdmission/` (`AdmissionRules` is pure logic).
 - Guardians are **not** Identity users: `AdmissionGuardianAccount` + its own cookie scheme (`GuardianPortalAuth`, `AdmissionGuardian`) and `GuardianPortalControllerBase`. Portal actions are `[AllowAnonymous]` at the base and enforce the guardian check themselves; mark open actions `[GuardianAnonymous]`.
-- Uploads are private under `App_Data/AdmissionFiles/{applicationId}/` (`AdmissionFileStore`) and only streamed by ownership/permission-checked actions. Never move them under `wwwroot`, and never commit runtime uploads (`App_Data` is **not** gitignored).
+- Uploads are private under `App_Data/AdmissionFiles/{applicationId}/` (`AdmissionFileStore`, tenant-aware via `ITenantFileStorage`) and only streamed by ownership/permission-checked actions. Never move them under `wwwroot`, and never commit runtime uploads (`App_Data` is **not** gitignored).
 - Public endpoints are IP rate-limited (`AdmissionRateLimits.Auth` 10/min, `Upload` 30/min, configured in `Program.cs`).
 - Every workflow change must go through `IAdmissionRepository.ExecuteInTransactionAsync` (EF retry-on-failure is on, so a bare `BeginTransaction` throws) and write an `AdmissionApplicationHistory` row.
 
 ## Real-time notifications (SignalR)
 
 - `UserNotificationManager` (BLL) only persists rows; `SMS_App/Utilities/Notifications/NotificationService.cs` resolves recipients, persists first, then pushes best-effort.
-- Hub `SMS_App/Hubs/NotificationHub.cs` is mapped at `/hubs/notifications`, is receive-only, and groups connections by `user:{Context.UserIdentifier}`. Client: `wwwroot/js/notifications.js` + vendored `wwwroot/lib/signalr/`.
+- Hub `SMS_App/Hubs/NotificationHub.cs` is mapped at `/hubs/notifications`, is receive-only, and groups connections by `tenant.Scoped("user:{id}")` (i.e. `t:{school}:user:{id}`) — same user id can exist in two schools. Client: `wwwroot/js/notifications.js` + vendored `wwwroot/lib/signalr/`.
 - `INotificationService` is registered in `DependencyInjectionConfiguration.cs`, not `Program.cs`. Naming trap: `SMS.Entities/StudentHub.cs` is a domain entity, not SignalR.
 
 ## Attendance, tickets, bulk import
 
 - **All punch↔person matching must go through `SMS.Entities/Utilities/AttendancePinMatcher.cs`** (normalizes leading zeros; tries `MachineUserId` → `UniqueId` → class roll). Plain string compares caused students to show present on one screen and absent on another; don't add new ad-hoc matching.
 - Push-only attendance devices use `Controllers/IClockController.cs` (`/iclock/*`, `[AllowAnonymous]`, plain-text responses, trusts a registered `SN`). Staff screens are `AttendanceMachines` / `AttendanceMachineDevices`; direct-socket sync is `SMS.BLL/ZKTeco/ZkClient.cs`.
-- Ticket attachments go to `wwwroot/Uploads/Tickets` (created at startup; images/PDF only, max 2 MB). Admission uploads are the opposite: private under `App_Data/AdmissionFiles/`.
+- Ticket attachments go to `<ITenantFileStorage.WebRootPath>/Uploads/Tickets` (single-tenant `wwwroot/Uploads/Tickets`; images/PDF only, max 2 MB). Admission uploads are the opposite: private under `App_Data/AdmissionFiles/`.
 - Student bulk import stages previews in `SMS_App/App_Data/BulkImports/` (gitignored).
 
 ## Conventions that differ from defaults
@@ -82,7 +101,7 @@ dotnet run --project Resources/deployment/EncryptConnString -- enc|dec|test "<va
 ## Logging, deploy, misc
 
 - Unhandled exceptions are written to the `Logs` table by `ExceptionLoggingMiddleware` (view at `/Logs`) and `IAppLogger`; `appsettings.json` `Serilog` sections are **dead config** — there is no Serilog package or wiring.
-- Pushing to **`FinalDeployment`** deploys **all five production instances** (`.github/workflows/deploy.yml`); use manual workflow dispatch to target one. The pipeline builds once, strips `appsettings*.json`, and never touches server-side `Keys/`, logs, or uploads.
+- Pushing to **`FinalDeployment`** deploys **all four production instances** (`.github/workflows/deploy.yml`): three Windows/IIS hosts over FTP (checksum deltas) and one Linux VPS built on-box over SSH; use manual workflow dispatch to target one. The pipeline builds once, strips `appsettings*.json`, and never touches server-side `Keys/`, logs, `App_Data/`, `wwwroot/Uploads/`, or uploaded images. Every deploy ends by reading `/build-info` and failing unless the instance reports the shipped commit.
 - Product version is `VersionPrefix` in `Directory.Build.props`, bumped by hand; CI appends build number/commit/timestamp. `global.json` pins SDK `8.0.415`.
 - Data protection keys persist to `SMS_App/Keys/` (gitignored; don't delete — shared-hosting stability).
 - Raw SQL (stored procs, views, data migration) lives in `Resources/sql*` and `Resources/StudentMigrationScripts/` — run outside EF.
