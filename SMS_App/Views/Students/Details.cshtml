@@ -54,6 +54,20 @@
             color:black !important;
         }
 
+        /* Square, non-distorting circular student photo: a 1:1 box at any width,
+           object-fit crops instead of stretching a portrait into an oval. */
+        .student-avatar {
+            width: 60%;
+            max-width: 150px;
+            aspect-ratio: 1 / 1;
+            height: auto;
+            object-fit: cover;
+            object-position: center top; /* keep the face in frame */
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, .7);
+            background-color: #f8f9fa;
+        }
+
         /* Results tab ------------------------------------------------------ */
         #results { text-align: left; }
         .result-stat {
@@ -94,11 +108,11 @@
             <div class="col-md-12 text-center">
                 @if (string.IsNullOrEmpty(Model.Student.Photo))
                 {
-                    <img class="rounded-circle" src="~/Images/Student/noimage.jpg" alt="Student Photo" onerror="this.src='@Url.Content("~/Images/Student/noimage.jpg")'" style="width:40%;" />
+                    <img class="student-avatar" src="~/Images/Student/noimage.jpg" alt="Student Photo" onerror="this.src='@Url.Content("~/Images/Student/noimage.jpg")'" />
                 }
                 else
                 {
-                    <img class="rounded-circle" src="~/Images/Student/@Model.Student.Photo" alt="Student Photo" onerror="this.src='@Url.Content("~/Images/Student/noimage.jpg")'" style="width:40%;" />
+                    <img class="student-avatar" src="~/Images/Student/@Model.Student.Photo" alt="Student Photo" onerror="this.src='@Url.Content("~/Images/Student/noimage.jpg")'" />
                 }
             </div>
         </div>
