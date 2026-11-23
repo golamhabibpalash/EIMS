@@ -43,6 +43,12 @@ public class ProfileResult {
     public double CurrentObtainMarks { get; set; }
     public int CurrentTotalFail { get; set; }
     public List<CurrentExamDetail> CurrentExamDetails { get; set; } = [];
+
+    /// <summary>One row per academic session, oldest first, for the progress history.</summary>
+    public List<ResultSessionProgress> Sessions { get; set; } = [];
+
+    /// <summary>Per-subject percentage series aligned to <see cref="Sessions"/>.</summary>
+    public List<ResultSubjectTrend> SubjectTrends { get; set; } = [];
 }
 public class CurrentExamDetail
 {
@@ -52,6 +58,38 @@ public class CurrentExamDetail
     public string Grade { get; set; } = "N/F";
     public double GPA { get; set; }
     public double TotalObtainMark { get; set; }
+}
+public class ResultSessionProgress
+{
+    public int AcademicSessionId { get; set; }
+    public string SessionName { get; set; }
+    public string ClassName { get; set; }
+    public string ExamName { get; set; }
+    public int ExamCount { get; set; }
+    public double CGPA { get; set; }
+    public string Grade { get; set; }
+    public int Rank { get; set; }
+    public double ObtainedMarks { get; set; }
+    public double TotalMarks { get; set; }
+    public int TotalFails { get; set; }
+    public List<ResultSubjectMark> Subjects { get; set; } = [];
+}
+public class ResultSubjectMark
+{
+    public string SubjectName { get; set; }
+    public string SubjectCode { get; set; }
+    public double ObtainedMarks { get; set; }
+    public double TotalMarks { get; set; }
+    public double Percentage => TotalMarks > 0 ? (ObtainedMarks * 100.0) / TotalMarks : 0;
+    public string Grade { get; set; }
+    public double GPA { get; set; }
+}
+public class ResultSubjectTrend
+{
+    public string SubjectName { get; set; }
+    public string SubjectCode { get; set; }
+    public List<double?> Percentages { get; set; } = [];
+    public List<string> Grades { get; set; } = [];
 }
 public class ProfilePayment
 {

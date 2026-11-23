@@ -30,6 +30,8 @@ public class ExamResultManager : Manager<ExamResult>, IExamResultManager
         return await _examResultRepository.Table
             .AsNoTracking()
             .Include(e => e.AcademicExamGroup)
+                .ThenInclude(g => g.AcademicSession)
+            .Include(e => e.AcademicClass)
             .Include(e => e.ExamResultDetails)
                 .ThenInclude(d => d.AcademicSubject)
             .Where(e => e.StudentId == studentId)

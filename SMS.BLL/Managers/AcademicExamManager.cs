@@ -24,7 +24,6 @@ public class AcademicExamManager : Manager<AcademicExam>, IAcademicExamManager
     private readonly IOffDayManager _offDayManager;
     private AcademicExamGroup _cachedExamGroup;
     private List<GradingTable> _cachedGradingTable;
-    private readonly IAcademicExamDetailsManager _academicExamDetailsManager;
     private int _cachedExamMonthId;
 
 
@@ -34,7 +33,6 @@ public class AcademicExamManager : Manager<AcademicExam>, IAcademicExamManager
         IAcademicExamGroupRepository academicExamGroupRepository,
         IAcademicClassRepository academicClassRepository,
         IGradingTableRepository gradingTableRepository,
-        IAcademicExamDetailsManager academicExamDetailsManager,
         IExamResultManager examResultManager,
         IAttendanceMachineManager attendanceMachineManager,
         IOffDayManager offDayManager) : base(academicExamRepository)
@@ -44,7 +42,6 @@ public class AcademicExamManager : Manager<AcademicExam>, IAcademicExamManager
         _academicExamGroupRepository = academicExamGroupRepository;
         _academicClassRepository = academicClassRepository;
         _gradingTableRepository = gradingTableRepository;
-        _academicExamDetailsManager = academicExamDetailsManager;
         _examResultManager = examResultManager;
         _attendanceMachineManager = attendanceMachineManager;
         _offDayManager = offDayManager;
@@ -596,45 +593,136 @@ public class AcademicExamManager : Manager<AcademicExam>, IAcademicExamManager
     }
     public async Task<ProfileResult> GetSingleStudentResultDetailForProfile(int studentId)
     {
-        ProfileResult profileResult = new();
-        var LastAttendedExamDetail = await _academicExamDetailsManager.GetLastDataFromExamByStudentId(studentId);
-        if (LastAttendedExamDetail!=null)
+        var profileResult = new ProfileResult();
+        var results = await _examResultManager.GetByStudentIdAsync(studentId);
+        if (results == null || results.Count == 0)
         {
-            profileResult.CurrentExamName = LastAttendedExamDetail.AcademicExam.AcademicExamGroup.ExamGroupName;
-
-            var subjectWiseAllResult = await _examResultManager.GetExamResultsByExamGroupNClassId(LastAttendedExamDetail.AcademicExam.AcademicExamGroupId, LastAttendedExamDetail.AcademicExam.AcademicClassId);
-
-            var filterResultByStudent = subjectWiseAllResult.FirstOrDefault(s => s.StudentId == studentId);
-            if (filterResultByStudent!=null)
-            {
-                profileResult.CurrentCGPA = filterResultByStudent.CGPA;
-                profileResult.CurrentClassRank = filterResultByStudent.Rank;
-                profileResult.CurrentGrade = filterResultByStudent.FinalGrade;
-                profileResult.CurrentObtainMarks = filterResultByStudent.TotalObtainMarks;
-                profileResult.CurrentTotalFail = filterResultByStudent.TotalFails;
-            }
-            else
-            {
-                return profileResult;
-            }
-
-            var subjectWiseAllExams =await _academicExamDetailsManager.GetAllByExamGroupAndStudentId(LastAttendedExamDetail.AcademicExam.AcademicExamGroupId,studentId);
-            foreach (var item in subjectWiseAllExams)
-            {
-                var subjectWiseResult = filterResultByStudent.ExamResultDetails.FirstOrDefault(c => c.AcademicSubjectId == item.AcademicExam.AcademicSubjectId);
-                CurrentExamDetail currentExamDetail = new()
-                {
-                    SubjectName = item.AcademicExam.AcademicSubject?.SubjectName,
-                    SubjectCode = item.AcademicExam.AcademicSubject.SubjectCode?.ToString(),
-                    TotalMark = item.AcademicExam.TotalMarks,
-                    TotalObtainMark = subjectWiseResult.ObtainMark,
-                    Grade = subjectWiseResult.Grade,
-                    GPA = subjectWiseResult.GPA
-                };
-                profileResult.CurrentExamDetails.Add(currentExamDetail);
-            }
-
+            return profileResult;
         }
+
+        var orderedResults = results
+            .Where(r => r.AcademicExamGroup != null)
+            .OrderBy(r => r.AcademicExamGroup.AcademicSession?.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(r => r.AcademicExamGroup.AcademicSessionId)
+            .ThenBy(r => r.AcademicExamGroup.ExamMonthId)
+            .ThenBy(r => r.Id)
+            .ToList();
+
+        if (orderedResults.Count == 0)
+        {
+            return profileResult;
+        }
+
+        var latestResult = orderedResults[orderedResults.Count - 1];
+        profileResult.CurrentExamName = latestResult.AcademicExamGroup?.ExamGroupName ?? profileResult.CurrentExamName;
+        profileResult.CurrentCGPA = latestResult.CGPA;
+        profileResult.CurrentClassRank = latestResult.Rank;
+        profileResult.CurrentGrade = latestResult.FinalGrade;
+        profileResult.CurrentObtainMarks = latestResult.TotalObtainMarks;
+        profileResult.CurrentTotalFail = latestResult.TotalFails;
+
+        profileResult.CurrentExamDetails = (latestResult.ExamResultDetails ?? new List<ExamResultDetail>())
+            .Where(d => d.AcademicSubject != null)
+            .Select(d => new CurrentExamDetail
+            {
+                SubjectName = d.AcademicSubject.SubjectName,
+                SubjectCode = d.AcademicSubject.SubjectCode?.ToString(),
+                TotalMark = d.TotalMark,
+                TotalObtainMark = d.ObtainMark,
+                Grade = d.Grade,
+                GPA = d.GPA
+            })
+            .ToList();
+
+        if (orderedResults.Count > 1)
+        {
+            profileResult.LastSemesterCGPA = orderedResults[orderedResults.Count - 2].CGPA;
+        }
+
+        var sessionGroups = orderedResults
+            .GroupBy(r => new
+            {
+                r.AcademicExamGroup.AcademicSessionId,
+                SessionName = r.AcademicExamGroup.AcademicSession?.Name
+                    ?? $"Session {r.AcademicExamGroup.AcademicSessionId}"
+            })
+            .OrderBy(g => g.Key.SessionName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(g => g.Key.AcademicSessionId);
+
+        foreach (var sessionGroup in sessionGroups)
+        {
+            var sessionResults = sessionGroup
+                .OrderBy(r => r.AcademicExamGroup.ExamMonthId)
+                .ThenBy(r => r.Id)
+                .ToList();
+            var latestInSession = sessionResults[sessionResults.Count - 1];
+
+            var session = new ResultSessionProgress
+            {
+                AcademicSessionId = sessionGroup.Key.AcademicSessionId,
+                SessionName = sessionGroup.Key.SessionName,
+                ClassName = latestInSession.AcademicClass?.Name,
+                ExamName = latestInSession.AcademicExamGroup?.ExamGroupName,
+                ExamCount = sessionResults.Count,
+                CGPA = latestInSession.CGPA,
+                Grade = latestInSession.FinalGrade,
+                Rank = latestInSession.Rank,
+                TotalFails = latestInSession.TotalFails
+            };
+
+            var subjectGroups = sessionResults
+                .SelectMany(r => r.ExamResultDetails ?? new List<ExamResultDetail>())
+                .Where(d => d.AcademicSubject != null && !string.IsNullOrWhiteSpace(d.AcademicSubject.SubjectName))
+                .GroupBy(d => d.AcademicSubject.SubjectName.Trim(), StringComparer.OrdinalIgnoreCase);
+
+            foreach (var subjectGroup in subjectGroups)
+            {
+                var marks = subjectGroup.OrderBy(d => d.Id).ToList();
+                var latestMark = marks[marks.Count - 1];
+                session.Subjects.Add(new ResultSubjectMark
+                {
+                    SubjectName = latestMark.AcademicSubject.SubjectName,
+                    SubjectCode = latestMark.AcademicSubject.SubjectCode?.ToString(),
+                    ObtainedMarks = marks.Sum(m => m.ObtainMark),
+                    TotalMarks = marks.Sum(m => m.TotalMark),
+                    Grade = latestMark.Grade,
+                    GPA = latestMark.GPA
+                });
+            }
+
+            session.ObtainedMarks = session.Subjects.Sum(s => s.ObtainedMarks);
+            session.TotalMarks = session.Subjects.Sum(s => s.TotalMarks);
+            profileResult.Sessions.Add(session);
+        }
+
+        var subjectNames = profileResult.Sessions
+            .SelectMany(s => s.Subjects)
+            .Select(s => s.SubjectName)
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var subjectName in subjectNames)
+        {
+            var trend = new ResultSubjectTrend { SubjectName = subjectName };
+            foreach (var session in profileResult.Sessions)
+            {
+                var mark = session.Subjects.FirstOrDefault(s =>
+                    string.Equals(s.SubjectName, subjectName, StringComparison.OrdinalIgnoreCase));
+                trend.Percentages.Add(mark?.Percentage);
+                trend.Grades.Add(mark?.Grade);
+                if (string.IsNullOrWhiteSpace(trend.SubjectCode) && mark != null)
+                {
+                    trend.SubjectCode = mark.SubjectCode;
+                }
+            }
+            profileResult.SubjectTrends.Add(trend);
+        }
+
+        profileResult.SubjectTrends = profileResult.SubjectTrends
+            .OrderBy(t => t.SubjectName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         return profileResult;
     }
 
