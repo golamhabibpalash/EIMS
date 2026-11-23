@@ -25,6 +25,12 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.8.2] - 2026-11-24
+
+### Fixed
+
+- **Student Details** page showed the student photo stretched into an oval when the uploaded image was not square; it now displays as a properly proportioned circle regardless of the original photo's shape.
+
 ## [2.8.1] - 2026-11-23
 
 ### Changed
