@@ -507,8 +507,11 @@
                             var r = Model.Results ?? new SMS.Entities.AdditionalModels.StudentVM.ProfileResult();
                             var hasResult = r.CurrentExamDetails != null && r.CurrentExamDetails.Count > 0;
                             var cgpaDelta = r.CurrentCGPA - r.LastSemesterCGPA;
+                            var sessions = r.Sessions ?? new List<SMS.Entities.AdditionalModels.StudentVM.ResultSessionProgress>();
+                            var trends = r.SubjectTrends ?? new List<SMS.Entities.AdditionalModels.StudentVM.ResultSubjectTrend>();
+                            var hasHistory = sessions.Count > 0;
                         }
-                        @if (!hasResult)
+                        @if (!hasResult && !hasHistory)
                         {
                             <div class="text-center text-muted py-4">
                                 <i class="fa fa-graduation-cap fa-2x mb-2"></i>
@@ -519,13 +522,18 @@
                         else
                         {
                             <div class="p-2">
-                                <h5 class="text-primary mb-3">@r.CurrentExamName</h5>
-                                <div class="row g-2 mb-3">
-                                    <div class="col-6 col-md-3"><div class="border rounded p-2 text-center"><div class="text-muted small">CGPA</div><div class="h5 mb-0">@r.CurrentCGPA.ToString("0.00")</div></div></div>
-                                    <div class="col-6 col-md-3"><div class="border rounded p-2 text-center"><div class="text-muted small">Grade</div><div class="h5 mb-0">@r.CurrentGrade</div></div></div>
-                                    <div class="col-6 col-md-3"><div class="border rounded p-2 text-center"><div class="text-muted small">Class Rank</div><div class="h5 mb-0">@(r.CurrentClassRank > 0 ? r.CurrentClassRank.ToString() : "N/A")</div></div></div>
-                                    <div class="col-6 col-md-3"><div class="border rounded p-2 text-center"><div class="text-muted small">Obtained</div><div class="h5 mb-0">@r.CurrentObtainMarks.ToString("0.##")</div></div></div>
-                                </div>
+                                @if (hasResult)
+                                {
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                                        <h5 class="text-primary mb-0">Latest published result</h5>
+                                        <span class="badge bg-primary">@r.CurrentExamName</span>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-6 col-md-3"><div class="border rounded p-2 text-center"><div class="text-muted small">CGPA</div><div class="h5 mb-0">@r.CurrentCGPA.ToString("0.00")</div></div></div>
+                                        <div class="col-6 col-md-3"><div class="border rounded p-2 text-center"><div class="text-muted small">Grade</div><div class="h5 mb-0">@r.CurrentGrade</div></div></div>
+                                        <div class="col-6 col-md-3"><div class="border rounded p-2 text-center"><div class="text-muted small">Class Rank</div><div class="h5 mb-0">@(r.CurrentClassRank > 0 ? r.CurrentClassRank.ToString() : "N/A")</div></div></div>
+                                        <div class="col-6 col-md-3"><div class="border rounded p-2 text-center"><div class="text-muted small">Obtained</div><div class="h5 mb-0">@r.CurrentObtainMarks.ToString("0.##")</div></div></div>
+                                    </div>
                                 @if (r.LastSemesterCGPA > 0)
                                 {
                                     <p class="mb-2">Compared to the previous exam (CGPA @r.LastSemesterCGPA.ToString("0.00")):
@@ -547,32 +555,142 @@
                                 {
                                     <p class="text-danger mb-2">Failed in @r.CurrentTotalFail subject(s).</p>
                                 }
-                                <div class="card mb-3">
-                                    <div class="card-body">
-                                        <h6 class="card-title mb-2">Performance curve — subject-wise obtained marks</h6>
-                                        <canvas id="resultChart" height="110"></canvas>
-                                    </div>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-bordered align-middle">
-                                        <thead class="table-light">
-                                            <tr><th>Subject</th><th>Code</th><th class="text-end">Total</th><th class="text-end">Obtained</th><th class="text-center">Grade</th><th class="text-end">GPA</th></tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach (var s in r.CurrentExamDetails)
+                                }
+
+                                @if (hasHistory)
+                                {
+                                    <div class="card mb-3">
+                                        <div class="card-body">
+                                            <div class="d-flex flex-wrap justify-content-between align-items-center mb-2">
+                                                <h6 class="card-title mb-0">Academic session progress</h6>
+                                                <span class="text-muted small">@sessions.Count session(s) &middot; @trends.Count subject(s)</span>
+                                            </div>
+                                            <div style="position:relative;height:340px;">
+                                                <canvas id="resultProgressChart"></canvas>
+                                            </div>
+                                            @if (sessions.Count < 2)
                                             {
-                                                <tr>
-                                                    <td>@s.SubjectName</td>
-                                                    <td>@s.SubjectCode</td>
-                                                    <td class="text-end">@s.TotalMark.ToString("0.##")</td>
-                                                    <td class="text-end">@s.TotalObtainMark.ToString("0.##")</td>
-                                                    <td class="text-center">@s.Grade</td>
-                                                    <td class="text-end">@s.GPA.ToString("0.00")</td>
-                                                </tr>
+                                                <p class="text-muted small mb-0 mt-2">A trend line appears once results from more than one academic session are published.</p>
                                             }
-                                        </tbody>
-                                    </table>
-                                </div>
+                                        </div>
+                                    </div>
+
+                                    <h6 class="mb-2">Session summary</h6>
+                                    <div class="table-responsive mb-1">
+                                        <table class="table table-sm table-bordered align-middle mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Academic Session</th>
+                                                    <th>Class</th>
+                                                    <th class="text-center">Exams</th>
+                                                    <th>Latest Exam</th>
+                                                    <th class="text-end">CGPA</th>
+                                                    <th class="text-center">Grade</th>
+                                                    <th class="text-end">Rank</th>
+                                                    <th class="text-end">Marks</th>
+                                                    <th class="text-center">Fail</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var session in sessions)
+                                                {
+                                                    <tr>
+                                                        <td>@session.SessionName</td>
+                                                        <td>@(string.IsNullOrWhiteSpace(session.ClassName) ? "N/A" : session.ClassName)</td>
+                                                        <td class="text-center">@session.ExamCount</td>
+                                                        <td>@session.ExamName</td>
+                                                        <td class="text-end">@session.CGPA.ToString("0.00")</td>
+                                                        <td class="text-center">@session.Grade</td>
+                                                        <td class="text-end">@(session.Rank > 0 ? session.Rank.ToString() : "N/A")</td>
+                                                        <td class="text-end">@session.ObtainedMarks.ToString("0.##") / @session.TotalMarks.ToString("0.##")</td>
+                                                        <td class="text-center">@session.TotalFails</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p class="text-muted small mb-3">Marks are summed across all published exams in the session; CGPA, grade and rank come from the latest exam in that session.</p>
+
+                                    <h6 class="mb-2">Subject-wise progress</h6>
+                                    <div class="table-responsive mb-3">
+                                        <table class="table table-sm table-bordered align-middle mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Subject</th>
+                                                    @foreach (var session in sessions)
+                                                    {
+                                                        <th class="text-end">@session.SessionName</th>
+                                                    }
+                                                    <th class="text-end">Change</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var trend in trends)
+                                                {
+                                                    var values = trend.Percentages ?? new List<double?>();
+                                                    var scored = values.Where(v => v.HasValue).Select(v => v.Value).ToList();
+                                                    double? delta = scored.Count >= 2 ? scored[scored.Count - 1] - scored[scored.Count - 2] : (double?)null;
+                                                    <tr>
+                                                        <td>
+                                                            @trend.SubjectName
+                                                            @if (!string.IsNullOrWhiteSpace(trend.SubjectCode))
+                                                            {
+                                                                <span class="text-muted small">(@trend.SubjectCode)</span>
+                                                            }
+                                                        </td>
+                                                        @foreach (var value in values)
+                                                        {
+                                                            <td class="text-end">@(value.HasValue ? value.Value.ToString("0.0") + "%" : "—")</td>
+                                                        }
+                                                        <td class="text-end">
+                                                            @if (!delta.HasValue)
+                                                            {
+                                                                <span class="text-muted">—</span>
+                                                            }
+                                                            else if (delta.Value > 0)
+                                                            {
+                                                                <span class="text-success fw-bold">&#9650; @delta.Value.ToString("0.0")%</span>
+                                                            }
+                                                            else if (delta.Value < 0)
+                                                            {
+                                                                <span class="text-danger fw-bold">&#9660; @Math.Abs(delta.Value).ToString("0.0")%</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <span class="text-muted">0.0%</span>
+                                                            }
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+
+                                @if (hasResult)
+                                {
+                                    <h6 class="mb-2">Latest exam subjects</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered align-middle">
+                                            <thead class="table-light">
+                                                <tr><th>Subject</th><th>Code</th><th class="text-end">Total</th><th class="text-end">Obtained</th><th class="text-center">Grade</th><th class="text-end">GPA</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var s in r.CurrentExamDetails)
+                                                {
+                                                    <tr>
+                                                        <td>@s.SubjectName</td>
+                                                        <td>@s.SubjectCode</td>
+                                                        <td class="text-end">@s.TotalMark.ToString("0.##")</td>
+                                                        <td class="text-end">@s.TotalObtainMark.ToString("0.##")</td>
+                                                        <td class="text-center">@s.Grade</td>
+                                                        <td class="text-end">@s.GPA.ToString("0.00")</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
                             </div>
                         }
                     </div>
@@ -702,16 +820,59 @@
     </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // Result performance curve: subject-wise obtained marks for the current exam.
+        // Result progress: subject percentage across academic sessions.
         (function () {
-            var el = document.getElementById('resultChart');
+            var el = document.getElementById('resultProgressChart');
             if (!el || typeof Chart === 'undefined') return;
-            var labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize((Model.Results?.CurrentExamDetails ?? new System.Collections.Generic.List<SMS.Entities.AdditionalModels.StudentVM.CurrentExamDetail>()).Select(x => x.SubjectName)));
-            var marks = @Html.Raw(System.Text.Json.JsonSerializer.Serialize((Model.Results?.CurrentExamDetails ?? new System.Collections.Generic.List<SMS.Entities.AdditionalModels.StudentVM.CurrentExamDetail>()).Select(x => x.TotalObtainMark)));
+            var labels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize((Model.Results?.Sessions ?? new System.Collections.Generic.List<SMS.Entities.AdditionalModels.StudentVM.ResultSessionProgress>()).Select(s => s.SessionName)));
+            var series = @Html.Raw(System.Text.Json.JsonSerializer.Serialize((Model.Results?.SubjectTrends ?? new System.Collections.Generic.List<SMS.Entities.AdditionalModels.StudentVM.ResultSubjectTrend>()).Select(t => new { name = t.SubjectName, code = t.SubjectCode, data = t.Percentages, grades = t.Grades })));
+            if (!labels.length || !series.length) return;
+            var palette = ['#0d6efd', '#198754', '#dc3545', '#fd7e14', '#6f42c1', '#20c997', '#d63384', '#ffc107', '#0dcaf0', '#6c757d', '#84cc16', '#e83e8c'];
+            var datasets = series.map(function (s, i) {
+                var color = palette[i % palette.length];
+                return {
+                    label: s.name + (s.code ? ' (' + s.code + ')' : ''),
+                    data: s.data,
+                    borderColor: color,
+                    backgroundColor: color,
+                    fill: false,
+                    tension: 0.35,
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    spanGaps: false,
+                    _grades: s.grades
+                };
+            });
             new Chart(el, {
                 type: 'line',
-                data: { labels: labels, datasets: [{ label: 'Obtained marks', data: marks, borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.15)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#0d6efd' }] },
-                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: true } } }
+                data: { labels: labels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: { display: true, text: 'Obtained marks (%)' },
+                            ticks: { callback: function (value) { return value + '%'; } }
+                        },
+                        x: { title: { display: true, text: 'Academic session' } }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
+                        tooltip: {
+                            callbacks: {
+                                label: function (ctx) {
+                                    var value = ctx.parsed.y;
+                                    if (value === null || typeof value === 'undefined') return ctx.dataset.label + ': no result';
+                                    var grade = ctx.dataset._grades && ctx.dataset._grades[ctx.dataIndex];
+                                    return ctx.dataset.label + ': ' + value.toFixed(1) + '%' + (grade ? ' (' + grade + ')' : '');
+                                }
+                            }
+                        }
+                    }
+                }
             });
         })();
     </script>
