@@ -25,6 +25,12 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.8.1] - 2026-11-23
+
+### Changed
+
+- **Student Details → Results** tab redesigned for clarity: colour-coded grade badges, summary tiles for CGPA / grade / rank / obtained marks with the improvement indicator built in, and each section (session progress chart, session summary, subject-wise progress, latest exam subjects) now in its own card with hover-highlighted tables.
+
 ## [2.8.0] - 2026-11-23
 
 ### Added
