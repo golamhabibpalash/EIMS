@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SMS.BLL.Contracts;
 using SMS.Entities;
+using SMS_App.Utilities.Institutes;
 
 namespace SMS_App.Areas.API.Controllers;
 
@@ -61,15 +62,11 @@ public class InstituteController : ControllerBase
     /// <summary>
     /// Whether the current time falls within the institute's opening hours, or
     /// null when no hours are configured (both times default to midnight).
+    /// Uses Bangladesh time: the Linux host's own clock is UTC.
     /// </summary>
-    private static bool? IsOpenNow(Institute institute)
-    {
-        var start = institute.StartingTime.TimeOfDay;
-        var end = institute.ClosingTime.TimeOfDay;
-        if (start == TimeSpan.Zero && end == TimeSpan.Zero)
-            return null;
-
-        var now = DateTime.Now.TimeOfDay;
-        return now >= start && now <= end;
-    }
+    private static bool? IsOpenNow(Institute institute) =>
+        InstituteClock.IsOpen(
+            institute.StartingTime.TimeOfDay,
+            institute.ClosingTime.TimeOfDay,
+            InstituteClock.Now().TimeOfDay);
 }
