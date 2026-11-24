@@ -9,6 +9,7 @@ using SMS.DAL.Contracts.Reports;
 using SMS.DAL.Repositories;
 using SMS.DAL.Repositories.Reports;
 using SMS_App.Utilities.LoggerService;
+using SMS_App.Utilities.Notifications;
 using SMS_App.Utilities.ShortMessageService;
 
 namespace SMS_App.Configurations;
@@ -123,6 +124,11 @@ public static class DependencyInjectionConfiguration
         services.AddScoped<IMobileNoticeManager, MobileNoticeManager>();
         services.AddScoped<IMobileSliderRepository, MobileSliderRepository>();
         services.AddScoped<IMobileSliderManager, MobileSliderManager>();
+        services.AddScoped<IMobileDeviceTokenRepository, MobileDeviceTokenRepository>();
+        services.AddScoped<IMobileDeviceTokenManager, MobileDeviceTokenManager>();
+        services.AddHttpClient();
+        services.AddSingleton<IFirebasePushSender, FirebasePushSender>();
+        services.AddScoped<IAttendancePushNotifier, AttendancePushNotifier>();
 
         services.AddScoped<IZKTecoService, ZKTecoService>();
         services.AddScoped<IAttendanceMachineService, AttendanceMachineService>();

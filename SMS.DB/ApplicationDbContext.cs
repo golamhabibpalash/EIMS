@@ -85,6 +85,7 @@ namespace SMS.DB
         #endregion
 
         #region M
+        public DbSet<MobileDeviceToken> MobileDeviceTokens { get; set; }
         public DbSet<MobileNotice> MobileNotices { get; set; }
         public DbSet<MobileSlider> MobileSliders { get; set; }
         #endregion
@@ -225,6 +226,13 @@ namespace SMS.DB
             builder.Entity<ApplicationSettings>()
                 .HasIndex(s => new { s.ShortName })
                 .IsUnique(true);
+
+            builder.Entity<MobileDeviceToken>()
+                .HasIndex(t => t.Token)
+                .IsUnique();
+
+            builder.Entity<MobileDeviceToken>()
+                .HasIndex(t => new { t.UserId, t.IsActive });
 
             builder.Entity<GradingTableHist>()
                 .HasIndex(s => s.AcademicExamGroupId)

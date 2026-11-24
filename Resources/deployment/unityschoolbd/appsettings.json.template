@@ -30,5 +30,12 @@
     "Audience": "EIMS.Mobile",
     "AccessTokenMinutes": 60,
     "RefreshTokenDays": 30
+  },
+  "Firebase": {
+    "Enabled": false,
+    "ProjectId": "",
+    "ServiceAccountPath": "Keys/firebase-service-account.json",
+    "ServiceAccountJson": "",
+    "ServiceAccountJsonBase64": ""
   }
 }

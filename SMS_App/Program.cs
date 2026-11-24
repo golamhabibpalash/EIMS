@@ -24,6 +24,7 @@ using SMS_App.Utilities.Automation.Hangfire;
 using SMS_App.Utilities.ShortMessageService;
 using SMS_App.Utilities.AutoMapperConfiguration;
 using SMS_App.Utilities.LoggerService;
+using SMS_App.Utilities.Notifications;
 using SMS_App.ViewModels.ModuleSubModuleVM;
 using Microsoft.AspNetCore.RateLimiting;
 using SMS_App.Utilities.OnlineAdmission;
@@ -169,6 +170,7 @@ builder.Services.AddAuthentication()
 // API endpoints opt in with [Authorize(AuthenticationSchemes = "Bearer")] and
 // the global policy below also accepts it.
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<FirebasePushOptions>(builder.Configuration.GetSection("Firebase"));
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
 if (string.IsNullOrWhiteSpace(jwtSettings.Key) || Encoding.UTF8.GetByteCount(jwtSettings.Key) < 32)

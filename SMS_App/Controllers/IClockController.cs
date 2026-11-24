@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using SMS.BLL.Contracts;
+using SMS_App.Utilities.Notifications;
 using SMS_App.Utilities.ShortMessageService;
 
 namespace SMS_App.Controllers
@@ -29,15 +30,18 @@ namespace SMS_App.Controllers
     {
         private readonly IAdmsPushManager _admsPushManager;
         private readonly IAttendanceSmsNotifier _smsNotifier;
+        private readonly IAttendancePushNotifier _pushNotifier;
         private readonly ILogger<IClockController> _logger;
 
         public IClockController(
             IAdmsPushManager admsPushManager,
             IAttendanceSmsNotifier smsNotifier,
+            IAttendancePushNotifier pushNotifier,
             ILogger<IClockController> logger)
         {
             _admsPushManager = admsPushManager;
             _smsNotifier = smsNotifier;
+            _pushNotifier = pushNotifier;
             _logger = logger;
         }
 
@@ -105,6 +109,15 @@ namespace SMS_App.Controllers
                 catch (Exception smsEx)
                 {
                     _logger.LogError(smsEx, "Attendance SMS failed for ATTLOG from {Serial}", sn);
+                }
+
+                try
+                {
+                    await _pushNotifier.NotifyBatchAsync(result.SavedPunches);
+                }
+                catch (Exception pushEx)
+                {
+                    _logger.LogError(pushEx, "Attendance push failed for ATTLOG from {Serial}", sn);
                 }
 
                 // The firmware clears its buffer on OK. Report the number we

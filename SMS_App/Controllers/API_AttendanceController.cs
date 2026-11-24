@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using SMS_App.Utilities.Notifications;
 using SMS_App.Utilities.ShortMessageService;
 using SMS.BLL.Contracts;
 using SMS.Entities;
@@ -19,15 +20,18 @@ namespace SMS_App.Controllers
         private readonly IAttendanceMachineManager _attendanceMachineManager;
         private readonly IAttendanceMachineService _attendanceMachineService;
         private readonly IAttendanceSmsNotifier _attendanceSmsNotifier;
+        private readonly IAttendancePushNotifier _attendancePushNotifier;
 
         public API_AttendanceController(
             IAttendanceMachineManager attendanceMachineManager,
             IAttendanceMachineService attendanceMachineService,
-            IAttendanceSmsNotifier attendanceSmsNotifier)
+            IAttendanceSmsNotifier attendanceSmsNotifier,
+            IAttendancePushNotifier attendancePushNotifier)
         {
             _attendanceMachineManager = attendanceMachineManager;
             _attendanceMachineService = attendanceMachineService;
             _attendanceSmsNotifier = attendanceSmsNotifier;
+            _attendancePushNotifier = attendancePushNotifier;
         }
 
 
@@ -104,7 +108,11 @@ namespace SMS_App.Controllers
                     IsSynced = true
                 };
 
-                await _attendanceMachineManager.AddAsync(punch);
+                var saved = await _attendanceMachineManager.AddAsync(punch);
+                if (saved)
+                {
+                    await _attendancePushNotifier.NotifyAsync(punch);
+                }
 
                 machine.LastSyncAt = DateTime.Now;
                 await _attendanceMachineService.UpdateAsync(machine);
