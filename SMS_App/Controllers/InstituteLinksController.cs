@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -51,6 +52,7 @@ public class InstituteLinksController : Controller
             return RedirectToAction("Index", "Institutes");
         }
 
+        NormalizeUrl(model);
         if (!ModelState.IsValid)
         {
             TempData["error"] = FirstError();
@@ -62,7 +64,7 @@ public class InstituteLinksController : Controller
             InstituteId = institute.Id,
             LinkTitle = model.LinkTitle.Trim(),
             LinkType = model.LinkType,
-            Url = model.Url.Trim(),
+            Url = model.Url,
             DisplayOrder = model.DisplayOrder,
             IsActive = model.IsActive
         };
@@ -85,6 +87,7 @@ public class InstituteLinksController : Controller
             return RedirectToAction("Index", "Institutes");
         }
 
+        NormalizeUrl(model);
         if (!ModelState.IsValid)
         {
             TempData["error"] = FirstError();
@@ -93,7 +96,7 @@ public class InstituteLinksController : Controller
 
         link.LinkTitle = model.LinkTitle.Trim();
         link.LinkType = model.LinkType;
-        link.Url = model.Url.Trim();
+        link.Url = model.Url;
         link.DisplayOrder = model.DisplayOrder;
         link.IsActive = model.IsActive;
         Stamp(link, isNew: false);
@@ -157,6 +160,35 @@ public class InstituteLinksController : Controller
             return null;
         }
         return link;
+    }
+
+    /// <summary>
+    /// Cleans up the posted URL: trims it, assumes https when the user left off the scheme
+    /// (so "example.com/page" is accepted), and adds a model error if the result still isn't an
+    /// absolute http/https address — which rejects unsafe schemes such as javascript: or data:.
+    /// Empty is left alone for the [Required] check to report.
+    /// </summary>
+    private void NormalizeUrl(InstituteLinkFormVM model)
+    {
+        var url = (model.Url ?? string.Empty).Trim();
+        if (url.Length == 0)
+        {
+            model.Url = url;
+            return;
+        }
+
+        if (!Regex.IsMatch(url, @"^[a-zA-Z][a-zA-Z0-9+.\-]*:"))
+        {
+            url = "https://" + url;
+        }
+        model.Url = url;
+
+        var ok = Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+        if (!ok)
+        {
+            ModelState.AddModelError(nameof(model.Url), "Enter a valid web address, e.g. https://example.com.");
+        }
     }
 
     private void Stamp(InstituteLink link, bool isNew)

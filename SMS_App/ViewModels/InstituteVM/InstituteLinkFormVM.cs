@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using SMS.Entities.AdditionalModels;
 using SMS.Entities.Enums;
 
 namespace SMS_App.ViewModels.InstituteVM;
@@ -22,9 +21,10 @@ public class InstituteLinkFormVM
     [Display(Name = "Link Type")]
     public InstituteLinkType LinkType { get; set; } = InstituteLinkType.Website;
 
+    // The scheme (http/https) is normalised and validated server-side in InstituteLinksController
+    // so users can type "example.com"; validating it here would reject that before we can fix it up.
     [Required(ErrorMessage = "Please enter the URL.")]
     [StringLength(2048)]
-    [AbsoluteHttpUrl]
     [Display(Name = "URL")]
     public string Url { get; set; }
 
