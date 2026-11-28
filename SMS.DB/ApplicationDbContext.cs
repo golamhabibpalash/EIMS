@@ -78,6 +78,7 @@ namespace SMS.DB
 
         #region I
         public DbSet<Institute> Institute { get; set; }
+        public DbSet<InstituteLink> InstituteLinks { get; set; }
         #endregion
 
         #region L
@@ -245,6 +246,15 @@ namespace SMS.DB
             builder.Entity<ParamBusConfig>()
                 .HasIndex(s => s.ConfigName)
                 .IsUnique();
+
+            // Institute links: cascade-delete with the parent institute; the common lookup is
+            // "this institute's links, in display order", so index the FK.
+            builder.Entity<InstituteLink>()
+                .HasOne(l => l.Institute).WithMany().HasForeignKey(l => l.InstituteId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.Entity<InstituteLink>()
+                .HasIndex(l => new { l.InstituteId, l.DisplayOrder });
 
             // Certificates must survive a student delete (official records), so restrict the FK.
             builder.Entity<StudentCertificate>()

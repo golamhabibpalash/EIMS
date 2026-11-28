@@ -21,7 +21,7 @@
 		     corrupts the trailing timestamp field BuildInfo.cs parses. -->
 		<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 
-		<VersionPrefix>2.8.2</VersionPrefix>
+		<VersionPrefix>2.9.0</VersionPrefix>
 
 		<BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
 		<GitCommit Condition="'$(GitCommit)' == ''">local</GitCommit>

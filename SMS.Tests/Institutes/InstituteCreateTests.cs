@@ -96,7 +96,7 @@ namespace SMS.Tests.Institutes
                 User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(ClaimTypes.Name, "admin") }, "test"))
             };
             http.Features.Set<ISessionFeature>(new SessionFeature());
-            var controller = new InstitutesController(institutes, null, NullLogger<InstitutesController>.Instance,
+            var controller = new InstitutesController(institutes, null, null, NullLogger<InstitutesController>.Instance,
                 new FakeStorage(_root), mapper)
             {
                 ControllerContext = new ControllerContext { HttpContext = http },

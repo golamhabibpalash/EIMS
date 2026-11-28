@@ -25,6 +25,17 @@ longer goes wrong, naming the screen. Rules the dialog relies on:
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-11-28
+
+### Added
+
+- **Institute profile** page now has a **Links & Social Media** section where you can add,
+  edit, enable/disable and delete any number of the institute's web links — official website,
+  Facebook, YouTube, Instagram, LinkedIn and others — including several of the same kind. Each
+  link has a title, type, address, display order and an active/inactive switch, and only
+  http/https addresses are accepted. These links are also available to the mobile app.
+  (Requires the `InstituteLinks` database script for this instance to be run before deploying.)
+
 ## [2.8.2] - 2026-11-24
 
 ### Fixed

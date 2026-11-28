@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -23,10 +24,12 @@ namespace SMS_App.Areas.API.Controllers;
 public class InstituteController : ControllerBase
 {
     private readonly IInstituteManager _instituteManager;
+    private readonly IInstituteLinkManager _linkManager;
 
-    public InstituteController(IInstituteManager instituteManager)
+    public InstituteController(IInstituteManager instituteManager, IInstituteLinkManager linkManager)
     {
         _instituteManager = instituteManager;
+        _linkManager = linkManager;
     }
 
     /// <summary>
@@ -57,6 +60,33 @@ public class InstituteController : ControllerBase
                 : $"/Images/Institute/{institute.Logo}",
             isOpen = IsOpenNow(institute),
         });
+    }
+
+    /// <summary>
+    /// The institute's published external links (website, social media, other resources) for the
+    /// mobile app. Anonymous and active-only, like <see cref="Profile"/> — these are public
+    /// branding the app can show before sign-in. Ordered by DisplayOrder then title.
+    /// </summary>
+    [HttpGet("links")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Links()
+    {
+        var institute = await _instituteManager.GetFirstOrDefaultAsync();
+        if (institute == null)
+            return NotFound(new { message = "Institute is not configured." });
+
+        var links = await _linkManager.GetActiveByInstituteIdAsync(institute.Id);
+
+        return Ok(links.Select(l => new
+        {
+            id = l.Id,
+            instituteId = l.InstituteId,
+            title = l.LinkTitle,
+            type = l.LinkType.ToString(),
+            url = l.Url,
+            displayOrder = l.DisplayOrder,
+            isActive = l.IsActive,
+        }));
     }
 
     /// <summary>

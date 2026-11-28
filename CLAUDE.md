@@ -117,6 +117,14 @@ In-app notifications are split deliberately across layers because Identity and t
 - `INotificationService` is registered in `DependencyInjectionConfiguration.cs` alongside the manager/repository, not in `Program.cs`.
 - **Naming trap**: `SMS.Entities/StudentHub.cs` is a domain entity (student enrollment), unrelated to SignalR.
 
+### Mobile Push Notifications (Firebase / FCM)
+SignalR covers the web; the Flutter app is reached via Firebase Cloud Messaging. All pieces live in `SMS_App/Utilities/Notifications/`:
+- `FirebasePushSender` (singleton, `IFirebasePushSender`) calls the FCM HTTP v1 API, minting an OAuth token from a Google service account (JWT → `oauth2.googleapis.com`, cached ~55 min). Configured from the `Firebase` section (`Enabled`, `ProjectId`, and the service account via `ServiceAccountJson` / `ServiceAccountJsonBase64` / `ServiceAccountPath`, or the `GOOGLE_APPLICATION_CREDENTIALS` env var). **Disabled by default** — there is no `Firebase` section in `appsettings.json`, so `IsConfigured` is false and sends no-op until an instance opts in (like the connection string / JWT key, this is per-instance secret config).
+- `AttendancePushNotifier` (`IAttendancePushNotifier`) is the one caller today: `IClockController` invokes `NotifyBatchAsync(result.SavedPunches)` best-effort after saving ZKTeco punches, alongside `AttendanceSmsNotifier`. It pushes **only the student's first punch of the current day**, and only within the institute's open window (`StartingTime`−1h .. `ClosingTime`+1h). Batches over 10 punches are skipped as offline replay, not live traffic.
+- Same **persist-first, push best-effort** rule as SignalR: it writes a `UserNotification` row via `UserNotificationManager`, *then* pushes to every active device token. FCM `404 NOT_FOUND` on a token auto-unregisters it.
+- `PushSendGate.TryClaim(studentId, date, tenantKey)` is an in-process, tenant-scoped, 5-minute dedupe so concurrent punches don't double-notify. It's per-process state, not shared across instances.
+- Device tokens live in the `MobileDeviceTokens` table (`IMobileDeviceTokenManager`; schema scripts `Resources/sql/MobileDeviceTokens_{SqlServer,PostgreSQL}.sql`). The app registers/unregisters them via `Areas/API/Controllers/DevicesController.cs` (`/API/Devices/register` requires bearer; `/unregister` is `[AllowAnonymous]` so a logged-out app can still detach).
+
 ### Online Admission
 - Public pages `AdmissionController` (`/Admission`), guardian portal `AdmissionPortalController`, staff `AdmissionSetup` / `AdmissionApplications` / `AdmissionPayments`. Business rules live in `SMS.BLL/Managers/OnlineAdmission/` (`AdmissionRules` holds the pure ones).
 - Guardians are **not** Identity users: `AdmissionGuardianAccount` + its own cookie scheme (`GuardianPortalAuth`). Portal controllers derive from `GuardianPortalControllerBase` (`[AllowAnonymous]` + its own guardian check); mark open actions `[GuardianAnonymous]`.
@@ -169,6 +177,9 @@ web app (default scheme stays the cookie). Key pieces:
 - `Areas/API/Controllers/InstituteController.cs` (`/API/Institute/profile`) — `[AllowAnonymous]`
   deployment branding (name, logo, open-now) the app reads before login; `logo` is a path relative
   to the instance root, null when none is uploaded.
+- `Areas/API/Controllers/DevicesController.cs` (`/API/Devices/register|unregister`) — stores the
+  app's FCM device token for push (see **Mobile Push Notifications** above); `register` is bearer,
+  `unregister` is `[AllowAnonymous]`.
 - `Areas/API/Controllers/AccountsController.cs` is still the empty scaffold (returns placeholder
   strings); it is not wired to anything. Ignore it — real auth is `AuthController`.
 - `Jwt` config lives in `appsettings.json` (`Key` ≥ 32 chars, set per instance like the connection

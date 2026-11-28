@@ -21,6 +21,7 @@ namespace SMS_App.Controllers;
 public class InstitutesController : Controller
 {
     private readonly IInstituteManager _instituteManager;
+    private readonly IInstituteLinkManager _linkManager;
     private readonly IWebHostEnvironment _host;
     private readonly ILogger<InstitutesController> _logger;
 
@@ -31,13 +32,14 @@ public class InstitutesController : Controller
     private readonly SMS_App.MultiTenancy.ITenantFileStorage _tenantFiles;
     private readonly IMapper _mapper;
 
-    public InstitutesController(IInstituteManager instituteManager, IWebHostEnvironment host, ILogger<InstitutesController> logger,
-        SMS_App.MultiTenancy.ITenantFileStorage tenantFiles, IMapper mapper)
+    public InstitutesController(IInstituteManager instituteManager, IInstituteLinkManager linkManager, IWebHostEnvironment host,
+        ILogger<InstitutesController> logger, SMS_App.MultiTenancy.ITenantFileStorage tenantFiles, IMapper mapper)
     {
         _tenantFiles = tenantFiles;
         _mapper = mapper;
         _logger = logger;
         _instituteManager = instituteManager;
+        _linkManager = linkManager;
         _host = host;
     }
 
@@ -50,9 +52,10 @@ public class InstitutesController : Controller
             var instituteInfo = result.FirstOrDefault();
             if (instituteInfo != null)
             {
+                ViewBag.InstituteLinks = await _linkManager.GetByInstituteIdAsync(instituteInfo.Id);
                 return View(instituteInfo);
             }
-        }            
+        }
         return RedirectToAction("Create");
     }
 

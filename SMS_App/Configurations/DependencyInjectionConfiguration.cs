@@ -126,6 +126,9 @@ public static class DependencyInjectionConfiguration
         services.AddScoped<IMobileSliderManager, MobileSliderManager>();
         services.AddScoped<IMobileDeviceTokenRepository, MobileDeviceTokenRepository>();
         services.AddScoped<IMobileDeviceTokenManager, MobileDeviceTokenManager>();
+
+        services.AddScoped<IInstituteLinkRepository, InstituteLinkRepository>();
+        services.AddScoped<IInstituteLinkManager, InstituteLinkManager>();
         services.AddHttpClient();
         services.AddSingleton<IFirebasePushSender, FirebasePushSender>();
         services.AddScoped<IAttendancePushNotifier, AttendancePushNotifier>();
